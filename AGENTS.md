@@ -321,7 +321,7 @@ checks do not make the Blueprint unusable.
 
 ## Commands
 
-- Runtime for development: Node.js 22 or newer.
+- Runtime for development: Node.js 22.15 or newer.
 - Package manager: npm; use the committed `package-lock.json`.
 - Install: `npm ci`.
 - Development watcher: `npm run dev` (rebuilds `main.js`; no web server).
@@ -329,9 +329,10 @@ checks do not make the Blueprint unusable.
 - Build: `npm run build`.
 - Test: `npm test` (Node's built-in test runner with TypeScript type stripping).
 - Verify: `npm run verify` (typecheck, tests, then production build).
-- Run the plugin: copy `main.js` and `manifest.json` into a separate test vault's
-  `.obsidian/plugins/thread/` directory and enable Thread in Obsidian. Include
-  `styles.css` when the app starts using it.
+- Package: `npm run package` (Verify, then reproducible three-file ZIP in `dist/`).
+- Run the plugin: extract `dist/thread-0.1.0.zip` into a separate test vault's
+  `.obsidian/plugins/` directory and enable Thread in Obsidian. See README.md for
+  local model setup and explicit read grants. All three package files are required.
 
 No lint, format, browser-test, or CI command is configured yet.
 Focused logic tests are configured and are a gate for logic-bearing changes.

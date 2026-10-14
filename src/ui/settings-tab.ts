@@ -8,6 +8,7 @@ interface ConnectionState { controller: AbortController | null; }
 
 function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement, connection: ConnectionState): void {
   containerEl.empty();
+  containerEl.addClass("thread-settings");
   containerEl.createEl("h2", { text: "Thread" });
   containerEl.createEl("p", { text: "Choose a project and a downloaded local model. Thread checks that Ollama cloud features are disabled before inference." });
   let endpoint = plugin.settings.endpoint;
@@ -19,8 +20,8 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   const roles: FolderRoles = {...plugin.settings.roles};
   new Setting(containerEl).setName("Local Ollama endpoint").setDesc("HTTP loopback only. Default: http://127.0.0.1:11434.")
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Local Ollama endpoint"); text.setValue(endpoint).onChange((value) => { endpoint = value; }); });
-  new Setting(containerEl).setName("Downloaded model").setDesc("Use the exact model name from ollama list, such as qwen3:4b.")
-    .addText((text) => { text.inputEl.setAttribute("aria-label", "Downloaded model"); text.setValue(model).setPlaceholder("qwen3:4b").onChange((value) => { model = value; }); });
+  new Setting(containerEl).setName("Downloaded model").setDesc("Use the exact model name from ollama list. Tested: qwen3:4b-instruct.")
+    .addText((text) => { text.inputEl.setAttribute("aria-label", "Downloaded model"); text.setValue(model).setPlaceholder("qwen3:4b-instruct").onChange((value) => { model = value; }); });
   new Setting(containerEl).setName("Project folder").setDesc("Selecting and saving explicitly allows Thread to read Markdown and text in this folder.")
     .addDropdown((dropdown) => {
       dropdown.addOption("", "Choose a folder");
@@ -64,6 +65,13 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     }
   }));
   new Setting(containerEl).setName("Starter project").addButton(b=>b.setButtonText("Preview a new workspace").onClick(()=>plugin.openWorkspace()));
+  new Setting(containerEl).setName("Derived text index").setDesc("Rebuild from currently allowed notes. Notes, settings, import history, rename metadata and change backups are preserved.")
+    .addButton(b=>b.setButtonText("Rebuild text index").onClick(async()=>{
+      b.setDisabled(true);feedback.setText("Rebuilding the allowed text index...");
+      try{await plugin.resetTextIndex();feedback.setText("Text index rebuilt. Notes and durable history were preserved.");}
+      catch(e){feedback.setText(e instanceof Error?e.message:"Could not rebuild the text index. Check vault write access.");}
+      finally{b.setDisabled(false);}
+    }));
   containerEl.createEl("p", { text: "If cloud status is unavailable, update Ollama. Start it with OLLAMA_NO_CLOUD=1; Thread does not download models or change services." });
 }
 

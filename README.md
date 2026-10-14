@@ -1,55 +1,191 @@
 # Thread
 
-Thread is a planned desktop Obsidian plugin that helps you resume projects,
-understand past decisions, and connect research using a local AI model.
+Thread is a desktop Obsidian plugin for returning to projects, finding evidence,
+recording decisions and turning research into reviewed Markdown knowledge. A
+local Ollama model supplies suggestions; your notes remain authoritative. No
+account, API key, backend or paid model service is required.
 
-Development follows the AI Blueprint build plan. The first implemented slice
-provides a local, sourced project briefing inside Obsidian.
+This is a **private local 0.1.0 build**, not a published Community plugin. It is
+tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
+`qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
+use. Windows, macOS, other models and later versions need their own validation.
 
-## Development
+## Build and install
 
-Requires Node.js 22 or newer and npm.
+Development needs Node.js **22.15 or newer** and npm. Node is not needed to run
+the packaged plugin. From this repository:
 
 ```bash
 npm ci
-npm run verify
-npm run dev
+npm run package
 ```
 
-`verify` runs TypeScript checking, focused logic tests, and a production bundle. `dev` watches the
-plugin source and rebuilds `main.js`.
+`package` runs the same typecheck, tests and production build as `npm run verify`,
+then creates `dist/thread-0.1.0.zip` and `dist/thread/`. The ZIP contains exactly
+`thread/main.js`, `thread/manifest.json` and `thread/styles.css`. No vault, model,
+settings or recovery data is included. Repeated builds of the same source and
+locked tools produce the same package bytes.
 
-## Planning
+Start with a separate test vault. Extract the `thread` directory from the ZIP
+into `<vault>/.obsidian/plugins/`, so `main.js` is directly inside
+`<vault>/.obsidian/plugins/thread/`. If you use a custom Obsidian configuration
+folder, substitute it for `.obsidian`. In Obsidian, open **Settings > Community
+plugins**, allow Community plugins, reload Obsidian and enable **Thread**.
+[Obsidian's plugin settings guide](https://obsidian.md/help/community-plugins)
+explains where to find the plugins folder. Thread is not in the Browse directory.
 
-- `blueprint/project-plan.md`: product direction, architecture, UX, and costs.
-- `blueprint/build-plan.md`: ordered features and release milestones.
+For an update, disable Thread, preserve its existing `data.json`, `changes.json`,
+`imports.json` and `renames.json`, replace only the three package files and enable
+it again. Keep an independent vault backup; the bounded change journal is not a
+complete backup system.
 
-## Obsidian smoke test
+## Set up the local model
 
-Use a separate test vault. After `npm run build`, copy `main.js` and
-`manifest.json`, and `styles.css` into `<test-vault>/.obsidian/plugins/thread/`.
-Enable Thread in Obsidian's Community plugins settings. Keep personal notes
-outside this source repository.
+Install [Ollama](https://ollama.com/download) separately. Thread never installs a
+server or downloads models. After starting the server with cloud features
+**disabled**, download the model while internet is available:
 
-## Resume a project
+```bash
+# Linux foreground server, in one terminal:
+OLLAMA_NO_CLOUD=1 ollama serve
 
-1. Install Ollama separately and download a local text model.
-2. Start Ollama with cloud features disabled, for example `OLLAMA_NO_CLOUD=1 ollama serve`
-   on Linux. Restart an already running service after applying the
-   setting. Thread requires the `/api/status` API to confirm local-only mode.
-3. Open **Thread: Open Thread** from Obsidian's command palette.
-4. Choose **Settings**, set the local endpoint and exact model name, select your
-   project folder, and add exclusions. Save and test the connection.
-5. Choose **Resume project**. Follow source buttons to the supporting notes.
+# In another terminal, using that server:
+ollama pull qwen3:4b-instruct
+ollama list
+```
 
-The briefing separates facts, interpretations, and suggestions. Cancellation,
-missing evidence, model errors, and source changes are visible. This initial
-slice does not write notes; later features add reviewed saving and editing.
+If Ollama is already running as an app or service, configure that instance and
+restart it first. Starting a second server on an occupied port will fail. Follow
+[Ollama's environment and cloud-disable instructions](https://docs.ollama.com/faq#how-do-i-disable-ollamas-cloud-features)
+for your installation. Keep it bound to loopback. Thread accepts only literal
+loopback HTTP endpoints such as `http://127.0.0.1:11434`; it refuses remote hosts,
+redirects, cloud models and a server that cannot confirm cloud is disabled.
 
-The Linux test setup uses Obsidian 1.14.4, Ollama 0.40.4, and qwen3:4b. On the
-available RTX 5070 laptop GPU, the first synthetic-project briefing took about
-38 seconds including model loading. This is a test observation, not a speed or
-quality guarantee for other hardware or vaults.
+The tested [Qwen3 4B instruct model](https://ollama.com/library/qwen3:4b-instruct)
+is about 2.5 GB to download. Use this exact **instruct** tag as the starting point;
+the generic `qwen3:4b` tag was less reliable in our structured-output trials.
+Leave space for Ollama, Obsidian, model working memory and your vault. Smaller or
+other local text-completion models are configurable but are not validated here.
+After installation/download, inference works offline while the local server runs.
 
-Obsidian and Ollama are runtime prerequisites for the planned local experience.
-Codex and Claude Code are development assistants, not runtime requirements.
+## Choose folders and start
+
+Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
+**Settings** in the Thread panel.
+
+1. Set the endpoint and exact downloaded model name. Choose **Test local
+   connection**; expect confirmation that the model is available and cloud is
+   disabled.
+2. Select one project folder. Saving explicitly grants read access to that folder.
+   Add other folders or notes under **Allowed read paths**, one vault-relative
+   path per line. Add **Excluded paths** before generation. Exclusions win.
+3. Map Projects, Inbox, Sources, Knowledge, Reviews and Templates to your existing
+   folders. Mapping a destination does not grant model read access. Knowledge
+   edits and refresh saves also need their destination inside allowed paths.
+4. Save settings, close the dialog and choose **Resume project**.
+
+First-use read scope is empty. Thread reads only permitted `.md` and `.txt` files.
+Hidden configuration folders are excluded. Project evidence uses containment,
+project IDs and explicit links, always within read scope. **All allowed paths**
+is an explicit wider scope, not permission to read the entire vault. Legacy notes
+need no migration. **Preview a new workspace** optionally creates UUID-tagged
+starter notes/templates without overwriting existing files.
+
+## Use Thread
+
+- **Resume project:** six sourced sections show objective, last recorded activity,
+  decisions, open questions, new evidence and suggested next actions. Follow
+  source buttons to inspect the current note. The briefing itself stays in the
+  panel. **Cancel** stops generation.
+- **Find evidence / Ask:** local text/link matching retrieves eligible passages.
+  Ask defaults to the selected project; wider scope is explicit. Questions
+  without matching evidence report a gap. Preview a supported answer and choose
+  **Save previewed note** to create a new Markdown answer.
+- **Decisions / Review decisions:** record your choice, rationale, alternatives
+  and revisit conditions. Acceptance is explicit. Review evidence to retain,
+  annotate or supersede a decision; inspect the proposed changes before Apply.
+  Superseding preserves the old record and links a new accepted choice.
+- **Capture:** type a thought into Inbox or import UTF-8 `.md`/`.txt` up to 2 MB
+  into Sources. Imported original text and provenance are preserved. Identical
+  imports are detected. Project suggestions require your selection; no URL is
+  fetched.
+- **Knowledge:** choose up to five sources and generate a concept/comparison or
+  append a synthesis to existing knowledge. **Changes** shows exact before/after
+  contents. Apply only after reading them. Raw source and Inbox notes cannot be
+  AI update targets.
+- **Wrap up / Weekly review:** create a session note or an on-demand seven-day
+  local-calendar review. Inspect and explicitly save the new note. Your reported
+  progress is labeled; interpretations and suggested actions remain distinct.
+  Weekly reviews use current note contents and dates, not reconstructed history.
+- **Source freshness:** inspect changed, renamed, missing or ambiguous support.
+  Select current replacement sources and a new version name, generate, review and
+  apply a new review note. The prior output stays unchanged. Stale derived output
+  is omitted from AI recall; only the latest delimited synthesis is reused.
+
+New-note previews never overwrite. Existing-note updates preserve all originals
+before their first write and refuse conflicts. Model text is untrusted: it cannot
+run tools, change access or accept a decision for you. Valid citation IDs identify
+passages; they do not establish that every claim follows from them.
+
+## Recovery, index rebuild and local data
+
+Thread stores local state in `<vault>/.obsidian/plugins/thread/`:
+
+| File | Purpose |
+| --- | --- |
+| `data.json` | Folder grants, mappings, selected project and local model settings. |
+| `index.json` | Rebuildable allowed text/link cache; may contain eligible note excerpts. |
+| `imports.json` | Import hashes and saved paths for duplicate detection. |
+| `renames.json` | Bounded observed allowed-path rename metadata. |
+| `changes.json` | Pending proposals, originals, recovery records and last 20 applied batches. |
+
+**Settings > Rebuild text index** replaces only the derived index from current
+allowed files. It preserves notes and the other files above. It is also available
+through **Find evidence**. A missing/corrupt cache can be rebuilt; the journal
+must be preserved. Changes/settings invalidate in-flight outputs. Wait for indexing
+and refresh the relevant dialog before reviewing again.
+
+After a partial failure, open **Changes**, inspect **Recovery required**, then
+choose **Recover previewed batch**. Thread attempts to restore the prior stable
+state while preserving unrelated later edits. If a conflict remains, compare the
+exact named paths and the durable originals in `changes.json` manually. Copy the
+journal before manual repair. Do not delete it to dismiss recovery. Cached
+previews with changed/unavailable source snapshots are hidden; original validated
+batch snapshots support undo, but unknown historical dependencies may require
+manual recovery. No journal is automatically purged on exclusion.
+
+**Preview undo > Undo previewed batch** works only while affected notes still
+match the applied contents. A created note moves to Obsidian's local trash only
+if unchanged. Later edits cause refusal. Multi-file filesystem updates are not
+atomic; the last-20-batch history does not promise permanent versioning.
+
+If model setup fails, check server availability, exact model name, cloud-disabled
+status and available memory. Update Ollama if `/api/status` is unavailable. The
+request timeout is configurable from 1-600 seconds. Unchanged legacy renames need
+to have been observed within allowed scope; duplicate IDs or unresolved provenance
+require explicit source selection. Whole-note hashes conservatively flag even
+unrelated edits. Rebuild does not restore deleted original sources.
+
+## Cost, limits and development
+
+There is **no mandatory API, hosting, account, subscription or sync charge** for
+this runtime on suitable existing hardware. Downloads need an internet connection;
+storage, RAM/VRAM, electricity and any hardware upgrades remain real costs.
+[Optional Obsidian services](https://obsidian.md/pricing) and development assistants such as Codex or Claude Code
+are separate. They are not required to use Thread. This private source currently
+uses `UNLICENSED`; no public distribution license is asserted. Obsidian, Ollama
+and model weights retain their own licenses/terms and are not bundled.
+
+This release has bounded text context and local keyword/link retrieval. It does
+not include embeddings, PDF/OCR, audio, web fetching, mobile inference, cloud
+fallback, autonomous background edits, scheduling, collaboration or cross-device
+sync. Small-model trials sometimes omitted objectives or put facts in the wrong briefing section. A blank section does not prove the notes lack that information. Model quality and speed vary; review important claims yourself. Testing
+covers a small synthetic vault, not production-scale vault performance or other
+operating systems. Generated Markdown remains readable when Thread is disabled.
+
+Developer commands: `npm run dev` watches/rebuilds `main.js`; `npm run typecheck`,
+`npm test`, `npm run build`, `npm run verify` and `npm run package` run locally.
+Tests use Node's built-in runner. No CI or publishing workflow is configured.
+Product direction, ordered implementation and per-feature verification/try guides
+live in `blueprint/project-plan.md`, `blueprint/build-plan.md` and
+`blueprint/history/features/`.

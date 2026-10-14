@@ -30,7 +30,7 @@ Keep these IDs stable; all features are initially unimplemented.
 
 ## Milestone E - Finish the local release
 
-- [ ] 12. **Offline release readiness** - Package the desktop plugin and demonstrate install, model setup, the core workflow, recovery, keyboard/theme usability, and offline inference in a synthetic Obsidian vault with accurate user instructions.
+- [x] 12. **Offline release readiness** - Package the desktop plugin and demonstrate install, model setup, the core workflow, recovery, keyboard/theme usability, and offline inference in a synthetic Obsidian vault with accurate user instructions.
 
 ## Build discipline
 

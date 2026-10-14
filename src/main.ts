@@ -210,6 +210,13 @@ export default class ThreadPlugin extends Plugin {
 
   private indexPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/index.json`;}
 
+  async resetTextIndex():Promise<void>{
+    this.scheduleIndex();
+    for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Text index rebuilding. Refresh this action afterward.");
+    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Text index rebuilding. Generate a fresh briefing afterward.");
+    await this.rebuildIndex();
+  }
+
   async rebuildIndex(): Promise<void> {
     if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
     this.indexController?.abort();const controller=new AbortController();this.indexController=controller;

@@ -8,7 +8,7 @@ export class ThreadModal extends Modal {
   epoch=0;
   status: HTMLElement | null=null;
   resultEl: HTMLElement | null=null;
-  constructor(plugin: ThreadPlugin) {super(plugin.app);this.plugin=plugin;}
+  constructor(plugin: ThreadPlugin) {super(plugin.app);this.plugin=plugin;this.contentEl.addClass("thread-modal");}
   invalidate(message="Notes or settings changed. Run this action again."): void {
     this.epoch++;
     this.controller?.abort();this.controller=null;this.resultEl?.empty();this.status?.setText(message);

@@ -1,8 +1,8 @@
 {
   "id": "thread",
   "name": "Thread",
-  "version": "0.0.1",
-  "minAppVersion": "1.8.0",
+  "version": "0.1.0",
+  "minAppVersion": "1.14.4",
   "description": "Resume projects, trace decisions, and connect research in your Obsidian vault.",
   "author": "Thread contributors",
   "isDesktopOnly": true
