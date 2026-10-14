@@ -35,7 +35,7 @@ export class SessionModal extends ThreadModal {
         const content=sessionMarkdown(approved.report,result,bundle,settings.model,project);this.resultEl!.createEl("pre",{text:content,cls:"thread-preview"});
         for(const s of bundle.sources)this.resultEl!.createEl("button",{text:`${s.id}: ${s.path} › ${s.heading}`}).onclick=()=>{void this.plugin.openIndexedSource(s.path,bundle.noteHashes[s.path]!,s.heading,current).catch(e=>this.status?.setText(String(e)));};
         this.previewButton!.disabled=false;this.previewButton!.onclick=()=>{
-          if(!current())return;const preview=new NewNoteModal(this.plugin,{path:target,content},async()=>current()&&await this.plugin.evidenceCurrent(bundle,settings));this.plugin.modals.add(preview);preview.open();
+          if(!current())return;const preview=new NewNoteModal(this.plugin,{path:target,content},()=>this.plugin.evidenceCurrent(bundle,settings));this.plugin.modals.add(preview);preview.open();
         };
         this.status?.setText("Review the user report, recorded context, questions and suggested next step. Nothing is saved until you approve the note preview.");
       }catch(e){if(current())this.status?.setText(e instanceof Error?e.message:"Wrap-up failed.");}

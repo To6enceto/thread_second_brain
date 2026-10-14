@@ -25,7 +25,7 @@ Keep these IDs stable; all features are initially unimplemented.
 ## Milestone D - Maintain continuity over time
 
 - [x] 9. **Session wrap-up** - Generate and save a reviewed project-session note with progress, open questions, and a suggested next step that informs the next Resume briefing.
-- [ ] 10. **Weekly project review** - Generate an on-demand, sourced review of project activity, resolved questions, new evidence, and projects to revisit, with an explicit save action.
+- [x] 10. **Weekly project review** - Generate an on-demand, sourced review of project activity, resolved questions, new evidence, and projects to revisit, with an explicit save action.
 - [ ] 11. **Source freshness** - Mark generated outputs when supporting passages change or disappear, follow renamed notes, and regenerate through reviewed changes while preserving prior output.
 
 ## Milestone E - Finish the local release

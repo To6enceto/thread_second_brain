@@ -10,6 +10,7 @@ import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
 import { ChangeManager } from "./vault/changes.ts";
 import { ChangeReviewModal } from "./ui/change-review-modal.ts";
+import { WeeklyModal } from "./ui/weekly-modal.ts";
 import { SessionModal } from "./ui/session-modal.ts";
 import { KnowledgeModal } from "./ui/knowledge-modal.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
@@ -60,6 +61,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
+    this.addCommand({id:"weekly-review",name:"Weekly project review",callback:()=>this.openWeekly()});
     this.addCommand({id:"session-wrap-up",name:"Session wrap-up",callback:()=>this.openSession()});
     this.addCommand({id:"knowledge-updates",name:"Knowledge updates",callback:()=>this.openKnowledge()});
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -88,6 +90,7 @@ export default class ThreadPlugin extends Plugin {
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
   openDecisionReview():void{const modal=new DecisionReviewModal(this);this.modals.add(modal);modal.open();}
+  openWeekly():void{const modal=new WeeklyModal(this);this.modals.add(modal);modal.open();}
   openSession():void{const modal=new SessionModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}
   async readReviewedTarget(path:string):Promise<string|null>{return this.readChangeText(path);}
