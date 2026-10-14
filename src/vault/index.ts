@@ -7,6 +7,13 @@ export interface IndexEntry {
   links: string[]; truncated: boolean;
 }
 export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; }
+export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean): string {
+  if(!ready)throw new Error("Project evidence is still loading. Refresh and preview again.");
+  if(!project)throw new Error("Select a project in Settings first.");
+  const ids=new Set(entries.filter(e=>e.path.slice(0,e.path.lastIndexOf("/"))===project&&e.metadata.type==="project"&&e.id?.trim()).map(e=>e.id!));
+  if(ids.size>1)throw new Error("This folder contains multiple project IDs. Select a specific project folder or resolve its project metadata first.");
+  return [...ids][0]??project;
+}
 export function linkTargets(text: string): string[] {
   return [...new Set([...text.matchAll(/\[\[([^\]|#]+)(?:[^\]]*)\]\]|\[[^\]]*\]\(([^\s)]+)\)/g)]
     .map(match=>(match[1]??match[2]??"").trim()).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
@@ -33,13 +40,16 @@ export class LocalIndex {
   ready=false;
   revision=0;
   clear(): void {this.entries=[];this.ready=false;this.revision++;}
-  recall(query: string, scope: ReadScope, project: string | null, limit=20): RecallHit[] {
-    const terms=queryTerms(query);if(!terms.length)return [];
+  projectEntries(scope:ReadScope,project:string|null): IndexEntry[] {
     const eligible=this.entries.filter(e=>readableText(e.path,scope));
     const contained=project?eligible.filter(e=>isWithin(e.path,project)):eligible;
     const ids=new Set(contained.filter(e=>e.metadata.type==="project").map(e=>e.id).filter(Boolean));
     const linked=new Set(contained.flatMap(e=>e.links));
-    const candidates=project?eligible.filter(e=>isWithin(e.path,project)||linked.has(e.path)||ids.has(String(e.metadata.project))):eligible;
+    return project?eligible.filter(e=>isWithin(e.path,project)||linked.has(e.path)||(typeof e.metadata.project==="string"&&ids.has(e.metadata.project))):eligible;
+  }
+  recall(query: string, scope: ReadScope, project: string | null, limit=20): RecallHit[] {
+    const terms=queryTerms(query);if(!terms.length)return [];
+    const candidates=this.projectEntries(scope,project);
     const hits=candidates.flatMap(entry=>entry.chunks.flatMap(chunk=>{
       const body=chunk.excerpt.toLocaleLowerCase();const heading=chunk.heading.toLocaleLowerCase();const title=entry.title.toLocaleLowerCase();
       const matched=terms.filter(t=>body.includes(t)||heading.includes(t)||title.includes(t));

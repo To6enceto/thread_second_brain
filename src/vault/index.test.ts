@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {LocalIndex,indexNote,hitsToNotes,linkTargets} from "./index.ts";
+import {LocalIndex,indexNote,hitsToNotes,linkTargets,identityFromIndex} from "./index.ts";
 import {buildEvidence} from "./evidence.ts";
 test("recall ranks text, metadata membership and eligible explicit links without scope escape",async()=>{
  const index=new LocalIndex();
@@ -23,4 +23,17 @@ test("chunks are bounded and link extraction ignores external URLs",async()=>{
  const entry=await indexNote({path:"P/a.md",text:"x".repeat(60000),metadata:{},modifiedAt:1},()=>null);
  assert(entry.truncated);assert(entry.chunks.every(c=>c.excerpt.length<=1200));
  assert.deepEqual(linkTargets("[[Note#Heading|name]] [web](https://example.com) [local](a.md)"),["Note","a.md"]);
+});
+test("missing project metadata cannot match a project whose ID is the string undefined",async()=>{
+ const index=new LocalIndex();for(const [path,metadata] of [["P/Overview.md",{type:"project",id:"undefined"}],["Other/a.md",{}]] as [string,Record<string,unknown>][])
+  index.entries.push(await indexNote({path,text:"shared term",metadata,modifiedAt:1},()=>null));
+ assert.deepEqual(index.projectEntries({allowedPaths:["P","Other"],excludedPaths:[]},"P").map(e=>e.path),["P/Overview.md"]);
+});
+test("pending project identity never becomes a legacy path fallback",async()=>{
+ const entry=await indexNote({path:"P/Overview.md",text:"Goal",metadata:{type:"project",id:"stable-project"},modifiedAt:1},()=>null);
+ assert.throws(()=>identityFromIndex([],"P",false),/still loading/);
+ assert.equal(identityFromIndex([entry],"P",true),"stable-project");
+ assert.equal(identityFromIndex([],"P",true),"P");
+ assert.equal(identityFromIndex([entry],"Parent",true),"Parent");
+ assert.throws(()=>identityFromIndex([entry,{...entry,path:"P/Other.md",id:"conflicting"}],"P",true),/multiple project IDs/);
 });

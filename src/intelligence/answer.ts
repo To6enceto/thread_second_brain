@@ -32,7 +32,10 @@ export function sourceReferences(bundle:EvidenceBundle): Record<string,string>[]
 export function outputMarkdown(type:string,title:string,body:string,bundle:EvidenceBundle,model:string,project=""): string {
   return frontmatter({id:crypto.randomUUID(),type,generated_on:localDay(),thread_model:model,...(project?{project}:{}),thread_sources:JSON.stringify(sourceReferences(bundle))})
     +`# ${escapeMarkdown(title)}\n\n${body}\n\n## Evidence and provenance\n\nGenerated locally with ${escapeMarkdown(model)}. References identify passages; they do not prove semantic support.\n\n`
-    +bundle.sources.map(s=>`- ${s.id}: [${escapeMarkdown(s.path)}${s.heading?` › ${escapeMarkdown(s.heading)}`:""}](<${encodeURI(s.path).replace(/#/g,"%23")}${s.heading?`#${encodeURIComponent(s.heading)}`:""}>)`).join("\n")+"\n";
+    +evidenceMarkdown(bundle);
+}
+export function evidenceMarkdown(bundle:EvidenceBundle): string {
+  return bundle.sources.map(s=>`- ${s.id}: [${escapeMarkdown(s.path)}${s.heading?` › ${escapeMarkdown(s.heading)}`:""}](<${encodeURI(s.path).replace(/#/g,"%23")}${s.heading?`#${encodeURIComponent(s.heading)}`:""}>)`).join("\n")+"\n";
 }
 export function answerMarkdown(question:string,result:Answer,bundle:EvidenceBundle,model:string,project=""): string {
   if(!result.supported||!result.answer.length)throw new Error("Only a supported answer can be saved.");

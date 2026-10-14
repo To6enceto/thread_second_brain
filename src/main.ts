@@ -1,9 +1,10 @@
 import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal } from "obsidian";
-import { LocalIndex, indexNote, type IndexEntry } from "./vault/index.ts";
+import { LocalIndex, indexNote, identityFromIndex, type IndexEntry } from "./vault/index.ts";
 import { RecallModal } from "./ui/recall-modal.ts";
 import { ThreadModal } from "./ui/thread-modal.ts";
 import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { AskModal } from "./ui/ask-modal.ts";
+import { DecisionModal } from "./ui/decision-modal.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
 import { writablePath, type NewNote } from "./vault/workspace.ts";
 import { createNewNotes } from "./vault/new-notes.ts";
@@ -33,6 +34,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id: "create-workspace", name: "Create project workspace", callback: () => this.openWorkspace() });
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
+    this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -54,8 +56,9 @@ export default class ThreadPlugin extends Plugin {
 
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
+  openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
   projectIdentity(path=this.settings.selectedProject): string {
-    return this.index.entries.find(e=>isWithin(e.path,path)&&e.metadata.type==="project"&&e.id)?.id??path;
+    return identityFromIndex(this.index.entries,path,this.index.ready);
   }
 
   private scheduleIndex(): void {

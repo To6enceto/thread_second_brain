@@ -54,6 +54,7 @@ export class BriefingView extends ItemView {
     });
     actions.createEl("button",{text:"Find evidence"}).onclick=()=>this.plugin.openRecall();
     actions.createEl("button",{text:"Ask"}).onclick=()=>this.plugin.openAsk();
+    actions.createEl("button",{text:"Decisions"}).onclick=()=>this.plugin.openDecisions();
     root.createEl("p", { text: this.message, cls: "thread-status", attr: { role: "status", "aria-live": "polite" } });
     if (!this.result || !this.bundle) return;
     root.createEl("p", { text: `Generated ${this.generatedAt} using ${this.plugin.settings.model}.`, cls: "thread-meta" });

@@ -14,7 +14,7 @@ Keep these IDs stable; all features are initially unimplemented.
 
 - [x] 3. **Indexed evidence recall** - Find relevant eligible passages through a rebuildable local text/link index that updates on note edits, renames, deletions, and scope changes.
 - [x] 4. **Ask your vault** - Answer project-scoped or explicitly vault-scoped questions with source references and unsupported-answer handling, and save selected answers as new Markdown notes.
-- [ ] 5. **Decision records** - Create and review project decisions with alternatives, rationale, supporting evidence, acceptance status, and revisit conditions while retaining superseded choices.
+- [x] 5. **Decision records** - Create and review project decisions with alternatives, rationale, supporting evidence, acceptance status, and revisit conditions while retaining superseded choices.
 
 ## Milestone C - Grow knowledge through reviewed changes
 
