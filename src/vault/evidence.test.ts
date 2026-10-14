@@ -53,3 +53,22 @@ test("JSON escaping stays inside the complete serialized evidence budget", async
     assert.equal(bundle.truncated, true);
   }
 });
+
+
+test("latest same-date session remains in bounded Resume evidence despite long decisions",async()=>{
+ const bundle=await buildEvidence([
+  {path:"P/Older.md",text:"Earlier session",metadata:{type:"session",recorded_on:"2026-10-14"},modifiedAt:1},
+  {path:"P/Latest.md",text:"Current session: tested both approaches",metadata:{type:"session",recorded_on:"2026-10-14"},modifiedAt:5},
+  ...Array.from({length:8},(_,i)=>({path:`P/Decision${i}.md`,text:"Long reasoning ".repeat(1000),metadata:{type:"decision"},modifiedAt:10+i}))
+ ],Date.parse("2026-10-14T15:00:00Z"));
+ assert.equal(bundle.baseline?.path,"P/Latest.md");assert.equal(bundle.sources[0]?.path,"P/Latest.md");assert.ok(bundle.truncated);assert.ok(JSON.stringify(bundle.sources).length<=16000);
+});
+
+
+test("current local calendar day is eligible just after midnight",async()=>{
+ const now=new Date(2026,9,15,0,30).getTime();
+ const bundle=await buildEvidence([{path:"P/Today.md",text:"Just wrapped up",metadata:{type:"session",recorded_on:"2026-10-15"},modifiedAt:now}],now);
+ assert.equal(bundle.baseline?.path,"P/Today.md");
+ const future=await buildEvidence([{path:"P/Tomorrow.md",text:"Future record",metadata:{type:"session",recorded_on:"2026-10-16"},modifiedAt:now}],now);
+ assert.equal(future.baseline,undefined);
+});

@@ -97,11 +97,13 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
     const date = note.metadata.type === "session" ? note.metadata.recorded_on
       : note.metadata.type === "review" ? note.metadata.generated_on : undefined;
     return typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)
-      && Number.isFinite(Date.parse(date)) && Date.parse(date) <= now
-      ? [{ path: note.path, date }] : [];
-  }).sort((a, b) => b.date.localeCompare(a.date));
-  const baseline = baselines[0];
-  const ordered = [...notes].sort((a, b) => priority(b) - priority(a)
+      && Number.isFinite(Date.parse(date)) && (date.length===10?date<=localDay(now):Date.parse(date)<=now)
+      ? [{ path: note.path, date,modifiedAt:note.modifiedAt }] : [];
+  }).sort((a, b) => b.date.slice(0,10).localeCompare(a.date.slice(0,10))||b.modifiedAt-a.modifiedAt||a.path.localeCompare(b.path));
+  const latest=baselines[0];
+  const baseline = latest?{path:latest.path,date:latest.date}:undefined;
+  const weight=(note:SourceNote)=>note.path===baseline?.path?10:priority(note);
+  const ordered = [...notes].sort((a, b) => weight(b) - weight(a)
     || b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path));
   for (const note of ordered) {
     noteHashes[note.path] = note.fullHash ?? await contentHash(note.text);

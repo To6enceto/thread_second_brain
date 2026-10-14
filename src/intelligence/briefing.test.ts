@@ -43,3 +43,22 @@ test("dated source changes remain visible even when the model omits their summar
   assert.match(result.sections.newEvidence[0]?.text ?? "", /2026-10-14/);
   assert.deepEqual(result.sections.newEvidence[0]?.sourceIds, ["S1"]);
 });
+
+
+test("latest user-reported progress informs activity without converting plans to completed work",()=>{
+ const sources=[{id:"S1",path:"P/Session.md",noteType:"session",heading:"User-reported progress",excerpt:"Finished the correction toggle.\n\nThe report above is user input. Context follows.",contentHash:"a",recordedDate:"2026-10-15",dateBasis:"recorded_on"},{id:"S2",path:"P/Session.md",noteType:"session",heading:"Suggested next step",excerpt:"Test voice later",contentHash:"b",recordedDate:"2026-10-15",dateBasis:"recorded_on"}];
+ const b={sources,truncated:false,noteHashes:{},baseline:{path:"P/Session.md",date:"2026-10-15"}};
+ const raw={objective:[],lastActivity:[{text:"Test voice later",kind:"suggestion",sourceIds:["S2"]}],decisions:[],openQuestions:[],newEvidence:[],nextActions:[],gaps:[]};
+ const result=validateBriefing(JSON.stringify(raw),b);assert.equal(result.sections.lastActivity.length,1);assert.match(result.sections.lastActivity[0]!.text,/User-reported progress: Finished/);assert.deepEqual(result.sections.lastActivity[0]!.sourceIds,["S1"]);
+});
+
+
+test("model citation cannot promote user-reported achievement into established fact",()=>{
+ const source={id:"S1",path:"P/Session.md",noteType:"session",heading:"User-reported progress",excerpt:"Completed a correction toggle.\n\nThe report above is user input. Older context follows.",contentHash:"a",recordedDate:"2026-10-15",dateBasis:"recorded_on"};
+ const b={sources:[source],truncated:false,noteHashes:{},baseline:{path:source.path,date:"2026-10-15"}};
+ const raw={objective:[],lastActivity:[{text:"The correction toggle is completed.",kind:"fact",sourceIds:["S1"]}],decisions:[],openQuestions:[],newEvidence:[],nextActions:[],gaps:[]};
+ const result=validateBriefing(JSON.stringify(raw),b);
+ assert.deepEqual(result.sections.lastActivity,[{text:"User-reported progress: Completed a correction toggle.",kind:"fact",sourceIds:["S1"]}]);
+ const empty=validateBriefing(JSON.stringify(raw),{...b,sources:[{...source,excerpt:"Not reported.\n\nThe report above is user input."}]});
+ assert.equal(empty.sections.lastActivity.length,0);
+});
