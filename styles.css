@@ -14,3 +14,4 @@
 .thread-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }
 .thread-evidence summary { cursor: pointer; }
 .thread-view button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+.thread-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; padding: var(--size-4-3); background: var(--background-secondary); }

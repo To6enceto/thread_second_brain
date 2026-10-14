@@ -1,6 +1,6 @@
 import { App, Modal, PluginSettingTab, Setting, TFolder } from "obsidian";
 import type ThreadPlugin from "../main.ts";
-import { localEndpoint } from "../settings/settings.ts";
+import { localEndpoint, roleNames, type FolderRoles } from "../settings/settings.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { vaultPath } from "../vault/scope.ts";
 
@@ -15,6 +15,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   let project = plugin.settings.selectedProject;
   let exclusions = plugin.settings.excludedPaths.join("\n");
   let timeout = String(plugin.settings.timeoutMs / 1000);
+  const roles: FolderRoles = {...plugin.settings.roles};
   new Setting(containerEl).setName("Local Ollama endpoint").setDesc("HTTP loopback only. Default: http://127.0.0.1:11434.")
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Local Ollama endpoint"); text.setValue(endpoint).onChange((value) => { endpoint = value; }); });
   new Setting(containerEl).setName("Downloaded model").setDesc("Use the exact model name from ollama list, such as qwen3:4b.")
@@ -32,6 +33,10 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     .addTextArea((text) => { text.inputEl.setAttribute("aria-label", "Excluded paths"); text.setValue(exclusions).onChange((value) => { exclusions = value; }); });
   new Setting(containerEl).setName("Request timeout in seconds").setDesc("A whole number from 1 to 600.")
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Request timeout in seconds"); text.setValue(timeout).onChange((value) => { timeout = value; }); });
+  containerEl.createEl("h3",{text:"Vault folder mapping"});
+  containerEl.createEl("p",{text:"Map destinations for new notes. Mapping a folder does not grant model read access. Existing notes stay in place."});
+  for(const role of roleNames)new Setting(containerEl).setName(`${role[0]!.toUpperCase()}${role.slice(1)} folder`)
+    .addText(t=>{t.inputEl.setAttribute("aria-label",`${role} folder`);t.setValue(roles[role]).setPlaceholder(role[0]!.toUpperCase()+role.slice(1)).onChange(v=>{roles[role]=v;});});
   const feedback = containerEl.createEl("p", { cls: "thread-status", attr: { role: "status", "aria-live": "polite" } });
   new Setting(containerEl).addButton((button) => button.setButtonText("Save settings").setCta().onClick(async () => {
     try {
@@ -40,7 +45,8 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
       const selectedProject = project ? vaultPath(project) : "";
       await plugin.updateSettings({ ...plugin.settings, endpoint: localEndpoint(endpoint),
         model: model.trim(), selectedProject, allowedPaths: selectedProject ? [selectedProject] : [],
-        excludedPaths: exclusions.split(/\r?\n/).filter((value) => value.trim()).map(vaultPath), timeoutMs });
+        excludedPaths: exclusions.split(/\r?\n/).filter((value) => value.trim()).map(vaultPath), timeoutMs,
+        roles:Object.fromEntries(roleNames.map(role=>[role,roles[role].trim()?vaultPath(roles[role]):""])) as FolderRoles });
       feedback.setText("Settings saved. Open Thread and choose Resume project.");
     } catch (error) { feedback.setText(error instanceof Error ? error.message : "Could not save settings."); }
   })).addButton((button) => button.setButtonText("Test local connection").onClick(async () => {
@@ -54,6 +60,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
       if (!controller.signal.aborted) feedback.setText(error instanceof Error ? error.message : "Connection failed.");
     }
   }));
+  new Setting(containerEl).setName("Starter project").addButton(b=>b.setButtonText("Preview a new workspace").onClick(()=>plugin.openWorkspace()));
   containerEl.createEl("p", { text: "If cloud status is unavailable, update Ollama. Start it with OLLAMA_NO_CLOUD=1; Thread does not download models or change services." });
 }
 

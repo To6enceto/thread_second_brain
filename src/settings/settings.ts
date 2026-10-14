@@ -1,11 +1,22 @@
 import { vaultPath, type ReadScope } from "../vault/scope.ts";
 
+export const roleNames = ["projects", "inbox", "sources", "knowledge", "reviews", "templates"] as const;
+export type FolderRoles = Record<typeof roleNames[number], string>;
+export function loadRoles(value: unknown): FolderRoles {
+  const data = object(value);
+  return Object.fromEntries(roleNames.map((name) => {
+    try { return [name, typeof data[name] === "string" ? vaultPath(data[name]) : ""]; }
+    catch { return [name, ""]; }
+  })) as FolderRoles;
+}
+
 export interface ThreadSettings extends ReadScope {
   schemaVersion: 1;
   endpoint: string;
   model: string;
   selectedProject: string;
   timeoutMs: number;
+  roles: FolderRoles;
 }
 
 export function localEndpoint(input: string): string {
@@ -21,7 +32,8 @@ export function localEndpoint(input: string): string {
 export function defaultSettings(): ThreadSettings {
   return {
     schemaVersion: 1, endpoint: "http://127.0.0.1:11434", model: "",
-    allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000
+    allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000,
+    roles: loadRoles({})
   };
 }
 
@@ -40,6 +52,7 @@ export function validPaths(value: unknown): string[] {
 export function loadSettings(value: unknown): ThreadSettings {
   const data = object(value);
   const settings = defaultSettings();
+  settings.roles = loadRoles(data.roles);
   try { if (typeof data.endpoint === "string") settings.endpoint = localEndpoint(data.endpoint); } catch { /* Invalid endpoints reset to loopback. */ }
   if (typeof data.model === "string") settings.model = data.model.trim();
   settings.allowedPaths = validPaths(data.allowedPaths);

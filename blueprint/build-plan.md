@@ -8,7 +8,7 @@ Keep these IDs stable; all features are initially unimplemented.
 ## Milestone A - Resume a project with local evidence
 
 - [x] 1. **Local project briefings** - Select an allowed project folder, connect a local Ollama model, and generate a read-only Resume briefing with validated source links, evidence gaps, cancellation, and setup errors.
-- [ ] 2. **Reusable project workspaces** - Map existing vault folders or explicitly create starter project notes and templates, persisting project selection and read exclusions without overwriting existing notes.
+- [x] 2. **Reusable project workspaces** - Map existing vault folders or explicitly create starter project notes and templates, persisting project selection and read exclusions without overwriting existing notes.
 
 ## Milestone B - Find information and preserve reasoning
 

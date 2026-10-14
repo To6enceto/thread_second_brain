@@ -1,4 +1,6 @@
-import { Plugin, TFile, TFolder, parseYaml } from "obsidian";
+import { Plugin, TFile, TFolder, parseYaml, type Modal } from "obsidian";
+import { WorkspaceModal } from "./ui/workspace-modal.ts";
+import { rejectCollisions, writablePath, type NewNote } from "./vault/workspace.ts";
 import { defaultSettings, loadSettings, type ThreadSettings } from "./settings/settings.ts";
 import { ThreadSettingTab, ThreadSetupModal } from "./ui/settings-tab.ts";
 import { BriefingView, THREAD_VIEW } from "./ui/briefing-view.ts";
@@ -9,6 +11,7 @@ export default class ThreadPlugin extends Plugin {
   settings: ThreadSettings = defaultSettings();
   settingsTab: ThreadSettingTab | null = null;
   setupModal: ThreadSetupModal | null = null;
+  modals = new Set<Modal>();
 
   async onload(): Promise<void> {
     this.settings = loadSettings(await this.loadData());
@@ -17,6 +20,7 @@ export default class ThreadPlugin extends Plugin {
     this.addSettingTab(this.settingsTab);
     this.addRibbonIcon("book-open", "Open Thread", () => { void this.openThread(); });
     this.addCommand({ id: "open-thread", name: "Open Thread", callback: () => { void this.openThread(); } });
+    this.addCommand({ id: "create-workspace", name: "Create project workspace", callback: () => this.openWorkspace() });
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -26,9 +30,38 @@ export default class ThreadPlugin extends Plugin {
   }
 
   onunload(): void {
+    for (const modal of this.modals) modal.close();
     this.setupModal?.close(); this.settingsTab?.hide();
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
       if (leaf.view instanceof BriefingView) leaf.view.cancelPending();
+    }
+  }
+
+  openWorkspace(): void {
+    const modal=new WorkspaceModal(this);this.modals.add(modal);modal.open();
+  }
+
+  async ensureFolder(path: string): Promise<void> {
+    let current="";
+    for(const part of path.split("/")){
+      current=current ? `${current}/${part}` : part;
+      const existing=this.app.vault.getAbstractFileByPath(current);
+      if(existing && !(existing instanceof TFolder))throw new Error(`A note blocks folder ${current}.`);
+      if(!existing)await this.app.vault.createFolder(current);
+    }
+  }
+
+  async createNotes(notes: NewNote[]): Promise<void> {
+    rejectCollisions(notes,path=>Boolean(this.app.vault.getAbstractFileByPath(path)));
+    const created:string[]=[];
+    try{
+      for(const note of notes){
+        writablePath(note.path,[...Object.values(this.settings.roles),this.settings.selectedProject],this.settings.excludedPaths);
+        await this.ensureFolder(note.path.slice(0,note.path.lastIndexOf("/")));
+        await this.app.vault.create(note.path,note.content);created.push(note.path);
+      }
+    }catch(error){
+      throw new Error(`${error instanceof Error?error.message:"Write failed."}${created.length ? ` Partial creation; already created: ${created.join(", ")}. Inspect these notes before retrying.` : ""}`);
     }
   }
 
