@@ -1,7 +1,9 @@
-import { Notice } from "obsidian";
+import { Notice,parseYaml } from "obsidian";
 import { ThreadModal } from "./thread-modal.ts";
 import type { ChangeBatch } from "../vault/changes.ts";
 import { readableText } from "../vault/scope.ts";
+import { FreshnessGraph,outputProjection,type FreshNote } from "../vault/freshness.ts";
+import { readMetadata } from "../vault/evidence.ts";
 
 export class ChangeReviewModal extends ThreadModal {
   undoId:string|null=null;
@@ -15,12 +17,23 @@ export class ChangeReviewModal extends ThreadModal {
   }
   private contextAllowed(batch:ChangeBatch):boolean{
     if(!batch.context)return true;
-    try{const data=JSON.parse(batch.context) as {noteHashes:unknown};return data.noteHashes!==null&&typeof data.noteHashes==="object"&&!Array.isArray(data.noteHashes)&&Object.keys(data.noteHashes).every(path=>readableText(path,this.plugin.settings));}
+    try{const data=JSON.parse(batch.context) as {noteHashes:unknown};
+      if(data.noteHashes===null||typeof data.noteHashes!=="object"||Array.isArray(data.noteHashes))return false;
+      const paths=Object.keys(data.noteHashes);if(paths.length&&!this.plugin.index.ready)return false;
+      // Applied/recovery batches retain validated original bytes. Use those exact
+      // snapshots for their source context, never substitute newer provenance.
+      const notes=new Map<string,FreshNote>(this.plugin.index.entries.map(note=>[note.path,note]));
+      for(const op of batch.operations)if(op.before!==null&&op.beforeHash&&readableText(op.path,this.plugin.settings)){
+        const metadata=readMetadata(op.before,parseYaml);const output=outputProjection(op.before,metadata).output;
+        notes.set(op.path,{path:op.path,hash:op.beforeHash,metadata,...(typeof metadata.id==="string"?{id:metadata.id}:{}),...(output?{output}:{})});
+      }
+      const graph=new FreshnessGraph([...notes.values()],this.plugin.settings,this.plugin.index.renames);
+      return Object.entries(data.noteHashes).every(([path,hash])=>typeof hash==="string"&&readableText(path,this.plugin.settings)&&graph.scopeAllows(path,hash));}
     catch{return false;}
   }
   private allowed(batch:ChangeBatch):boolean{return this.contextAllowed(batch)&&batch.operations.every(op=>this.plugin.changePathAllowed(op.path));}
   private preview(batch:ChangeBatch,undo=false):void{
-    if(!this.contextAllowed(batch)){this.resultEl!.createEl("p",{text:"Source read scope changed. Cached note contents are hidden; restore their allowed scope before reviewing this batch."});return;}
+    if(!this.contextAllowed(batch)){this.resultEl!.createEl("p",{text:"Supporting source snapshots changed, are unavailable or outside current read scope. Cached contents are hidden. Resolve source access before reviewing, or inspect the durable changes.json journal for manual recovery."});return;}
     for(const op of batch.operations){
       const row=this.resultEl!.createEl("section");row.createEl("h3",{text:op.path});
       if(!this.plugin.changePathAllowed(op.path)){row.createEl("p",{text:"Target outside current read/write scope. Its cached contents are hidden."});continue;}

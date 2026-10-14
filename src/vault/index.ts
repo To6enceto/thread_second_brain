@@ -1,10 +1,11 @@
+import { outputProjection,FreshnessGraph,type OutputProvenance,type RenameMap } from "./freshness.ts";
 import { noteSections, type SourceNote } from "./evidence.ts";
 import { contentHash, isWithin, readableText, type ReadScope } from "./scope.ts";
 
 export interface IndexEntry {
   path: string; id?: string; title: string; metadata: Record<string, unknown>;
   hash: string; modifiedAt: number; chunks: {heading: string; excerpt: string}[];
-  links: string[]; truncated: boolean;
+  links: string[]; truncated: boolean; output?:OutputProvenance;
 }
 export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; }
 export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean): string {
@@ -23,17 +24,21 @@ export function linkTargets(text: string): string[] {
     }).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
 }
 export async function indexNote(note: SourceNote, resolve: (link: string) => string | null): Promise<IndexEntry> {
-  const text=note.text.slice(0,50000);
+  const projected=outputProjection(note.text,note.metadata);
+  const body=projected.text.replace(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,"");
+  const text=body.slice(0,50000);
+  const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output"]);
+  const metadata=Object.fromEntries(Object.entries(note.metadata).filter(([key,value])=>fields.has(key)&&typeof value==="string"));
   const chunks=noteSections(text).flatMap(section=>{
     const result: {heading:string;excerpt:string}[]=[];
     for(let start=0;start<section.excerpt.length;start+=1000)result.push({heading:section.heading,excerpt:section.excerpt.slice(start,start+1200)});
     return result;
   });
   return {path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
-    title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata:note.metadata,
+    title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata,...(projected.output?{output:projected.output}:{}),
     hash:await contentHash(note.text),modifiedAt:note.modifiedAt,chunks,
     links:[...new Set(linkTargets(text).map(resolve).filter((p):p is string=>Boolean(p)))],
-    truncated:note.text.length>50000};
+    truncated:body.length>50000};
 }
 const stopWords=new Set(["the","a","an","and","or","is","to","of","in","for","what","how","we","our","was","are","did","does","why","with"]);
 export function queryTerms(query: string): string[] {
@@ -43,9 +48,17 @@ export class LocalIndex {
   entries: IndexEntry[]=[];
   ready=false;
   revision=0;
+  renames:RenameMap={};
+  graph(scope:ReadScope):FreshnessGraph{return new FreshnessGraph(this.entries,scope,this.renames);}
+  replace(entries:IndexEntry[],scope:ReadScope):void{
+    const allowed=entries.filter(e=>readableText(e.path,scope));
+    const graph=new FreshnessGraph(allowed,scope,this.renames);
+    this.entries=allowed.map(e=>e.output&&!graph.assess(e.path).usable?{...e,chunks:[],links:[]}:e);this.ready=true;
+  }
   clear(): void {this.entries=[];this.ready=false;this.revision++;}
   projectEntries(scope:ReadScope,project:string|null): IndexEntry[] {
-    const eligible=this.entries.filter(e=>readableText(e.path,scope));
+    const graph=this.graph(scope);
+    const eligible=this.entries.filter(e=>readableText(e.path,scope)&&graph.assess(e.path).usable);
     const contained=project?eligible.filter(e=>isWithin(e.path,project)):eligible;
     const ids=new Set(contained.filter(e=>e.metadata.type==="project").map(e=>e.id).filter(Boolean));
     const linked=new Set(contained.flatMap(e=>e.links));

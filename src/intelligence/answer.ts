@@ -27,7 +27,7 @@ export function answerPrompt(question:string,bundle:EvidenceBundle): string {
 }
 export function escapeMarkdown(text:string): string {return text.replace(/([\\`*_{}\[\]()<>#!|~])/g,"\\$1");}
 export function sourceReferences(bundle:EvidenceBundle): Record<string,string>[] {
-  return bundle.sources.map(s=>({path:s.path,...(s.noteId?{id:s.noteId}:{}),heading:s.heading,excerpt:s.excerpt,hash:s.contentHash,noteHash:bundle.noteHashes[s.path]!}));
+  return bundle.sources.map(s=>({path:s.path,...(s.noteId?{id:s.noteId}:{}),...(s.noteType?{noteType:s.noteType}:{}),...(s.noteStatus?{noteStatus:s.noteStatus}:{}),heading:s.heading,excerpt:s.excerpt,hash:s.contentHash,noteHash:bundle.noteHashes[s.path]!}));
 }
 export function outputMarkdown(type:string,title:string,body:string,bundle:EvidenceBundle,model:string,project=""): string {
   return frontmatter({id:crypto.randomUUID(),type,generated_on:localDay(),thread_model:model,...(project?{project}:{}),thread_sources:JSON.stringify(sourceReferences(bundle))})

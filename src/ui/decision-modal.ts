@@ -37,7 +37,7 @@ export class DecisionModal extends ThreadModal {
       try{
         if(!settings.selectedProject)throw new Error("Select a project in Settings first.");
         if(!this.plugin.index.ready)throw new Error("Project evidence is still loading. Refresh decisions before previewing.");
-        const bundle=await buildEvidence([...selected.values()].map(entry=>({path:entry.path,text:entry.chunks[0]?.excerpt??"",metadata:entry.metadata,modifiedAt:entry.modifiedAt,fullHash:entry.hash})));
+        const bundle=this.plugin.withDependencies(await buildEvidence([...selected.values()].map(entry=>({path:entry.path,text:entry.chunks[0]?.excerpt??"",metadata:entry.metadata,modifiedAt:entry.modifiedAt,fullHash:entry.hash}))),settings);
         if(!await this.plugin.evidenceCurrent(bundle,settings)||this.closed||epoch!==this.epoch)throw new Error("Evidence changed. Refresh decisions and select current evidence.");
         const content=decisionMarkdown(approved,this.plugin.projectIdentity(settings.selectedProject),bundle);
         const path=`${settings.selectedProject}/Decisions/${noteName(approvedName)}.md`;

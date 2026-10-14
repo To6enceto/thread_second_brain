@@ -35,7 +35,8 @@ export class AskModal extends ThreadModal {
     try{
       if(!this.plugin.index.ready)await this.plugin.rebuildIndex();controller.signal.throwIfAborted();
       const hits=this.plugin.index.recall(question,settings,vault?null:settings.selectedProject);
-      const bundle=await buildEvidence(hitsToNotes(hits));controller.signal.throwIfAborted();
+      const bundle=this.plugin.withDependencies(await buildEvidence(hitsToNotes(hits)),settings);controller.signal.throwIfAborted();
+      if(!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Supporting sources changed. Ask again.");controller.signal.throwIfAborted();
       let answer:Answer;
       if(!bundle.sources.length)answer={supported:false,answer:[],gaps:["No matching eligible passages. Try more specific words or change the allowed scope."]};
       else{

@@ -1,5 +1,5 @@
 import type { Answer } from "../intelligence/answer.ts";
-import { escapeMarkdown,evidenceMarkdown,sourceReferences } from "../intelligence/answer.ts";
+import { escapeMarkdown,evidenceMarkdown,sourceReferences,outputMarkdown } from "../intelligence/answer.ts";
 import type { EvidenceBundle } from "./evidence.ts";
 import { frontmatter,localDay } from "./workspace.ts";
 
@@ -14,4 +14,12 @@ export function synthesisBlock(title:string,answer:Answer,bundle:EvidenceBundle,
 export function knowledgeMarkdown(title:string,type:"concept"|"comparison",answer:Answer,bundle:EvidenceBundle,model:string,project=""):string{
   return frontmatter({id:crypto.randomUUID(),type,updated:localDay(),generated_on:localDay(),thread_model:model,thread_sources:JSON.stringify(sourceReferences(bundle)),...(project?{project}:{})})
     +`# ${escapeMarkdown(title)}\n`+synthesisBlock(title,answer,bundle,model,project);
+}
+
+export function refreshedMarkdown(title:string,answer:Answer,bundle:EvidenceBundle,model:string,previous:string,project=""):string{
+  if(!answer.supported||!answer.answer.length)throw new Error("The selected sources do not support a refreshed synthesis.");
+  const body=`Original output preserved: [Open prior version](<${encodeURI(previous).replace(/#/g,"%23")}>)\n\n`
+    +answer.answer.map(c=>`- **${c.kind}:** ${escapeMarkdown(c.text)} (${c.sourceIds.join(", ")})`).join("\n")
+    +`\n\n## Evidence gaps\n\n${answer.gaps.map(g=>`- ${escapeMarkdown(g)}`).join("\n")||"None recorded."}`;
+  return outputMarkdown("review",title,body,bundle,model,project);
 }

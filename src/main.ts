@@ -2,6 +2,7 @@ import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal } from "obsidian"
 import { LocalIndex, indexNote, identityFromIndex, type IndexEntry } from "./vault/index.ts";
 import { RecallModal } from "./ui/recall-modal.ts";
 import { ThreadModal } from "./ui/thread-modal.ts";
+import { outputProjection,loadRenames,type RenameMap } from "./vault/freshness.ts";
 import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { AskModal } from "./ui/ask-modal.ts";
 import { DecisionReviewModal } from "./ui/decision-review-modal.ts";
@@ -10,6 +11,7 @@ import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
 import { ChangeManager } from "./vault/changes.ts";
 import { ChangeReviewModal } from "./ui/change-review-modal.ts";
+import { FreshnessModal } from "./ui/freshness-modal.ts";
 import { WeeklyModal } from "./ui/weekly-modal.ts";
 import { SessionModal } from "./ui/session-modal.ts";
 import { KnowledgeModal } from "./ui/knowledge-modal.ts";
@@ -37,11 +39,15 @@ export default class ThreadPlugin extends Plugin {
   changes!:ChangeManager;
   changesWarning="";
   changesText="";
+  renames:RenameMap={};
+  renameWrite:Promise<void>=Promise.resolve();
   changeTicket={context:"",revision:-1,settings:""};
 
   async onload(): Promise<void> {
     this.active=true;
     this.settings = loadSettings(await this.loadData());
+    try{if(await this.app.vault.adapter.exists(this.renamesPath()))this.renames=loadRenames(JSON.parse(await this.app.vault.adapter.read(this.renamesPath())));}catch{new Notice("Thread legacy rename metadata is unavailable; stable source IDs still resolve. Check source freshness before reuse.");}
+    this.index.renames=this.renames;
     this.changes=this.createChangeManager();
     if(await this.app.vault.adapter.exists(this.changesPath())){
       try{this.changesText=await this.app.vault.adapter.read(this.changesPath());await this.changes.load(JSON.parse(this.changesText));}catch{this.changesWarning="Change history is invalid. Preserve changes.json and recover from a known backup; Thread will not overwrite it.";}
@@ -61,6 +67,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
+    this.addCommand({id:"source-freshness",name:"Source freshness",callback:()=>this.openFreshness()});
     this.addCommand({id:"weekly-review",name:"Weekly project review",callback:()=>this.openWeekly()});
     this.addCommand({id:"session-wrap-up",name:"Session wrap-up",callback:()=>this.openSession()});
     this.addCommand({id:"knowledge-updates",name:"Knowledge updates",callback:()=>this.openKnowledge()});
@@ -68,6 +75,10 @@ export default class ThreadPlugin extends Plugin {
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+      if(readableText(oldPath,this.settings)&&readableText(file.path,this.settings)||file instanceof TFolder&&this.settings.allowedPaths.some(root=>isWithin(oldPath,root)&&isWithin(file.path,root))&&!this.settings.excludedPaths.some(root=>isWithin(oldPath,root)||isWithin(file.path,root))){
+        this.renames={...this.renames,[oldPath]:file.path};const keys=Object.keys(this.renames);for(const key of keys.slice(0,Math.max(0,keys.length-2000)))delete this.renames[key];this.index.renames=this.renames;
+        const text=JSON.stringify({schemaVersion:1,paths:this.renames});this.renameWrite=this.renameWrite.catch(()=>{}).then(()=>this.app.vault.adapter.write(this.renamesPath(),text)).catch(()=>{new Notice("Thread could not save legacy rename metadata. Stable IDs remain preferred.");});
+      }
       this.invalidatePath(oldPath, file instanceof TFolder); this.invalidatePath(file.path, file instanceof TFolder);
     }));
     this.scheduleIndex();
@@ -90,6 +101,7 @@ export default class ThreadPlugin extends Plugin {
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
   openDecisionReview():void{const modal=new DecisionReviewModal(this);this.modals.add(modal);modal.open();}
+  openFreshness():void{const modal=new FreshnessModal(this);this.modals.add(modal);modal.open();}
   openWeekly():void{const modal=new WeeklyModal(this);this.modals.add(modal);modal.open();}
   openSession():void{const modal=new SessionModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}
@@ -100,6 +112,7 @@ export default class ThreadPlugin extends Plugin {
     await this.app.workspace.getLeaf(false).openFile(file);
   }
   importsPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/imports.json`;}
+  renamesPath():string{return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/renames.json`;}
   changesPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/changes.json`;}
   changeContext(bundle:EvidenceBundle,settings=this.settings): string {return JSON.stringify({settings,noteHashes:bundle.noteHashes});}
   private checkChangePath(path:string): void {
@@ -129,6 +142,7 @@ export default class ThreadPlugin extends Plugin {
         }
       }catch{return false;}
     }
+    try{if(!this.index.ready)await this.rebuildIndex();noteHashes=this.withDependencies({sources:[],truncated:false,noteHashes},settings).noteHashes;}catch{return false;}
     const valid=await this.evidenceCurrent({sources:[],truncated:false,noteHashes},settings);
     if(!valid||!this.active||revision!==this.index.revision||settingsText!==JSON.stringify(this.settings))return false;
     this.changeTicket={context,revision,settings:settingsText};return true;
@@ -213,11 +227,11 @@ export default class ThreadPlugin extends Plugin {
     }
     controller.signal.throwIfAborted();
     if(JSON.stringify(settings)!==JSON.stringify(this.settings))throw new DOMException("Scope changed","AbortError");
-    this.index.entries=entries;this.index.ready=true;
+    this.index.replace(entries,settings);
     const revision=this.index.revision;
     this.cacheWrite=this.cacheWrite.catch(()=>{}).then(async()=>{
       if(revision!==this.index.revision||controller.signal.aborted)return;
-      await this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries}));
+      await this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries:this.index.entries}));
     });
     await this.cacheWrite;
   }
@@ -281,38 +295,50 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
-    if(readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"))){
+    const allowed=readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"));
+    if(allowed){
       this.scheduleIndex();
       for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
     }
-    if (!affectsProject(path, this.settings.selectedProject, this.settings, folder)) return;
+    if (!allowed&&!affectsProject(path, this.settings.selectedProject, this.settings, folder)) return;
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
       if (leaf.view instanceof BriefingView) leaf.view.invalidate(folder
         ? "Project folders changed. Check the selected folder and generate a fresh briefing."
-        : "Project notes changed. Generate a fresh briefing.");
+        : "Allowed source notes changed. Generate a fresh briefing.");
     }
   }
 
-  async evidence(settings: ThreadSettings, signal: AbortSignal): Promise<EvidenceBundle> {
-    const files = this.app.vault.getFiles().filter((file) => isWithin(file.path, settings.selectedProject)
-      && readableText(file.path, settings));
-    const notes: SourceNote[] = [];
-    for (const file of files) {
-      signal.throwIfAborted();
-      const text = await this.app.vault.read(file);
-      notes.push({ path: file.path, text, metadata: readMetadata(text, parseYaml), modifiedAt: file.stat.mtime });
+  withDependencies(bundle:EvidenceBundle,settings:ThreadSettings):EvidenceBundle{
+    if(!this.index.ready||JSON.stringify(settings)!==JSON.stringify(this.settings))throw new Error("Evidence index or scope changed. Refresh and try again.");
+    const graph=this.index.graph(settings);const noteHashes={...bundle.noteHashes};
+    for(const path of Object.keys(bundle.noteHashes)){
+      const state=graph.assess(path);if(!state.usable)throw new Error(`Saved output needs source review: ${path}. Open Source freshness.`);
+      for(const [dependency,hash]of Object.entries(state.dependencies)){
+        if(noteHashes[dependency]&&noteHashes[dependency]!==hash)throw new Error("Source snapshots disagree. Rebuild the index and generate again.");noteHashes[dependency]=hash;
+      }
     }
-    return buildEvidence(notes);
+    return {...bundle,noteHashes};
+  }
+  async evidence(settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
+    if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();
+    if(JSON.stringify(settings)!==JSON.stringify(this.settings))throw new Error("Read scope changed.");
+    const paths=this.index.projectEntries(settings,settings.selectedProject).map(e=>e.path);
+    return this.evidenceFromPaths(paths,settings,signal);
   }
   async evidenceFromPaths(paths:string[],settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
-    const notes:SourceNote[]=[];
+    if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();
+    const notes:SourceNote[]=[];const graph=this.index.graph(settings);
     for(const path of [...new Set(paths)]){
       signal.throwIfAborted();if(JSON.stringify(settings)!==JSON.stringify(this.settings)||!readableText(path,settings))throw new Error("Source is outside current read scope.");
+      const entry=this.index.entries.find(e=>e.path===path);if(!entry||!graph.assess(path).usable)throw new Error(`Source unavailable or needs freshness review: ${path}.`);
       const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error(`Source missing: ${path}.`);
-      const text=await this.app.vault.read(file);signal.throwIfAborted();if(file.path!==path)throw new Error("Source moved while reading.");
-      notes.push({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime});
+      const raw=await this.app.vault.read(file);signal.throwIfAborted();if(file.path!==path)throw new Error("Source moved while reading.");
+      const fullHash=await contentHash(raw);if(fullHash!==entry.hash)throw new Error("Source changed since indexing. Rebuild and try again.");
+      const metadata=readMetadata(raw,parseYaml);const projected=outputProjection(raw,metadata);
+      notes.push({path,text:projected.text,metadata,modifiedAt:file.stat.mtime,fullHash});
     }
-    const bundle=await buildEvidence(notes);signal.throwIfAborted();return bundle;
+    const bundle=this.withDependencies(await buildEvidence(notes),settings);signal.throwIfAborted();
+    if(!await this.evidenceCurrent(bundle,settings))throw new Error("Supporting evidence changed. Generate again.");signal.throwIfAborted();return bundle;
   }
 
   async evidenceCurrent(bundle: EvidenceBundle, settings: ThreadSettings): Promise<boolean> {
