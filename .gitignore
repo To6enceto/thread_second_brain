@@ -1,0 +1,14 @@
+node_modules/
+main.js
+main.js.map
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Keep real personal vaults, model data, and scratch content out of source control.
+local-vault/
+.thread-local/
