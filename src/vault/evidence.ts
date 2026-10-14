@@ -5,6 +5,7 @@ export interface SourceNote {
   text: string;
   metadata: Record<string, unknown>;
   modifiedAt: number;
+  fullHash?: string;
 }
 
 export interface Evidence {
@@ -103,7 +104,7 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
   const ordered = [...notes].sort((a, b) => priority(b) - priority(a)
     || b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path));
   for (const note of ordered) {
-    noteHashes[note.path] = await contentHash(note.text);
+    noteHashes[note.path] = note.fullHash ?? await contentHash(note.text);
     for (const section of noteSections(note.text)) {
       if (remaining < 100) { truncated = true; break; }
       const excerpt = section.excerpt.slice(0, Math.min(4000, remaining));

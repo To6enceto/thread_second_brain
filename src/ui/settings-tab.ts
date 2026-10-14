@@ -14,6 +14,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   let model = plugin.settings.model;
   let project = plugin.settings.selectedProject;
   let exclusions = plugin.settings.excludedPaths.join("\n");
+  let allowed = plugin.settings.allowedPaths.join("\n");
   let timeout = String(plugin.settings.timeoutMs / 1000);
   const roles: FolderRoles = {...plugin.settings.roles};
   new Setting(containerEl).setName("Local Ollama endpoint").setDesc("HTTP loopback only. Default: http://127.0.0.1:11434.")
@@ -31,6 +32,8 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     });
   new Setting(containerEl).setName("Excluded paths").setDesc("One vault-relative folder or note per line. Exclusions apply before reads.")
     .addTextArea((text) => { text.inputEl.setAttribute("aria-label", "Excluded paths"); text.setValue(exclusions).onChange((value) => { exclusions = value; }); });
+  new Setting(containerEl).setName("Allowed read paths").setDesc("One folder or note per line. All allowed paths is an explicit search scope; the selected project is also allowed when saving.")
+    .addTextArea(t=>{t.inputEl.setAttribute("aria-label","Allowed read paths");t.setValue(allowed).onChange(v=>allowed=v);});
   new Setting(containerEl).setName("Request timeout in seconds").setDesc("A whole number from 1 to 600.")
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Request timeout in seconds"); text.setValue(timeout).onChange((value) => { timeout = value; }); });
   containerEl.createEl("h3",{text:"Vault folder mapping"});
@@ -44,7 +47,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
       if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error("Use a timeout from 1 to 600 seconds.");
       const selectedProject = project ? vaultPath(project) : "";
       await plugin.updateSettings({ ...plugin.settings, endpoint: localEndpoint(endpoint),
-        model: model.trim(), selectedProject, allowedPaths: selectedProject ? [selectedProject] : [],
+        model: model.trim(), selectedProject, allowedPaths: [...new Set([...allowed.split(/\r?\n/).filter(v=>v.trim()).map(vaultPath),...(selectedProject?[selectedProject]:[])])],
         excludedPaths: exclusions.split(/\r?\n/).filter((value) => value.trim()).map(vaultPath), timeoutMs,
         roles:Object.fromEntries(roleNames.map(role=>[role,roles[role].trim()?vaultPath(roles[role]):""])) as FolderRoles });
       feedback.setText("Settings saved. Open Thread and choose Resume project.");

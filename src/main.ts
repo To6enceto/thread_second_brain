@@ -1,4 +1,8 @@
-import { Plugin, TFile, TFolder, parseYaml, type Modal } from "obsidian";
+import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal } from "obsidian";
+import { LocalIndex, indexNote, type IndexEntry } from "./vault/index.ts";
+import { RecallModal } from "./ui/recall-modal.ts";
+import { ThreadModal } from "./ui/thread-modal.ts";
+import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
 import { rejectCollisions, writablePath, type NewNote } from "./vault/workspace.ts";
 import { defaultSettings, loadSettings, type ThreadSettings } from "./settings/settings.ts";
@@ -12,6 +16,10 @@ export default class ThreadPlugin extends Plugin {
   settingsTab: ThreadSettingTab | null = null;
   setupModal: ThreadSetupModal | null = null;
   modals = new Set<Modal>();
+  index=new LocalIndex();
+  indexController: AbortController | null=null;
+  indexTimer: ReturnType<typeof setTimeout> | null=null;
+  cacheWrite: Promise<void>=Promise.resolve();
 
   async onload(): Promise<void> {
     this.settings = loadSettings(await this.loadData());
@@ -21,20 +29,68 @@ export default class ThreadPlugin extends Plugin {
     this.addRibbonIcon("book-open", "Open Thread", () => { void this.openThread(); });
     this.addCommand({ id: "open-thread", name: "Open Thread", callback: () => { void this.openThread(); } });
     this.addCommand({ id: "create-workspace", name: "Create project workspace", callback: () => this.openWorkspace() });
+    this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       this.invalidatePath(oldPath, file instanceof TFolder); this.invalidatePath(file.path, file instanceof TFolder);
     }));
+    this.scheduleIndex();
   }
 
   onunload(): void {
+    this.index.clear();
+    this.indexController?.abort();if(this.indexTimer)clearTimeout(this.indexTimer);
     for (const modal of this.modals) modal.close();
     this.setupModal?.close(); this.settingsTab?.hide();
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
       if (leaf.view instanceof BriefingView) leaf.view.cancelPending();
     }
+  }
+
+  openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
+
+  private scheduleIndex(): void {
+    this.indexController?.abort();this.index.clear();
+    this.cacheWrite=this.cacheWrite.catch(()=>{}).then(()=>this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries:[]})))
+      .catch(()=>{new Notice("Thread could not clear its derived index cache. Check vault write access and rebuild.");});
+    if(this.indexTimer)clearTimeout(this.indexTimer);
+    this.indexTimer=setTimeout(()=>{this.indexTimer=null;void this.rebuildIndex().catch(e=>{if(!(e instanceof DOMException&&e.name==="AbortError"))new Notice("Thread index unavailable. Open Find evidence and rebuild.");});},300);
+  }
+
+  private indexPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/index.json`;}
+
+  async rebuildIndex(): Promise<void> {
+    if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
+    this.indexController?.abort();const controller=new AbortController();this.indexController=controller;
+    const settings=structuredClone(this.settings);const entries:IndexEntry[]=[];
+    for(const file of this.app.vault.getFiles().filter(f=>readableText(f.path,settings))){
+      controller.signal.throwIfAborted();
+      const text=await this.app.vault.read(file);controller.signal.throwIfAborted();
+      const note={path:file.path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime};
+      entries.push(await indexNote(note,link=>{
+        const target=this.app.metadataCache.getFirstLinkpathDest(link,file.path);
+        return target&&readableText(target.path,settings)?target.path:null;
+      }));
+    }
+    controller.signal.throwIfAborted();
+    if(JSON.stringify(settings)!==JSON.stringify(this.settings))throw new DOMException("Scope changed","AbortError");
+    this.index.entries=entries;this.index.ready=true;
+    const revision=this.index.revision;
+    this.cacheWrite=this.cacheWrite.catch(()=>{}).then(async()=>{
+      if(revision!==this.index.revision||controller.signal.aborted)return;
+      await this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries}));
+    });
+    await this.cacheWrite;
+  }
+
+  async openIndexedSource(path:string,hash:string,heading="",isCurrent:()=>boolean=()=>true): Promise<void> {
+    const file=this.app.vault.getAbstractFileByPath(path);
+    if(!(file instanceof TFile))throw new Error("Source is missing. Search again.");
+    const revision=this.index.revision;
+    await verifyThenOpenSource(hash,()=>this.app.vault.read(file),()=>isCurrent()&&revision===this.index.revision&&file.path===path&&readableText(path,this.settings),
+      ()=>this.app.workspace.getLeaf(false).openFile(file,{eState:{subpath:heading?`#${heading}`:""}}));
   }
 
   openWorkspace(): void {
@@ -85,6 +141,8 @@ export default class ThreadPlugin extends Plugin {
 
   async updateSettings(settings: ThreadSettings): Promise<void> {
     this.settings = loadSettings(settings);
+    this.scheduleIndex();
+    for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Settings changed. Run this action again.");
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
       if (leaf.view instanceof BriefingView) leaf.view.invalidate("Settings changed. Generate a new briefing.");
     }
@@ -92,6 +150,10 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
+    if(readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"))){
+      this.scheduleIndex();
+      for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
+    }
     if (!affectsProject(path, this.settings.selectedProject, this.settings, folder)) return;
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
       if (leaf.view instanceof BriefingView) leaf.view.invalidate(folder
