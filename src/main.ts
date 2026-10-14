@@ -5,6 +5,8 @@ import { ThreadModal } from "./ui/thread-modal.ts";
 import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { AskModal } from "./ui/ask-modal.ts";
 import { DecisionModal } from "./ui/decision-modal.ts";
+import { CaptureModal } from "./ui/capture-modal.ts";
+import { ImportRegistry } from "./vault/capture.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
 import { writablePath, type NewNote } from "./vault/workspace.ts";
 import { createNewNotes } from "./vault/new-notes.ts";
@@ -23,9 +25,14 @@ export default class ThreadPlugin extends Plugin {
   indexController: AbortController | null=null;
   indexTimer: ReturnType<typeof setTimeout> | null=null;
   cacheWrite: Promise<void>=Promise.resolve();
+  imports=new ImportRegistry();
+  importsWarning="";
 
   async onload(): Promise<void> {
     this.settings = loadSettings(await this.loadData());
+    if(await this.app.vault.adapter.exists(this.importsPath())){
+      try{this.imports.load(JSON.parse(await this.app.vault.adapter.read(this.importsPath())));}catch{this.importsWarning="Import history is unavailable. Rebuild it from allowed source notes before importing.";}
+    }
     this.registerView(THREAD_VIEW, (leaf) => new BriefingView(leaf, this));
     this.settingsTab = new ThreadSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
@@ -35,6 +42,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
+    this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -57,6 +65,21 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
+  openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
+  importsPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/imports.json`;}
+  async rebuildImports(): Promise<void> {
+    if(this.imports.active.size||this.imports.rebuilding)throw new Error("Wait for pending imports or history rebuild first.");
+    this.imports.rebuilding=true;
+    try{
+      if(!this.index.ready)await this.rebuildIndex();
+      const records:Record<string,string>={...this.imports.records};
+      for(const entry of this.index.projectEntries(this.settings,null)){
+        const hash=entry.metadata.thread_import_hash;
+        if(entry.metadata.type==="source"&&typeof hash==="string"&&/^[a-f0-9]{64}$/.test(hash))records[hash]=entry.path;
+      }
+      await this.imports.queue.catch(()=>{});await this.app.vault.adapter.write(this.importsPath(),JSON.stringify({schemaVersion:1,records}));this.imports.records=records;this.importsWarning="";
+    }finally{this.imports.rebuilding=false;}
+  }
   projectIdentity(path=this.settings.selectedProject): string {
     return identityFromIndex(this.index.entries,path,this.index.ready);
   }

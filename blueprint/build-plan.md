@@ -18,7 +18,7 @@ Keep these IDs stable; all features are initially unimplemented.
 
 ## Milestone C - Grow knowledge through reviewed changes
 
-- [ ] 6. **Inbox capture** - Capture thoughts and import Markdown/text sources with provenance, identical-import detection, and reviewed suggestions for project association.
+- [x] 6. **Inbox capture** - Capture thoughts and import Markdown/text sources with provenance, identical-import detection, and reviewed suggestions for project association.
 - [ ] 7. **Reviewed knowledge updates** - Turn selected sources into proposed summaries and links, preview affected notes, and apply approved changes with before-hash checks, recoverable partial failures, and guarded undo.
 - [ ] 8. **Decision evidence review** - Flag relevant or potentially conflicting new evidence for an existing decision and let the user retain, annotate, or supersede it through the reviewed-change workflow.
 

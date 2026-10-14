@@ -9,6 +9,7 @@ export class NewNoteModal extends ThreadModal {
   applying=false;
   constructor(plugin:ThreadPlugin,note:NewNote,validate:()=>Promise<boolean>=async()=>true){super(plugin);this.note={...note};this.validate=validate;}
   override invalidate(message?:string): void {if(this.applying)return;super.invalidate(message);if(this.apply)this.apply.disabled=true;}
+  protected async persist(approved:NewNote,validate:()=>Promise<void>,current:()=>boolean): Promise<void> {await this.plugin.createNotes([approved],validate,current);}
   onOpen(): void {
     this.contentEl.createEl("h2",{text:"Save a new note"});this.contentEl.createEl("p",{text:this.note.path});
     this.resultEl=this.contentEl.createDiv();this.resultEl.createEl("pre",{text:this.note.content,cls:"thread-preview"});
@@ -24,7 +25,7 @@ export class NewNoteModal extends ThreadModal {
           if(this.closed||epoch!==this.epoch||revision!==this.plugin.index.revision||settings!==JSON.stringify(this.plugin.settings))throw new Error("Preview or evidence changed.");
           validatedRevision=revision;validatedSettings=settings;
         };
-        await this.plugin.createNotes([approved],validate,()=>!this.closed&&epoch===this.epoch&&validatedRevision===this.plugin.index.revision&&validatedSettings===JSON.stringify(this.plugin.settings));
+        await this.persist(approved,validate,()=>!this.closed&&epoch===this.epoch&&validatedRevision===this.plugin.index.revision&&validatedSettings===JSON.stringify(this.plugin.settings));
         if(!this.closed)this.status?.setText(`Saved ${approved.path}.`);
       }catch(e){if(!this.closed)this.status?.setText(e instanceof Error?e.message:"Save failed.");}
       finally{this.applying=false;}
