@@ -7,6 +7,9 @@ import { AskModal } from "./ui/ask-modal.ts";
 import { DecisionModal } from "./ui/decision-modal.ts";
 import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
+import { ChangeManager } from "./vault/changes.ts";
+import { ChangeReviewModal } from "./ui/change-review-modal.ts";
+import { KnowledgeModal } from "./ui/knowledge-modal.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
 import { writablePath, type NewNote } from "./vault/workspace.ts";
 import { createNewNotes } from "./vault/new-notes.ts";
@@ -27,9 +30,19 @@ export default class ThreadPlugin extends Plugin {
   cacheWrite: Promise<void>=Promise.resolve();
   imports=new ImportRegistry();
   importsWarning="";
+  active=true;
+  changes!:ChangeManager;
+  changesWarning="";
+  changesText="";
+  changeTicket={context:"",revision:-1,settings:""};
 
   async onload(): Promise<void> {
+    this.active=true;
     this.settings = loadSettings(await this.loadData());
+    this.changes=this.createChangeManager();
+    if(await this.app.vault.adapter.exists(this.changesPath())){
+      try{this.changesText=await this.app.vault.adapter.read(this.changesPath());await this.changes.load(JSON.parse(this.changesText));}catch{this.changesWarning="Change history is invalid. Preserve changes.json and recover from a known backup; Thread will not overwrite it.";}
+    }else{this.changesText=JSON.stringify(this.changes.state);await this.app.vault.adapter.write(this.changesPath(),this.changesText);}
     if(await this.app.vault.adapter.exists(this.importsPath())){
       try{this.imports.load(JSON.parse(await this.app.vault.adapter.read(this.importsPath())));}catch{this.importsWarning="Import history is unavailable. Rebuild it from allowed source notes before importing.";}
     }
@@ -43,6 +56,8 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
+    this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
+    this.addCommand({id:"knowledge-updates",name:"Knowledge updates",callback:()=>this.openKnowledge()});
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -53,6 +68,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.active=false;
     this.index.clear();
     this.indexController?.abort();if(this.indexTimer)clearTimeout(this.indexTimer);
     for (const modal of this.modals) modal.close();
@@ -66,7 +82,84 @@ export default class ThreadPlugin extends Plugin {
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
+  openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
+  openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}
+  async readReviewedTarget(path:string):Promise<string|null>{return this.readChangeText(path);}
+  changePathAllowed(path:string):boolean {try{this.checkChangePath(path);return true;}catch{return false;}}
+  async openChangeTarget(path:string):Promise<void>{
+    this.checkChangePath(path);const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error("The current target note is missing.");
+    await this.app.workspace.getLeaf(false).openFile(file);
+  }
   importsPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/imports.json`;}
+  changesPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/changes.json`;}
+  changeContext(bundle:EvidenceBundle,settings=this.settings): string {return JSON.stringify({settings,noteHashes:bundle.noteHashes});}
+  private checkChangePath(path:string): void {
+    if(!this.active)throw new Error("Thread stopped. Reopen it and review recovery.");
+    if(this.changesWarning)throw new Error(this.changesWarning);
+    writablePath(path,[this.settings.roles.knowledge,this.settings.selectedProject,this.settings.roles.reviews],this.settings.excludedPaths);
+    if(!readableText(path,this.settings))throw new Error("Allow this destination in Thread read paths for conflict checks before applying changes.");
+    if([this.settings.roles.sources,this.settings.roles.inbox].filter(Boolean).some(root=>isWithin(path,root)))throw new Error("Reviewed updates cannot modify original Inbox or Sources notes.");
+  }
+  private async readChangeText(path:string): Promise<string|null> {
+    this.checkChangePath(path);const file=this.app.vault.getAbstractFileByPath(path);if(!file)return null;
+    if(!(file instanceof TFile))throw new Error(`A folder occupies ${path}.`);
+    const text=await this.app.vault.read(file);this.checkChangePath(path);
+    if(file.path!==path)throw new Error("Target moved during review.");
+    if(readMetadata(text,parseYaml).type==="source")throw new Error("Original source notes cannot be changed through reviewed updates.");
+    return text;
+  }
+  private async validateChangeContext(context:string): Promise<boolean> {
+    const revision=this.index.revision;const settings=structuredClone(this.settings);const settingsText=JSON.stringify(settings);
+    let noteHashes:Record<string,string>={};
+    if(context){
+      try{
+        const data=JSON.parse(context) as {settings:unknown;noteHashes:unknown};
+        if(JSON.stringify(data.settings)!==settingsText||!data.noteHashes||typeof data.noteHashes!=="object"||Array.isArray(data.noteHashes))return false;
+        for(const [path,hash] of Object.entries(data.noteHashes)){
+          if(typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)||!readableText(path,settings))return false;noteHashes[path]=hash;
+        }
+      }catch{return false;}
+    }
+    const valid=await this.evidenceCurrent({sources:[],truncated:false,noteHashes},settings);
+    if(!valid||!this.active||revision!==this.index.revision||settingsText!==JSON.stringify(this.settings))return false;
+    this.changeTicket={context,revision,settings:settingsText};return true;
+  }
+  private createChangeManager(): ChangeManager {
+    const key=Symbol.for("thread.reviewed-changes.busy");
+    const sessions=this.app as unknown as {[key:symbol]:{busy:boolean}|undefined};
+    const lease=sessions[key]??{busy:false};sessions[key]=lease;
+    return new ChangeManager({
+      check:path=>this.checkChangePath(path),read:path=>this.readChangeText(path),
+      prepare:async path=>{this.checkChangePath(path);await this.ensureFolder(path.slice(0,path.lastIndexOf("/")));this.checkChangePath(path);},
+      create:async(path,content)=>{this.checkChangePath(path);if(readMetadata(content,parseYaml).type==="source")throw new Error("Cannot create a raw source through reviewed updates.");await this.app.vault.create(path,content);},
+      replace:async(path,expected,content,currentState=()=>true)=>{
+        this.checkChangePath(path);const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error(`Target missing: ${path}.`);
+        await this.app.vault.process(file,current=>{
+          this.checkChangePath(path);
+          if(!currentState())throw new Error("Evidence changed while waiting to write. Generate a new proposal.");
+          if(file.path!==path||current!==expected)throw new Error(`Concurrent edit at ${path}.`);
+          if(readMetadata(current,parseYaml).type==="source"||readMetadata(content,parseYaml).type==="source")throw new Error("Raw sources cannot be updated.");
+          return content;
+        });
+      },
+      removeCreated:async(path,expected)=>{
+        const revision=this.index.revision;const text=await this.readChangeText(path);this.checkChangePath(path);
+        const file=this.app.vault.getAbstractFileByPath(path);
+        if(!(file instanceof TFile)||text!==expected||revision!==this.index.revision)throw new Error(`Newer changes prevent undo at ${path}.`);
+        await this.app.vault.trash(file,false);
+      },
+      persist:async(state,currentState=()=>true)=>{
+        if(this.changesWarning)throw new Error(this.changesWarning);
+        await this.app.vault.adapter.process(this.changesPath(),current=>{
+          if(!currentState())throw new Error("Proposal generation canceled before persistence.");
+          if(current!==this.changesText)throw new Error("Change history changed in another plugin instance. Reload Thread before continuing.");return state;
+        });
+        this.changesText=state;
+      },
+      validateContext:context=>this.validateChangeContext(context),
+      contextCurrent:context=>this.active&&this.changeTicket.context===context&&this.changeTicket.revision===this.index.revision&&this.changeTicket.settings===JSON.stringify(this.settings)
+    },lease);
+  }
   async rebuildImports(): Promise<void> {
     if(this.imports.active.size||this.imports.rebuilding)throw new Error("Wait for pending imports or history rebuild first.");
     this.imports.rebuilding=true;
@@ -103,6 +196,8 @@ export default class ThreadPlugin extends Plugin {
       const text=await this.app.vault.read(file);controller.signal.throwIfAborted();
       const note={path:file.path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime};
       entries.push(await indexNote(note,link=>{
+        const exact=this.app.vault.getAbstractFileByPath(link);
+        if(exact instanceof TFile&&readableText(exact.path,settings))return exact.path;
         const target=this.app.metadataCache.getFirstLinkpathDest(link,file.path);
         return target&&readableText(target.path,settings)?target.path:null;
       }));
@@ -199,6 +294,16 @@ export default class ThreadPlugin extends Plugin {
       notes.push({ path: file.path, text, metadata: readMetadata(text, parseYaml), modifiedAt: file.stat.mtime });
     }
     return buildEvidence(notes);
+  }
+  async evidenceFromPaths(paths:string[],settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
+    const notes:SourceNote[]=[];
+    for(const path of [...new Set(paths)]){
+      signal.throwIfAborted();if(JSON.stringify(settings)!==JSON.stringify(this.settings)||!readableText(path,settings))throw new Error("Source is outside current read scope.");
+      const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error(`Source missing: ${path}.`);
+      const text=await this.app.vault.read(file);signal.throwIfAborted();if(file.path!==path)throw new Error("Source moved while reading.");
+      notes.push({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime});
+    }
+    const bundle=await buildEvidence(notes);signal.throwIfAborted();return bundle;
   }
 
   async evidenceCurrent(bundle: EvidenceBundle, settings: ThreadSettings): Promise<boolean> {

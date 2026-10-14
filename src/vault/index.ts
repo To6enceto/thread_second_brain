@@ -16,7 +16,11 @@ export function identityFromIndex(entries:IndexEntry[],project:string,ready:bool
 }
 export function linkTargets(text: string): string[] {
   return [...new Set([...text.matchAll(/\[\[([^\]|#]+)(?:[^\]]*)\]\]|\[[^\]]*\]\(([^\s)]+)\)/g)]
-    .map(match=>(match[1]??match[2]??"").trim()).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
+    .flatMap(match=>{
+      if(match[1])return [match[1].trim()];
+      const target=(match[2]??"").replace(/^<|>$/g,"").split("#")[0]??"";
+      try{return [decodeURIComponent(target).trim()];}catch{return [];}
+    }).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
 }
 export async function indexNote(note: SourceNote, resolve: (link: string) => string | null): Promise<IndexEntry> {
   const text=note.text.slice(0,50000);
