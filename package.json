@@ -2,6 +2,7 @@
   "name": "thread-obsidian",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "description": "A local AI project memory and research companion for Obsidian.",
   "license": "UNLICENSED",
   "engines": {
@@ -10,8 +11,9 @@
   "scripts": {
     "dev": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
     "build": "node esbuild.config.mjs --production",
-    "verify": "npm run typecheck && npm run build"
+    "verify": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

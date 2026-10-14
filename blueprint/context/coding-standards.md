@@ -7,6 +7,8 @@ for the commands that actually exist. Keep Blueprint workflow policy in
 ## TypeScript and runtime
 
 - Use strict TypeScript and the existing compiler configuration.
+- Use erasable TypeScript syntax so Node's built-in type-stripping test runner
+  can load pure logic without a separate transpiler.
 - Prefer proper types or `unknown` with narrowing over `any`.
 - Treat parsed frontmatter, model responses, and persisted settings as external
   data; validate before using them as domain records.
@@ -95,9 +97,9 @@ for the commands that actually exist. Keep Blueprint workflow policy in
 
 ## Testing and verification
 
-- The current Verify command is `npm run verify`: typecheck, then build.
-- No unit runner is installed at setup. Add one explicitly with the first
-  logic-bearing feature or the Blueprint Tests skill.
+- The current Verify command is `npm run verify`: typecheck, logic tests, then build.
+- `npm test` uses Node's built-in test runner with type stripping through
+  `scripts/test.mjs`; no additional test-runner dependency is required.
 - A Test command in AGENTS.md enables the logic-test gate. When configured,
   steps adding parsers, scope checks, citation resolution, proposal validation,
   or write/undo logic must include meaningful tests and pass that command.

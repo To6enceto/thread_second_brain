@@ -1,0 +1,16 @@
+.thread-view { padding: 16px; }
+.thread-view h2 { margin-top: 0; }
+.thread-project { color: var(--text-muted); overflow-wrap: anywhere; }
+.thread-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.thread-status { padding: 10px 0; color: var(--text-muted); }
+.thread-view section { margin: 20px 0; }
+.thread-view h3 { font-size: var(--font-ui-medium); margin-bottom: 10px; }
+.thread-claim { margin: 12px 0; padding-left: 10px; border-left: 2px solid var(--background-modifier-border); }
+.thread-claim p { margin: 6px 0; }
+.thread-kind { font-size: var(--font-ui-smaller); color: var(--text-muted); text-transform: capitalize; }
+.thread-kind-suggestion { color: var(--text-accent); }
+.thread-source { display: block; white-space: normal; text-align: left; height: auto; margin: 4px 0; overflow-wrap: anywhere; }
+.thread-meta, .thread-muted, .thread-excerpt { color: var(--text-muted); font-size: var(--font-ui-small); }
+.thread-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread-evidence summary { cursor: pointer; }
+.thread-view button:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }

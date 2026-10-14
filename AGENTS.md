@@ -327,15 +327,15 @@ checks do not make the Blueprint unusable.
 - Development watcher: `npm run dev` (rebuilds `main.js`; no web server).
 - Typecheck: `npm run typecheck`.
 - Build: `npm run build`.
-- Verify: `npm run verify` (typecheck, then production build).
+- Test: `npm test` (Node's built-in test runner with TypeScript type stripping).
+- Verify: `npm run verify` (typecheck, tests, then production build).
 - Run the plugin: copy `main.js` and `manifest.json` into a separate test vault's
   `.obsidian/plugins/thread/` directory and enable Thread in Obsidian. Include
   `styles.css` when the app starts using it.
 
-No lint, format, unit-test, browser-test, or CI command is configured yet.
-Introduce focused logic tests explicitly with the first feature that needs
-them, or run `$tests` (`/tests` in Claude Code). Once configured, declare the
-real Test command here and include it in Verify. An empty suite must not pass.
+No lint, format, browser-test, or CI command is configured yet.
+Focused logic tests are configured and are a gate for logic-bearing changes.
+The test runner discovers adjacent `*.test.ts` files and rejects an empty suite.
 Do not silently install a browser harness for this desktop plugin. UI proof
 requires actual Obsidian interaction in a synthetic test vault; a web-browser
 mock or a green bundle alone is insufficient.
@@ -361,4 +361,5 @@ Automatic GitHub checks are optional and separate from setup. Run `$ci` or
   overview condenses them; regenerate it after a material plan change.
 - Blueprint workflow files are intended to travel with the repository. Ignore
   transient dashboard state through `blueprint/.state/.gitignore`.
-- Current setup is a plugin scaffold. Do not present planned features as shipped.
+- Product progress lives in the build checklist and feature history. Report only
+  features with implementation and verification evidence as completed.

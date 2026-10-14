@@ -289,11 +289,12 @@ necessary for contradiction detection and other interpretive tasks.
 ### Commands and verification
 
 The scaffold has `npm ci`, `npm run dev`, `npm run typecheck`, `npm run build`,
-and `npm run verify`. Verify currently runs typechecking and the production
-build. It does not yet run a test suite or launch Obsidian.
+and `npm run verify`. Verify runs typechecking, focused logic tests through Node's built-in TypeScript
+test runner, and the production build. It does not launch Obsidian. The runner
+discovers adjacent `*.test.ts` files and rejects an empty suite.
 
-Add a TypeScript unit runner explicitly when the first feature introduces
-parsing, scope validation, or citation logic that warrants tests. Cover real
+The first feature explicitly configures the Node test runner for parsing, scope
+validation, and citation logic. Cover real
 failure cases, including unsupported questions, malformed model output,
 exclusions, renamed/missing sources, concurrent edits, and partial write failure.
 Once configured, add its command to Verify and the project agent instructions.

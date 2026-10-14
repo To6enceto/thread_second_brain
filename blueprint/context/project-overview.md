@@ -1,6 +1,6 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash 4c6249f56ff3a8e2c621b08f0c584ed06e4b05ff37c150f3dedf71f7cba9baaa -->
+<!-- blueprint:source-hash d7a210a872083f43572aa3dcdf8a518a4c1815cf12d34ff860eebd1bb1ad07bd -->
 
 > A desktop Obsidian plugin that helps individuals resume projects, recover
 > decision reasoning, and connect research through a local AI model.
@@ -43,8 +43,9 @@ and Claude Code are development assistants, not runtime prerequisites.
 
 ## Features
 
-Build-plan IDs are stable. All 12 items are currently unchecked. Scaffold and
-Blueprint setup do not constitute completed product features.
+Build-plan IDs are stable. Read completion state from the build checklist and
+feature history. Scaffold and Blueprint setup do not constitute completed product
+features.
 
 1. **Local project briefings** - Headline read-only Resume action over an allowed
    project folder, with local-model setup, cited facts, gaps, and cancellation.
@@ -184,14 +185,14 @@ request or review an established-note update. A generated summary supplements
 original evidence; it does not replace it. A valid citation does not guarantee
 that the passage semantically supports a claim.
 
-Only `src/main.ts` is currently implemented. Add `ui`, `vault`, `retrieval`,
+The initial scaffold starts at `src/main.ts`. Add `ui`, `vault`, `retrieval`,
 `intelligence`, `changes`, and `settings` modules as each feature needs them.
 
 Commands: `npm ci`, `npm run dev`, `npm run typecheck`, `npm run build`, and
 `npm run verify`. Dev watches the bundle; it does not launch a web server.
-Verify currently means typecheck then build. No tests or CI are configured.
-Introduce a focused TypeScript unit runner explicitly with the first suitable
-logic-bearing feature, then declare Test in AGENTS.md and add it to Verify.
+Verify means typecheck, focused logic tests through Node's built-in TypeScript
+runner, then build. Test is declared in AGENTS.md; the runner rejects an empty
+suite. CI remains an optional separate setup.
 Evaluate parsing, scope, evidence gaps, malformed output, stale references,
 concurrent edits, partial failure, and guarded undo with controlled fixtures.
 UI/integration acceptance requires actual Obsidian evidence in a synthetic
