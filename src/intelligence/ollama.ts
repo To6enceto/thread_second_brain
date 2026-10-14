@@ -52,10 +52,10 @@ export class OllamaClient {
     if (Object.keys(object(details.model_info)).length === 0) throw new Error("Ollama did not confirm a local model. Choose a downloaded model.");
   }
 
-  async generate(model: string, prompt: string, signal: AbortSignal): Promise<string> {
+  async generate(model: string, prompt: string, signal: AbortSignal, schema: unknown = BRIEFING_SCHEMA): Promise<string> {
     await this.check(model, signal);
     const data = await this.request("/api/chat", {
-      model, stream: false, think: false, truncate: false, format: BRIEFING_SCHEMA,
+      model, stream: false, think: false, truncate: false, format: schema,
       options: { temperature: 0, num_ctx: 8192, num_predict: 1400 },
       messages: [
         { role: "system", content: "You are a careful project research assistant. Use only the supplied evidence, cite source IDs, distinguish suggestions from facts, and return the requested JSON schema." },

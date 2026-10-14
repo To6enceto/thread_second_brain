@@ -13,7 +13,7 @@ export interface Briefing {
   gaps: string[];
 }
 
-const claimSchema = {
+export const claimSchema = {
   type: "object", additionalProperties: false,
   properties: {
     text: { type: "string" }, kind: { type: "string", enum: ["fact", "interpretation", "suggestion"] },

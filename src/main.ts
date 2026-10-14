@@ -3,8 +3,10 @@ import { LocalIndex, indexNote, type IndexEntry } from "./vault/index.ts";
 import { RecallModal } from "./ui/recall-modal.ts";
 import { ThreadModal } from "./ui/thread-modal.ts";
 import { verifyThenOpenSource } from "./vault/source-link.ts";
+import { AskModal } from "./ui/ask-modal.ts";
 import { WorkspaceModal } from "./ui/workspace-modal.ts";
-import { rejectCollisions, writablePath, type NewNote } from "./vault/workspace.ts";
+import { writablePath, type NewNote } from "./vault/workspace.ts";
+import { createNewNotes } from "./vault/new-notes.ts";
 import { defaultSettings, loadSettings, type ThreadSettings } from "./settings/settings.ts";
 import { ThreadSettingTab, ThreadSetupModal } from "./ui/settings-tab.ts";
 import { BriefingView, THREAD_VIEW } from "./ui/briefing-view.ts";
@@ -30,6 +32,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id: "open-thread", name: "Open Thread", callback: () => { void this.openThread(); } });
     this.addCommand({ id: "create-workspace", name: "Create project workspace", callback: () => this.openWorkspace() });
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
+    this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -50,6 +53,10 @@ export default class ThreadPlugin extends Plugin {
   }
 
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
+  openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
+  projectIdentity(path=this.settings.selectedProject): string {
+    return this.index.entries.find(e=>isWithin(e.path,path)&&e.metadata.type==="project"&&e.id)?.id??path;
+  }
 
   private scheduleIndex(): void {
     this.indexController?.abort();this.index.clear();
@@ -107,18 +114,12 @@ export default class ThreadPlugin extends Plugin {
     }
   }
 
-  async createNotes(notes: NewNote[]): Promise<void> {
-    rejectCollisions(notes,path=>Boolean(this.app.vault.getAbstractFileByPath(path)));
-    const created:string[]=[];
-    try{
-      for(const note of notes){
-        writablePath(note.path,[...Object.values(this.settings.roles),this.settings.selectedProject],this.settings.excludedPaths);
-        await this.ensureFolder(note.path.slice(0,note.path.lastIndexOf("/")));
-        await this.app.vault.create(note.path,note.content);created.push(note.path);
-      }
-    }catch(error){
-      throw new Error(`${error instanceof Error?error.message:"Write failed."}${created.length ? ` Partial creation; already created: ${created.join(", ")}. Inspect these notes before retrying.` : ""}`);
-    }
+  async createNotes(notes: NewNote[],validate:()=>Promise<void>=async()=>{},current:()=>boolean=()=>true): Promise<void> {
+    await createNewNotes(notes,{
+      exists:path=>Boolean(this.app.vault.getAbstractFileByPath(path)),
+      checkPath:path=>{writablePath(path,[...Object.values(this.settings.roles),this.settings.selectedProject],this.settings.excludedPaths);},
+      ensureFolder:path=>this.ensureFolder(path),create:(path,content)=>this.app.vault.create(path,content)
+    },validate,current);
   }
 
   openSetup(): void {
@@ -175,12 +176,14 @@ export default class ThreadPlugin extends Plugin {
   }
 
   async evidenceCurrent(bundle: EvidenceBundle, settings: ThreadSettings): Promise<boolean> {
+    const revision=this.index.revision;
     if (JSON.stringify(settings) !== JSON.stringify(this.settings)) return false;
     for (const [path, hash] of Object.entries(bundle.noteHashes)) {
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile) || !readableText(path, this.settings)) return false;
       if (await contentHash(await this.app.vault.read(file)) !== hash) return false;
+      if(file.path!==path||!readableText(path,this.settings))return false;
     }
-    return true;
+    return revision===this.index.revision&&JSON.stringify(settings)===JSON.stringify(this.settings);
   }
 }
