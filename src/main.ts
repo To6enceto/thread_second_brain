@@ -4,6 +4,7 @@ import { RecallModal } from "./ui/recall-modal.ts";
 import { ThreadModal } from "./ui/thread-modal.ts";
 import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { AskModal } from "./ui/ask-modal.ts";
+import { DecisionReviewModal } from "./ui/decision-review-modal.ts";
 import { DecisionModal } from "./ui/decision-modal.ts";
 import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
@@ -55,6 +56,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
+    this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
     this.addCommand({id:"knowledge-updates",name:"Knowledge updates",callback:()=>this.openKnowledge()});
@@ -83,6 +85,7 @@ export default class ThreadPlugin extends Plugin {
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
+  openDecisionReview():void{const modal=new DecisionReviewModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}
   async readReviewedTarget(path:string):Promise<string|null>{return this.readChangeText(path);}
   changePathAllowed(path:string):boolean {try{this.checkChangePath(path);return true;}catch{return false;}}
