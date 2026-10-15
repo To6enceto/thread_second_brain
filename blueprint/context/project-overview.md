@@ -1,6 +1,6 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash d7a210a872083f43572aa3dcdf8a518a4c1815cf12d34ff860eebd1bb1ad07bd -->
+<!-- blueprint:source-hash 17ae17886623a5af4a5cb6ce65d3f5de50d86d66e2a04c2bf98430babf7df7ee -->
 
 > A desktop Obsidian plugin that helps individuals resume projects, recover
 > decision reasoning, and connect research through a local AI model.
@@ -71,11 +71,22 @@ features.
 12. **Offline release readiness** - Package, document, and demonstrate the complete
     core workflow in an actual synthetic Obsidian vault.
 
+13. **Repeatable answer-quality evaluation** - Reusable synthetic fixtures and an opt-in local evaluation command covering missing evidence, conflicts, decision status, section placement and cited support, with honest baseline reports.
+14. **Dependable recorded briefings** - Show sourced recorded project context before inference, separate AI interpretation, expose supporting excerpts and keep recorded context usable without Ollama.
+15. **Project home and quick switching** - Switch among permitted projects directly in Thread and show recent sessions, decisions, questions and pending reviews without silently granting read access.
+16. **Ranked evidence search** - Improve keyword ranking, phrases/aliases and explicit filters, preserve relevance and source diversity in bounded context, and explain coverage limits.
+17. **Optional local semantic search** - Offer explicit opt-in local embeddings and hybrid retrieval while preserving scoped keyword search without an embedding model or paid services.
+18. **Editable change review** - Highlight changed lines, permit draft edits followed by renewed exact previews and validation, preserve dependent operation groups and give actionable recovery explanations.
+19. **Guided local setup** - Guide local-only connection, compatible downloaded model selection, folder grants and an optional sample; show actionable diagnostics without installing services or downloading models silently.
+20. **Incremental dependency indexing** - Reindex changed notes and affected dependencies, avoid unnecessary invalidation, and preserve immediate exclusion removal, cancellation and stale-source guards.
+21. **Project review queue** - Connect changed sources, affected decisions, explicit revisit dates/conditions, questions and stale outputs in an on-demand review queue; changes and resolutions remain explicit.
+
 Feature 1 reads current notes directly. Feature 3 adds the reusable index. New
 note creation must reject collisions; changing established notes uses feature
 7's proposal workflow. Saved answers, briefings, and reviews require user action.
 
-Deferred: embeddings/semantic search, cloud APIs, mobile AI, team features,
+Optional local embeddings/hybrid retrieval is approved for feature 17.
+Deferred: cloud APIs, mobile AI, team features,
 unattended agents, email/calendar, custom web clipping, audio, PDF extraction/OCR,
 model training, arbitrary web browsing, billing, and hosted dashboards.
 
@@ -171,7 +182,7 @@ Thread-created notes receive a stable `id`; plugin-specific metadata uses a
   Markdown rendering, vault events, and file/storage access.
 - **Native DOM helpers and Obsidian CSS variables**: theme-compatible UI.
 - **esbuild**: `src/main.ts` to CommonJS `main.js`, with host modules external.
-- **Node.js 22+ and npm**: development tooling and a committed exact lockfile.
+- **Node.js 22.15+ and npm**: development tooling and a committed exact lockfile.
 - **Ollama**: downloaded local model over loopback; use documented local-only
   configuration such as `OLLAMA_NO_CLOUD=1`. No model weights are bundled.
 - **Text/link retrieval**: local index, metadata, bounded context; no server,
@@ -245,8 +256,7 @@ Saved knowledge must remain readable after Thread is disabled.
 
 Community submission, a public repository/release, license selection, and
 publication are later user decisions. No publication is authorized by setup.
-The scaffold's `minAppVersion: 1.8.0` is provisional until APIs and compatibility
-checks establish the actual supported minimum.
+The released local 0.1.0 manifest requires Obsidian 1.14.4, the tested minimum.
 
 ## Open questions
 
@@ -260,3 +270,7 @@ checks establish the actual supported minimum.
 
 No contradictions were found between the two plans. These deferred decisions
 remain in the project plan and do not block the current setup.
+
+## Approved follow-up contracts
+
+Features 13-21 target a private local 0.2.0 build. Recorded facts precede AI interpretation, project switching never grants access, optional semantic search preserves keyword fallback, editable proposals require renewed exact approval, and indexing retains immediate privacy/freshness guards. The project review queue is on demand and never resolves questions or changes decisions automatically. Quality evaluations report observed strengths and failures rather than treating citations as semantic proof. Preserve original Markdown, durable history and the completed first-release archives.

@@ -446,3 +446,49 @@ runtime dependency. Recheck versions and terms when implementing integrations.
 - [Obsidian Web Clipper](https://obsidian.md/help/web-clipper)
 - [Ollama local operation and configuration](https://docs.ollama.com/faq)
 - [AI Blueprint](https://github.com/aiblueprinthq/ai-blueprint)
+
+
+## Approved improvements - local 0.2.0 target
+
+Approved on 2026-10-15. Preserve completed features 1-12 and their archives.
+This follow-up supersedes the initial-release deferral of optional local semantic
+search only; cloud inference, autonomous writes, publishing and paid services
+remain outside scope. Features 13-21 follow the ordered build plan.
+
+- Evaluate answer quality with tracked synthetic notes/questions, explicit known
+  expectations and opt-in real local-model runs. Baselines may disclose model
+  weaknesses; format/citation checks do not prove unrestricted semantic truth.
+- Present deterministic recorded context before AI generation. Recognized
+  headings/properties and user reports remain sourced; missing/ambiguous legacy
+  structure is visible. AI interpretations do not replace recorded facts.
+- Add a native project home and quick selector restricted to existing grants.
+- Improve keyword ranking/filtering and allocate bounded context across relevant
+  sources and roles. Show truncation/omission without claiming full-vault coverage.
+- Add opt-in local embeddings/hybrid retrieval. Keyword search remains available
+  when disabled or the embedding model is missing. Use the existing loopback and
+  cloud-disabled checks; scope/freshness filtering precedes embedding/retrieval.
+  Additional model weights are a separate explicit download, never bundled.
+- Improve review with real line diffs, editable drafts and renewed exact preview
+  approval. Keep related operations together and preserve hash/conflict guards,
+  durable originals, last-20-batch history and conservative recovery behavior.
+- Guide setup using compatible downloaded local models, explicit folder grants
+  and useful diagnostics. Connection and quality checks are different signals.
+- Index changed notes/dependencies incrementally; scope changes immediately scrub
+  unavailable content. Unrelated changes should not cancel safe independent work.
+- Offer an on-demand project review queue. Revisit dates are explicit; free-text
+  conditions and possible answers/conflicts need human judgment. No automatic
+  status changes, question resolution, notifications or scheduled services.
+
+Use native Obsidian views/controls and theme variables. Keep settings and durable
+history compatible; derived caches are disposable and must fail closed when
+invalid or unavailable. Source Markdown remains authoritative and raw originals
+stay unchanged. This is still a private local product; no public licensing,
+remote repository, paid API, system-wide install or deployment is introduced.
+
+The tested baseline is Linux, Obsidian 1.14.4, Ollama 0.40.4, Node 22.22.2 and
+qwen3:4b-instruct on the available laptop. Development requires Node 22.15+.
+The 0.1.0 release uses minAppVersion 1.14.4. Other platforms/models and large
+vault performance require their own evidence. Test only synthetic vaults.
+Local model and optional embedding downloads, storage, memory and power remain
+real costs; no mandatory paid runtime is introduced. Package the final private
+0.2.0 build after the complete approved queue is verified.

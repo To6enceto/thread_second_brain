@@ -189,3 +189,10 @@ Tests use Node's built-in runner. No CI or publishing workflow is configured.
 Product direction, ordered implementation and per-feature verification/try guides
 live in `blueprint/project-plan.md`, `blueprint/build-plan.md` and
 `blueprint/history/features/`.
+
+## Quality evaluation
+
+Run `npm run evaluate` for the synthetic reference/negative-control self-check.
+Opt-in real local-model evaluation and native Obsidian fixture collection are
+documented in [evaluation/README.md](evaluation/README.md). These curated checks
+report observed weaknesses and do not establish unrestricted semantic accuracy.

@@ -329,6 +329,7 @@ checks do not make the Blueprint unusable.
 - Build: `npm run build`.
 - Test: `npm test` (Node's built-in test runner with TypeScript type stripping).
 - Verify: `npm run verify` (typecheck, tests, then production build).
+- Quality evaluation: `npm run evaluate` (offline harness self-check; opt-in live mode in evaluation/README.md).
 - Package: `npm run package` (Verify, then reproducible three-file ZIP in `dist/`).
 - Run the plugin: extract `dist/thread-0.1.0.zip` into a separate test vault's
   `.obsidian/plugins/` directory and enable Thread in Obsidian. See README.md for
