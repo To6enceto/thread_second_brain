@@ -15,9 +15,11 @@ export interface Evidence {
   noteType?: string;
   noteStatus?: string;
   heading: string;
+  property?: "objective" | "goal";
   excerpt: string;
   contentHash: string;
   recordedDate: string;
+  modifiedAt?: number;
   dateBasis: string;
   changedOn?: string;
   changeBasis?: string;
@@ -107,14 +109,20 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
     || b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path));
   for (const note of ordered) {
     noteHashes[note.path] = note.fullHash ?? await contentHash(note.text);
-    for (const section of noteSections(note.text)) {
+    const properties: { heading: string; excerpt: string; property: "objective" | "goal" }[] = [];
+    if (note.metadata.type === "project") for (const property of ["objective", "goal"] as const) {
+      const value = note.metadata[property];
+      if (typeof value === "string" && value.trim()) properties.push({ heading: "", excerpt: value.trim(), property });
+    }
+    for (const section of [...properties, ...noteSections(note.text)]) {
       if (remaining < 100) { truncated = true; break; }
       const excerpt = section.excerpt.slice(0, Math.min(4000, remaining));
       truncated ||= excerpt.length !== section.excerpt.length;
       const source: Evidence = {
         id: `S${sources.length + 1}`, path: note.path, heading: section.heading,
-        excerpt, contentHash: await contentHash(excerpt), ...recordedDate(note)
+        excerpt, contentHash: await contentHash(excerpt), modifiedAt: note.modifiedAt, ...recordedDate(note)
       };
+      if ("property" in section && (section.property === "objective" || section.property === "goal")) source.property = section.property;
       if (typeof note.metadata.id === "string") source.noteId = note.metadata.id;
       if (typeof note.metadata.type === "string") source.noteType = note.metadata.type.slice(0, 100);
       if (typeof note.metadata.status === "string") source.noteStatus = note.metadata.status.slice(0, 100);

@@ -57,3 +57,5 @@ then restores settings. It refuses to run with open Thread dialogs or pending
 changes/recovery. It does not save or modify notes and is not a semantic pass
 claim. The CDP helper is developer tooling, never bundled into the plugin.
 Test runtimes, weights and collected reports stay ignored.
+
+Live briefing cases evaluate the recorded-first Resume composition. Reports retain `modelOutput` separately so model mistakes remain inspectable. Default reference/negative-control self-checks continue to exercise the curated evaluator directly.

@@ -196,3 +196,5 @@ Run `npm run evaluate` for the synthetic reference/negative-control self-check.
 Opt-in real local-model evaluation and native Obsidian fixture collection are
 documented in [evaluation/README.md](evaluation/README.md). These curated checks
 report observed weaknesses and do not establish unrestricted semantic accuracy.
+
+Resume loads **Recorded context** before contacting Ollama. Recognized Objective/Goal headings or project properties, decision statuses, open questions and the latest dated session user-report remain available without a selected or running model. Supporting excerpts and source links accompany records. Legacy structure remains unknown rather than inferred. AI interpretations and suggestions appear separately; a quoted record is not independent verification.

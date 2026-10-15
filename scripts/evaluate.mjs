@@ -5,6 +5,7 @@ import {qualityCases,evaluateQuality} from '../src/evaluation/quality.ts';
 import {buildEvidence} from '../src/vault/evidence.ts';
 import {validateAnswer,answerPrompt,ANSWER_SCHEMA} from '../src/intelligence/answer.ts';
 import {validateBriefing,briefingPrompt,SECTION_KEYS} from '../src/intelligence/briefing.ts';
+import {recordedBriefing,composeBriefing} from '../src/intelligence/recorded.ts';
 import {OllamaClient} from '../src/intelligence/ollama.ts';
 import {frontmatter} from '../src/vault/workspace.ts';
 const args=process.argv.slice(2),value=flag=>{const i=args.indexOf(flag);if(i<0)return undefined;const v=args[i+1];if(!v||v.startsWith('--'))throw new Error(`Missing value for ${flag}`);return v;};
@@ -38,8 +39,9 @@ if(exportPath){
    if(live){
     raw=c.mode==='answer'&&!bundle.sources.length?JSON.stringify({supported:false,answer:[],gaps:['No matching eligible passages.']}):await client.generate(model,c.mode==='answer'?answerPrompt(c.question,bundle):briefingPrompt('Synthetic quality project',bundle),controller.signal,c.mode==='answer'?ANSWER_SCHEMA:undefined);
    }
-   const output=c.mode==='answer'?validateAnswer(raw,bundle):validateBriefing(raw,bundle);
-   result={...evaluateQuality(c,output,bundle),output};
+   const modelOutput=c.mode==='answer'?validateAnswer(raw,bundle):validateBriefing(raw,bundle);
+   const output=live&&c.mode==='briefing'?composeBriefing(recordedBriefing(bundle,now),modelOutput).briefing:modelOutput;
+   result={...evaluateQuality(c,output,bundle),output,...(live&&c.mode==='briefing'?{pipeline:'recorded-first-resume',modelOutput}: {})};
    if(!live){
     const wrong=c.mode==='answer'?c.knownWrong:{sections:Object.fromEntries(SECTION_KEYS.map(k=>[k,c.knownWrong[k]])),gaps:[]};
     if(evaluateQuality(c,wrong,bundle).passed)throw new Error('Evaluator failed to detect the curated negative control.');
