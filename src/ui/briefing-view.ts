@@ -5,6 +5,7 @@ import { briefingPrompt, validateBriefing, SECTION_KEYS, type Briefing, type Cla
 import { recordedBriefing, composeBriefing } from "../intelligence/recorded.ts";
 import { readableText } from "../vault/scope.ts";
 import type { Evidence, EvidenceBundle } from "../vault/evidence.ts";
+import { permittedProjects, projectHome, type ProjectHome, type HomeItem } from "../vault/project-home.ts";
 
 export const THREAD_VIEW = "thread-briefing";
 const LABELS: Record<SectionKey, string> = {
@@ -24,6 +25,8 @@ export class BriefingView extends ItemView {
   bundle: EvidenceBundle | null = null;
   generatedAt = "";
   closed = false;
+  home: ProjectHome | null = null;
+  homeLoading = false;
 
   constructor(leaf: WorkspaceLeaf, plugin: ThreadPlugin) { super(leaf); this.plugin = plugin; }
   getViewType(): string { return THREAD_VIEW; }
@@ -32,15 +35,17 @@ export class BriefingView extends ItemView {
   async onOpen(): Promise<void> {
     this.closed = false;
     if (this.plugin.settings.selectedProject) this.message = "Ready to read your selected project's records. Local AI is optional.";
-    this.render();
+    await this.loadHome();
   }
   async onClose(): Promise<void> { this.closed = true; this.invalidate("Thread closed."); }
 
   cancelPending(): void { this.revision++; this.controller?.abort(); this.controller = null; }
 
-  invalidate(message: string): void {
+  invalidate(message: string, preserveHome = false): void {
     this.cancelPending(); this.result = null; this.recorded = null; this.bundle = null;
     this.interpretations = []; this.modelGaps = []; this.generatedAt = ""; this.message = message;
+    this.homeLoading = false;
+    if (!preserveHome) this.home = null;
     if (!this.closed) this.render();
   }
 
@@ -48,26 +53,32 @@ export class BriefingView extends ItemView {
     const root = this.contentEl;
     root.empty(); root.addClass("thread-view");
     root.createEl("h2", { text: "Thread" });
-    root.createEl("p", { text: this.plugin.settings.selectedProject || "No project selected", cls: "thread-project" });
+    const projectLabel = root.createEl("label", { text: "Project", cls: "thread-project-selector" });
+    const selector = projectLabel.createEl("select", { attr: { "aria-label": "Project" } });
+    selector.add(new Option("Choose a permitted project", ""));
+    for (const path of permittedProjects(this.plugin.index, this.plugin.settings)) selector.add(new Option(path, path));
+    selector.value = this.plugin.settings.selectedProject; selector.disabled = this.homeLoading;
+    selector.onchange = () => { void this.switchProject(selector.value); };
     const actions = root.createDiv({ cls: "thread-actions" });
     const resume = actions.createEl("button", { text: "Resume project", cls: "mod-cta" });
     resume.disabled = this.controller !== null;
     resume.addEventListener("click", () => { void this.resume(); });
     if (this.controller) actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => { void this.cancelGeneration(); });
-    actions.createEl("button", { text: "Settings" }).addEventListener("click", () => {
-      this.plugin.openSetup();
-    });
-    actions.createEl("button",{text:"Find evidence"}).onclick=()=>this.plugin.openRecall();
     actions.createEl("button",{text:"Ask"}).onclick=()=>this.plugin.openAsk();
-    actions.createEl("button",{text:"Decisions"}).onclick=()=>this.plugin.openDecisions();
-    actions.createEl("button",{text:"Capture"}).onclick=()=>this.plugin.openCapture();
-    actions.createEl("button",{text:"Review decisions"}).onclick=()=>this.plugin.openDecisionReview();
-    actions.createEl("button",{text:"Knowledge"}).onclick=()=>this.plugin.openKnowledge();
-    actions.createEl("button",{text:"Source freshness"}).onclick=()=>this.plugin.openFreshness();
-    actions.createEl("button",{text:"Weekly review"}).onclick=()=>this.plugin.openWeekly();
     actions.createEl("button",{text:"Wrap up"}).onclick=()=>this.plugin.openSession();
-    actions.createEl("button",{text:"Changes"}).onclick=()=>this.plugin.openChanges();
+    const refresh = actions.createEl("button", { text: "Refresh home" }); refresh.disabled = this.homeLoading;
+    refresh.onclick = () => { void this.loadHome(); };
+    const more = root.createEl("details", { cls: "thread-more-actions" }); more.createEl("summary", { text: "More actions" });
+    const secondary = more.createDiv({ cls: "thread-actions" });
+    for (const [label, action] of [
+      ["Find evidence", () => this.plugin.openRecall()], ["Capture", () => this.plugin.openCapture()],
+      ["Decisions", () => this.plugin.openDecisions()], ["Review decisions", () => this.plugin.openDecisionReview()],
+      ["Knowledge", () => this.plugin.openKnowledge()], ["Source freshness", () => this.plugin.openFreshness()],
+      ["Weekly review", () => this.plugin.openWeekly()], ["Changes", () => this.plugin.openChanges()],
+      ["Workspaces", () => this.plugin.openWorkspace()], ["Settings", () => this.plugin.openSetup()]
+    ] as const) secondary.createEl("button", { text: label }).onclick = action;
     root.createEl("p", { text: this.message, cls: "thread-status", attr: { role: "status", "aria-live": "polite" } });
+    this.renderHome(root);
     if (!this.result || !this.bundle) return;
     root.createEl("h3", { text: "Recorded context" });
     root.createEl("p", { text: "Quoted from recognized note fields. Recorded statements and user reports still need your judgment.", cls: "thread-meta" });
@@ -99,6 +110,56 @@ export class BriefingView extends ItemView {
       const item = details.createDiv(); this.sourceButton(item, source);
       item.createEl("p", { text: source.excerpt, cls: "thread-excerpt" });
     }
+  }
+
+  async loadHome(): Promise<void> {
+    this.invalidate("Loading current project home..."); this.homeLoading = true;
+    const revision = this.revision, settings = structuredClone(this.plugin.settings); this.render();
+    try {
+      if (!this.plugin.index.ready) await this.plugin.rebuildIndex();
+      if (revision !== this.revision || this.closed || JSON.stringify(settings) !== JSON.stringify(this.plugin.settings)) return;
+      if (settings.selectedProject) this.home = projectHome(this.plugin.index, settings, this.plugin.changes.state.pending);
+      this.message = settings.selectedProject ? "Project home ready. Resume loads recorded context; AI is optional." : "Choose a permitted project. Map folders and explicit read permissions in Settings if none appear.";
+    } catch (error) {
+      if (revision === this.revision && !this.closed) this.message = error instanceof Error ? error.message : "Could not load project home.";
+    } finally {
+      if (revision === this.revision && !this.closed) { this.homeLoading = false; this.render(); }
+    }
+  }
+
+  async switchProject(path: string): Promise<void> {
+    try {
+      if (path && !permittedProjects(this.plugin.index, this.plugin.settings).includes(path)) throw new Error("Project is no longer permitted. Refresh home or check Settings.");
+      await this.plugin.updateSettings({ ...this.plugin.settings, selectedProject: path });
+      if (!this.closed) await this.loadHome();
+    } catch (error) {
+      if (!this.closed) { this.invalidate(error instanceof Error ? error.message : "Could not switch project."); }
+    }
+  }
+
+  private renderHome(root: HTMLElement): void {
+    const snapshot = this.home; if (!snapshot) return;
+    const revision = this.revision;
+    const home = root.createEl("details", { cls: "thread-home" }); home.open = !this.result;
+    home.createEl("summary", { text: "Project home" });
+    home.createEl("p", { text: "Current indexed records. Refresh after changes; dates describe records, not verified events.", cls: "thread-meta" });
+    const items = (label: string, list: HomeItem[], total: number) => {
+      home.createEl("h3", { text: `${label} (${list.length} of ${total})` });
+      if (!list.length) home.createEl("p", { text: "No eligible records included.", cls: "thread-muted" });
+      for (const item of list) {
+        const open = home.createEl("button", { text: item.path, cls: "thread-source" });
+        home.createEl("p", { text: item.text, cls: "thread-excerpt" });
+        open.onclick = () => { void this.plugin.openIndexedSource(item.path, item.hash, item.heading,
+          () => !this.closed && this.revision === revision && this.home === snapshot && this.plugin.settings.selectedProject === snapshot.project)
+          .catch(error => { if (!this.closed && this.revision === revision) { this.message = error instanceof Error ? error.message : "Source unavailable. Refresh home."; this.render(); } }); };
+      }
+    };
+    items("Recent sessions", snapshot.sessions, snapshot.counts.sessions);
+    items("Decisions", snapshot.decisions, snapshot.counts.decisions);
+    items("Recorded questions", snapshot.questions, snapshot.counts.questions);
+    home.createEl("h3", { text: `Pending reviews (${snapshot.pendingReviews})` });
+    home.createEl("p", { text: snapshot.pendingReviews ? "A proposal for this project awaits explicit review." : "No proposal visible for this project. Changes also contains recovery and retained history.", cls: "thread-muted" });
+    home.createEl("button", { text: "Review changes" }).onclick = () => this.plugin.openChanges();
   }
 
   private renderClaim(parent: HTMLElement, claim: Claim): void {
@@ -143,7 +204,7 @@ export class BriefingView extends ItemView {
   }
 
   async resume(): Promise<void> {
-    this.invalidate("Reading recorded project context...");
+    this.invalidate("Reading recorded project context...", true);
     const settings = structuredClone(this.plugin.settings);
     if (!settings.selectedProject) {
       this.message = "Choose a readable project folder in Settings."; this.render(); return;

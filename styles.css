@@ -1,6 +1,9 @@
 .thread-view { padding: 16px; }
 .thread-view h2 { margin-top: 0; }
 .thread-project { color: var(--text-muted); overflow-wrap: anywhere; }
+.thread-project-selector { display: grid; gap: 6px; margin: 12px 0; }
+.thread-project-selector select { width: 100%; max-width: 100%; }
+.thread-home summary, .thread-more-actions summary { cursor: pointer; margin: 12px 0; }
 .thread-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .thread-status { padding: 10px 0; color: var(--text-muted); }
 .thread-view section { margin: 20px 0; }
