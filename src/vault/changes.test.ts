@@ -57,3 +57,22 @@ test("failed create never trashes a coincidentally identical collision",async()=
  const f=fixture();let removed=false;f.port.create=async(path,content)=>{f.files.set(path,content);throw new Error("another action created this note");};f.port.removeCreated=async()=>{removed=true;};
  await f.manager.propose([{path:"K/collision.md",before:null,after:"same approved bytes"}]);await assert.rejects(f.manager.apply(),/Recovery required/);assert.equal(f.files.get("K/collision.md"),"same approved bytes");assert.equal(removed,false);
 });
+
+test("renewed drafts preserve full ordered group and original backups, replacing the old approval",async()=>{
+ const f=fixture();await f.manager.propose([{path:"K/new.md",before:null,after:"new"},{path:"K/a.md",before:"before",after:"after"}],"source context");
+ const old=structuredClone(f.manager.state.pending!);await f.manager.revise(old.id,["edited new","edited after"]);const renewed=f.manager.state.pending!;
+ assert.notEqual(renewed.id,old.id);assert.equal(renewed.context,old.context);assert.deepEqual(renewed.operations.map(o=>[o.path,o.before,o.beforeHash]),old.operations.map(o=>[o.path,o.before,o.beforeHash]));
+ assert.notEqual(renewed.operations[0]!.afterHash,old.operations[0]!.afterHash);assert.equal(f.files.get("K/a.md"),"before");assert.equal(f.files.has("K/new.md"),false);
+ await assert.rejects(f.manager.apply(old.id),/Proposal changed/);await f.manager.apply(renewed.id);assert.equal(f.files.get("K/a.md"),"edited after");assert.equal(f.files.get("K/new.md"),"edited new");
+ await f.manager.undo(renewed.id);assert.equal(f.files.get("K/a.md"),"before");assert.equal(f.files.has("K/new.md"),false);
+});
+test("draft renewal refuses incomplete groups, stale evidence/targets, metadata edits, cancellation and failed persistence without writes",async()=>{
+ for(const failure of ["group","source","target","metadata","canceled","persist"]){
+  const f=fixture();await f.manager.propose([{path:"K/a.md",before:"before",after:"after"}],"ctx");const original=structuredClone(f.manager.state.pending!);
+  if(failure==="source")f.port.validateContext=async()=>false;
+  if(failure==="target")f.files.set("K/a.md","later user change");
+  if(failure==="persist")f.port.persist=async()=>{throw new Error("disk unavailable");};
+  await assert.rejects(f.manager.revise(original.id,failure==="group"?[]:failure==="metadata"?["---\ntype: source\n---\nbody"]:["edited"],()=>failure!=="canceled"));
+  assert.deepEqual(f.manager.state.pending,original);assert.equal(f.files.get("K/a.md"),failure==="target"?"later user change":"before");assert.equal(f.manager.state.history.length,0);
+ }
+});

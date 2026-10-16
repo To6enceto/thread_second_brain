@@ -483,7 +483,8 @@ Use native Obsidian views/controls and theme variables. Keep settings and durabl
 history compatible; derived caches are disposable and must fail closed when
 invalid or unavailable. Source Markdown remains authoritative and raw originals
 stay unchanged. This is still a private local product; no public licensing,
-remote repository, paid API, system-wide install or deployment is introduced.
+paid API, system-wide install or deployment is introduced. The user separately
+authorized Git pushes to their supplied repository on 2026-10-16.
 
 The tested baseline is Linux, Obsidian 1.14.4, Ollama 0.40.4, Node 22.22.2 and
 qwen3:4b-instruct on the available laptop. Development requires Node 22.15+.

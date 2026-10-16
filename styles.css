@@ -20,3 +20,11 @@
 .thread-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 20rem; overflow: auto; padding: var(--size-4-3); background: var(--background-secondary); }
 :is(.thread-modal, .thread-settings) :is(button, input, textarea, select, summary):focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
 .thread-modal select { max-width: 100%; }
+
+.thread-diff { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; padding: var(--size-4-3); background: var(--background-secondary); }
+.thread-diff span { display: block; min-height: 1.4em; }
+.thread-diff-added { color: var(--text-normal); background: color-mix(in srgb, var(--background-modifier-success) 18%, var(--background-secondary)); border-left: 3px solid var(--background-modifier-success); }
+.thread-diff-removed { color: var(--text-normal); background: color-mix(in srgb, var(--background-modifier-error) 18%, var(--background-secondary)); border-left: 3px solid var(--background-modifier-error); }
+.thread-diff-same { color: var(--text-muted); }
+.thread-modal textarea[aria-label^="Draft body"] { width: 100%; min-height: 12rem; font-family: var(--font-monospace); }
+.thread-modal .thread-draft-editor > .setting-item { display: block; }

@@ -227,3 +227,23 @@ plugin unload; no vector database or persistent embedding files are created.
 All embedding calls use the same cloud-disabled loopback checks as generation.
 References and semantic similarity do not establish factual support: inspect
 the quoted source before relying on an answer.
+
+
+Review knowledge changes highlights added and removed lines, with full exact
+before/after contents under a disclosure. Large comparisons use a bounded bulk
+diff and show at most 500 relevant lines; always inspect full contents when the
+diff says it was shortened. Related operations stay one batch.
+
+Open Edit proposed body to adjust a proposal. Note properties and Thread
+provenance markers stay fixed. Editing immediately disables Apply. Renew exact
+preview checks current targets, supporting sources and scope, preserves original
+backups and replaces the approval ID. Review the renewed entire batch before
+applying. Unsaved edits disappear on close or source/scope changes; no draft
+alone modifies a note. Citation support remains your responsibility after edits.
+
+For stale proposals, preserve any draft text you need, reject the proposal,
+refresh evidence and generate again. For interrupted changes, keep changes.json
+and copies of current notes, compare each exact recovery preview, and use Recover
+only when contents match a stored batch state. Later edits are preserved; reconcile
+conflicts manually before retrying. Do not delete recovery history to bypass a
+conflict. Undo still checks every applied hash and retains the last 20 batches.

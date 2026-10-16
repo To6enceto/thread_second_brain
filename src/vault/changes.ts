@@ -1,4 +1,5 @@
 import { contentHash, vaultPath } from "./scope.ts";
+import { draftContent } from "./change-draft.ts";
 import { object } from "../settings/settings.ts";
 
 export interface ChangeOperation {path:string;before:string|null;after:string;beforeHash:string|null;afterHash:string;}
@@ -76,6 +77,22 @@ export class ChangeManager {
     }
     const pending:ChangeProposal={id:crypto.randomUUID(),createdAt:new Date().toISOString(),operations,context,status:"pending"};
     await this.store({...this.state,pending},current);
+  });}
+  async revise(expectedId:string,bodies:string[],current:()=>boolean=()=>true):Promise<void>{return this.exclusive(async()=>{
+    const proposal=this.state.pending;
+    if(!proposal||proposal.id!==expectedId)throw new Error("Proposal changed. Refresh before editing.");
+    if(proposal.status!=="pending"||this.state.recovery)throw new Error("Stale or interrupted proposals cannot be edited. Resolve recovery, then reject and regenerate.");
+    if(bodies.length!==proposal.operations.length||bodies.some(body=>typeof body!=="string"))throw new Error("Renew the complete operation group together.");
+    if(!await this.port.validateContext(proposal.context)||!await this.matches(proposal,"before"))throw new Error("Sources, targets or scope changed. Reject and regenerate this proposal; your notes remain unchanged.");
+    let size=0;const operations:ChangeOperation[]=[];
+    for(const [i,op] of proposal.operations.entries()){
+      this.port.check(op.path);const after=draftContent(op.after,bodies[i]!);
+      size+=new TextEncoder().encode(op.before??"").length+new TextEncoder().encode(after).length;
+      if(size>1048576)throw new Error("Keep a reviewed batch within 1 MB of text.");
+      operations.push({...op,after,afterHash:await contentHash(after)});
+    }
+    const pending:ChangeProposal={...proposal,id:crypto.randomUUID(),createdAt:new Date().toISOString(),operations};
+    await this.store({...this.state,pending},()=>current()&&this.port.contextCurrent(proposal.context));
   });}
   async reject(expectedId?:string):Promise<void>{return this.exclusive(async()=>{
     if(expectedId&&this.state.pending?.id!==expectedId)throw new Error("Proposal changed. Refresh before rejecting.");
