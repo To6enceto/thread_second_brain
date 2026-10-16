@@ -247,3 +247,26 @@ and copies of current notes, compare each exact recovery preview, and use Recove
 only when contents match a stored batch state. Later edits are preserved; reconcile
 conflicts manually before retrying. Do not delete recovery history to bypass a
 conflict. Undo still checks every applied hash and retains the last 20 batches.
+
+
+Thread setup now guides four steps: local connection, downloaded model selection,
+read access preview, then trying the project. Find downloaded models reads only
+Ollama status/tags/model metadata, inspecting at most 40 listed models. Separate
+selectors show local completion and embedding capabilities; remote/incompatible
+or uninspectable entries are omitted. Nothing is selected or saved automatically.
+Manual exact model names remain available. Model capabilities do not guarantee
+answer quality or available memory.
+
+Before Save, Read access preview lists the resulting allowed roots, newly added
+roots and exclusions. Saving a selected project explicitly grants that folder;
+exclusions always win. Folder mappings are new-note destinations, not read grants.
+Test local connection checks the unsaved local endpoint/models without sending
+note text or running inference; model generation still rechecks local-only status
+later. Cancel checks, editing the endpoint and closing setup cancel pending work.
+
+Optional sample preview creates one invented project note only after you approve
+its exact new path/content. It requires a saved Projects mapping under advanced
+settings, refuses collisions/exclusions, and grants no read access. Select its
+folder separately and review the grants if you want to try Resume or Ask on it.
+Install Ollama and download free models yourself; Thread never starts services,
+installs system software, downloads weights or switches to a paid/cloud model.

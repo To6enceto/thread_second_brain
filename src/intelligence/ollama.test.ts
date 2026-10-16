@@ -93,3 +93,19 @@ test("embedding models need embedding capability, a valid digest and bounded inp
   for(const input of [[],[""],["x".repeat(2001)],Array(9).fill("x")])await assert.rejects(c.embed({model:"embed",digest},input,signal));
   assert.equal(calls.length,0);
 });
+
+test("downloaded model discovery is bounded, metadata-only and filters incompatible/remote entries",async()=>{
+ const calls:string[]=[];const tags=Array.from({length:45},(_,i)=>({name:`model:${i}`,digest}));
+ const responses:unknown[]=[{cloud:{disabled:true}},{models:tags},...tags.slice(0,40).map((_,i)=>i===1?{remote_host:"remote",model_info:{x:1},capabilities:["completion"]}:i===2?{model_info:{x:1},capabilities:["vision"]}:{model_info:{x:1},capabilities:[i===0?"embedding":"completion"]})];
+ const result=await new OllamaClient("http://localhost",1000,fake(responses,calls)).downloadedModels(new AbortController().signal);
+ assert.equal(result.total,45);assert.equal(result.models.length,38);assert.equal(result.omitted,7);assert.equal(result.models[0]?.embedding,true);assert.equal(result.models[0]?.completion,false);
+ assert.equal(calls.length,42);assert.ok(calls.every(url=>/\/api\/(status|tags|show)$/.test(url)));
+});
+test("discovery refuses unknown/cloud state and malformed metadata, and can be canceled",async()=>{
+ for(const response of [{cloud:{disabled:false}},{}]){
+  const calls:string[]=[];await assert.rejects(new OllamaClient("http://localhost",1000,fake([response],calls)).downloadedModels(new AbortController().signal),/cloud/);assert.equal(calls.length,1);
+ }
+ const c=new OllamaClient("http://localhost",1000,fake([{cloud:{disabled:true}},{models:[{name:"remote:cloud",digest},{name:"bad digest",digest},{name:"unknown",digest:"bad"}]}],[]));
+ assert.equal((await c.downloadedModels(new AbortController().signal)).models.length,0);
+ const controller=new AbortController();controller.abort();await assert.rejects(c.downloadedModels(controller.signal),{name:"AbortError"});
+});

@@ -3,6 +3,7 @@ import { BRIEFING_SCHEMA } from "./briefing.ts";
 
 const hostFetch: typeof fetch = (input, options) => fetch(input, options);
 export interface EmbeddingIdentity { model: string; digest: string; }
+export interface DownloadedModel { name: string; digest: string; completion: boolean; embedding: boolean; }
 function modelName(model: string): string { return model.slice(model.lastIndexOf("/") + 1).includes(":") ? model : `${model}:latest`; }
 export function validateVectors(value: unknown, count: number): number[][] {
   if (!Array.isArray(value) || value.length !== count || !value.length) throw new Error("Ollama returned an invalid embedding count.");
@@ -28,6 +29,7 @@ export class OllamaClient {
   }
 
   private async request(path: string, body: unknown, signal: AbortSignal): Promise<Record<string, unknown>> {
+    signal.throwIfAborted();
     const timeout = AbortSignal.timeout(this.timeoutMs);
     try {
       const response = await this.fetcher(`${this.endpoint}${path}`, {
@@ -39,7 +41,9 @@ export class OllamaClient {
       if (!response.ok) throw new Error(response.status === 404
         ? "Ollama could not find the selected model or required API. Check the model name and update Ollama if needed."
         : "Ollama could not complete the request. Check its local status and available memory.");
-      return object(await response.json());
+      const data = object(await response.json());
+      signal.throwIfAborted();
+      return data;
     } catch (error) {
       if (signal.aborted) throw new DOMException("Generation canceled.", "AbortError");
       if (timeout.aborted) throw new Error("Ollama took too long. Try a smaller model or increase the request timeout.");
@@ -67,6 +71,30 @@ export class OllamaClient {
   }
 
   async check(model: string, signal: AbortSignal): Promise<void> { await this.checkCapability(model, signal, "completion"); }
+
+  async downloadedModels(signal: AbortSignal): Promise<{ models: DownloadedModel[]; total: number; omitted: number }> {
+    signal.throwIfAborted();
+    const status = await this.request("/api/status", undefined, signal);
+    if (object(status.cloud).disabled !== true) throw new Error("Disable Ollama cloud features with OLLAMA_NO_CLOUD=1 before discovering models. If cloud status remains unavailable, update Ollama.");
+    const tags = await this.request("/api/tags", undefined, signal);
+    if (!Array.isArray(tags.models)) throw new Error("Ollama returned an invalid model list. Update Ollama and retry.");
+    const models: DownloadedModel[] = [], seen = new Set<string>();
+    for (const raw of tags.models.slice(0, 40)) {
+      signal.throwIfAborted();
+      const tag = object(raw), name = typeof tag.name === "string" ? tag.name : tag.model;
+      if (typeof name !== "string" || !name || name.length > 200 || /[\s\u0000-\u001f]/.test(name)
+        || /(?:[:/-])cloud(?:$|[:/])/i.test(name) || seen.has(name) || tag.remote_host || tag.remote_model
+        || typeof tag.digest !== "string" || !/^[a-f0-9]{64}$/.test(tag.digest)) continue;
+      seen.add(name);
+      try {
+        const details = await this.request("/api/show", { model: name }, signal);
+        if (details.remote_host || details.remote_model || !Object.keys(object(details.model_info)).length || !Array.isArray(details.capabilities)) continue;
+        const completion = details.capabilities.includes("completion"), embedding = details.capabilities.includes("embedding");
+        if (completion || embedding) models.push({ name, digest: tag.digest, completion, embedding });
+      } catch (error) { signal.throwIfAborted(); if (!(error instanceof Error)) throw error; /* Uninspectable models are omitted, never selected automatically. */ }
+    }
+    return { models, total: tags.models.length, omitted: tags.models.length - models.length };
+  }
 
   async embeddingIdentity(model: string, signal: AbortSignal): Promise<EmbeddingIdentity> {
     await this.checkCapability(model, signal, "embedding");
