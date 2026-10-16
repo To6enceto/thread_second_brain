@@ -1,5 +1,6 @@
 import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal } from "obsidian";
 import { LocalIndex, indexNote, identityFromIndex, type IndexEntry } from "./vault/index.ts";
+import { IndexUpdates } from "./vault/index-updates.ts";
 import { RecallModal } from "./ui/recall-modal.ts";
 import { ThreadModal } from "./ui/thread-modal.ts";
 import { outputProjection,loadRenames,type RenameMap } from "./vault/freshness.ts";
@@ -21,7 +22,7 @@ import { createNewNotes } from "./vault/new-notes.ts";
 import { defaultSettings, loadSettings, type ThreadSettings } from "./settings/settings.ts";
 import { ThreadSettingTab, ThreadSetupModal } from "./ui/settings-tab.ts";
 import { BriefingView, THREAD_VIEW } from "./ui/briefing-view.ts";
-import { isWithin, readableText, contentHash, affectsProject } from "./vault/scope.ts";
+import { isWithin, readableText, contentHash } from "./vault/scope.ts";
 import { buildEvidence, readMetadata, type SourceNote, type EvidenceBundle } from "./vault/evidence.ts";
 import { OllamaClient } from "./intelligence/ollama.ts";
 import { SemanticSearch, semanticCandidates } from "./retrieval/semantic.ts";
@@ -34,7 +35,7 @@ export default class ThreadPlugin extends Plugin {
   modals = new Set<Modal>();
   index=new LocalIndex();
   semantic=new SemanticSearch();
-  indexController: AbortController | null=null;
+  indexUpdates=new IndexUpdates(this.index);
   indexTimer: ReturnType<typeof setTimeout> | null=null;
   cacheWrite: Promise<void>=Promise.resolve();
   imports=new ImportRegistry();
@@ -92,7 +93,7 @@ export default class ThreadPlugin extends Plugin {
     this.active=false;
     this.index.clear();
     this.semantic.clear();
-    this.indexController?.abort();if(this.indexTimer)clearTimeout(this.indexTimer);
+    this.indexUpdates.stop();if(this.indexTimer)clearTimeout(this.indexTimer);
     for (const modal of this.modals) modal.close();
     this.setupModal?.close(); this.settingsTab?.hide();
     for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
@@ -205,49 +206,60 @@ export default class ThreadPlugin extends Plugin {
     return identityFromIndex(this.index.entries,path,this.index.ready);
   }
 
-  private scheduleIndex(): void {
-    this.semantic.clear();
-    this.indexController?.abort();this.index.clear();
-    this.cacheWrite=this.cacheWrite.catch(()=>{}).then(()=>this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries:[]})))
-      .catch(()=>{new Notice("Thread could not clear its derived index cache. Check vault write access and rebuild.");});
-    if(this.indexTimer)clearTimeout(this.indexTimer);
-    this.indexTimer=setTimeout(()=>{this.indexTimer=null;void this.rebuildIndex().catch(e=>{if(!(e instanceof DOMException&&e.name==="AbortError"))new Notice("Thread index unavailable. Open Find evidence and rebuild.");});},300);
+  private persistIndex():Promise<void>{
+    const revision=this.index.revision,settings=JSON.stringify(this.settings),text=JSON.stringify({schemaVersion:1,entries:this.index.entries});
+    this.cacheWrite=this.cacheWrite.catch(()=>{}).then(async()=>{
+      if(!this.active||revision!==this.index.revision||settings!==JSON.stringify(this.settings))return;
+      await this.app.vault.adapter.write(this.indexPath(),text);
+    });return this.cacheWrite;
   }
-
+  private queueIndex():void{
+    if(this.indexTimer)clearTimeout(this.indexTimer);
+    this.indexTimer=setTimeout(()=>{this.indexTimer=null;void this.rebuildIndex().catch(e=>{
+      if(!(e instanceof DOMException&&e.name==="AbortError"))new Notice("Thread index unavailable. Rebuild from Thread settings; original notes and history are preserved.");
+    });},300);
+  }
+  private scheduleIndex(): void {
+    this.semantic.clear();this.indexUpdates.reset();
+    void this.persistIndex().catch(()=>new Notice("Thread could not clear its derived cache. Check vault write access and rebuild."));
+    this.queueIndex();
+  }
   private indexPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/index.json`;}
-
   async resetTextIndex():Promise<void>{
     this.scheduleIndex();
     for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Text index rebuilding. Refresh this action afterward.");
     for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Text index rebuilding. Generate a fresh briefing afterward.");
     await this.rebuildIndex();
   }
-
+  private resolveIndexLink(path:string,target:string,settings:ThreadSettings):string|null{
+    const exact=this.app.vault.getAbstractFileByPath(target);
+    if(exact instanceof TFile&&readableText(exact.path,settings))return exact.path;
+    const file=this.app.metadataCache.getFirstLinkpathDest(target,path);
+    return file&&readableText(file.path,settings)?file.path:null;
+  }
   async rebuildIndex(): Promise<void> {
-    this.semantic.clear();
     if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
-    this.indexController?.abort();const controller=new AbortController();this.indexController=controller;
-    const settings=structuredClone(this.settings);const entries:IndexEntry[]=[];
-    for(const file of this.app.vault.getFiles().filter(f=>readableText(f.path,settings))){
-      controller.signal.throwIfAborted();
-      const text=await this.app.vault.read(file);controller.signal.throwIfAborted();
-      const note={path:file.path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime};
-      entries.push(await indexNote(note,link=>{
-        const exact=this.app.vault.getAbstractFileByPath(link);
-        if(exact instanceof TFile&&readableText(exact.path,settings))return exact.path;
-        const target=this.app.metadataCache.getFirstLinkpathDest(link,file.path);
-        return target&&readableText(target.path,settings)?target.path:null;
-      }));
+    while(this.active){
+      const settings=structuredClone(this.settings);
+      const current=()=>this.active&&JSON.stringify(settings)===JSON.stringify(this.settings);
+      try{
+        await this.indexUpdates.flush({scope:settings,current,paths:()=>this.app.vault.getFiles().filter(file=>readableText(file.path,settings)).map(file=>file.path),
+          read:async(path,signal)=>{
+            signal.throwIfAborted();if(!current()||!readableText(path,this.settings))throw new DOMException("Read scope changed.","AbortError");
+            const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))return null;
+            const text=await this.app.vault.read(file);signal.throwIfAborted();
+            if(!current()||file.path!==path||!readableText(path,this.settings))throw new DOMException("Read scope changed.","AbortError");
+            return indexNote({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime},target=>this.resolveIndexLink(path,target,settings));
+          },resolve:(path,target)=>this.resolveIndexLink(path,target,settings),affected:paths=>this.notifySources(paths),persist:()=>this.persistIndex()});
+        if(current()&&this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size)return;
+      }catch(error){if(!(error instanceof DOMException&&error.name==="AbortError")||!this.active)throw error;}
     }
-    controller.signal.throwIfAborted();
-    if(JSON.stringify(settings)!==JSON.stringify(this.settings))throw new DOMException("Scope changed","AbortError");
-    this.index.replace(entries,settings);
-    const revision=this.index.revision;
-    this.cacheWrite=this.cacheWrite.catch(()=>{}).then(async()=>{
-      if(revision!==this.index.revision||controller.signal.aborted)return;
-      await this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries:this.index.entries}));
-    });
-    await this.cacheWrite;
+    throw new DOMException("Thread stopped.","AbortError");
+  }
+  private notifySources(paths:Set<string>):void{
+    this.semantic.invalidate(paths);
+    for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidatePaths(paths);
+    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.sourcesChanged(paths);
   }
 
   async openIndexedSource(path:string,hash:string,heading="",isCurrent:()=>boolean=()=>true): Promise<void> {
@@ -310,16 +322,13 @@ export default class ThreadPlugin extends Plugin {
 
   private invalidatePath(path: string, folder = false): void {
     const allowed=readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"));
-    if(allowed){
-      this.scheduleIndex();
-      for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
-    }
-    if (!allowed&&!affectsProject(path, this.settings.selectedProject, this.settings, folder)) return;
-    for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
-      if (leaf.view instanceof BriefingView) leaf.view.invalidate(folder
-        ? "Project folders changed. Check the selected folder and generate a fresh briefing."
-        : "Allowed source notes changed. Generate a fresh briefing.");
-    }
+    if(!allowed)return;
+    if(folder){this.scheduleIndex();for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
+      for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Project folders changed. Refresh the project.");return;}
+    const affected=this.indexUpdates.invalidate([path],this.settings);
+    this.notifySources(affected);
+    void this.persistIndex().catch(()=>new Notice("Thread could not scrub its derived cache. Check vault write access and rebuild."));
+    this.queueIndex();
   }
 
   withDependencies(bundle:EvidenceBundle,settings:ThreadSettings):EvidenceBundle{
@@ -334,13 +343,20 @@ export default class ThreadPlugin extends Plugin {
     return {...bundle,noteHashes};
   }
   async searchEvidence(query:string,vault:boolean,filters:SearchFilters,hybrid:boolean,settings:ThreadSettings,
-    signal:AbortSignal,isCurrent:()=>boolean=()=>true):Promise<SearchResult>{
+    signal:AbortSignal,isCurrent:()=>boolean=()=>true,watch:(paths:string[])=>void=()=>{}):Promise<SearchResult>{
     if(!this.index.ready)await this.rebuildIndex();
-    const revision=this.index.revision;
-    const current=()=>this.active&&isCurrent()&&this.index.ready&&revision===this.index.revision&&JSON.stringify(settings)===JSON.stringify(this.settings);
+    let snapshot:IndexEntry[]=[];
+    const current=()=>{
+      if(!this.active||!isCurrent()||JSON.stringify(settings)!==JSON.stringify(this.settings))return false;
+      const graph=this.index.graph(settings),entries=new Map(this.index.entries.map(entry=>[entry.path,entry]));
+      return snapshot.every(entry=>entries.get(entry.path)===entry&&graph.assess(entry.path).usable);
+    };
     const assertCurrent=()=>{signal.throwIfAborted();if(!current())throw new DOMException("Search changed. Search again.","AbortError");};
     assertCurrent();
     const entries=this.index.projectEntries(settings,vault?null:settings.selectedProject);
+    snapshot=filterEntries(entries,filters);
+    const graph=this.index.graph(settings);
+    watch([...new Set(snapshot.flatMap(entry=>[entry.path,...Object.keys(graph.assess(entry.path).dependencies)]))]);
     if(!hybrid||!settings.semanticSearch)return searchEntries(entries,query,filters);
     // Hash only the bounded candidate notes before transmitting their passages.
     const candidates=semanticCandidates(filterEntries(entries,filters),query).candidates;
@@ -377,6 +393,12 @@ export default class ThreadPlugin extends Plugin {
   }
 
   async evidenceCurrent(bundle: EvidenceBundle, settings: ThreadSettings): Promise<boolean> {
+    if(!this.index.ready)await this.rebuildIndex();
+    const graph=this.index.graph(settings),entries=new Map(this.index.entries.map(entry=>[entry.path,entry]));
+    for(const [path,hash] of Object.entries(bundle.noteHashes)){
+      const state=graph.assess(path);
+      if(entries.get(path)?.hash!==hash||!state.usable||Object.entries(state.dependencies).some(([dependency,value])=>bundle.noteHashes[dependency]!==value))return false;
+    }
     const revision=this.index.revision;
     if (JSON.stringify(settings) !== JSON.stringify(this.settings)) return false;
     for (const [path, hash] of Object.entries(bundle.noteHashes)) {

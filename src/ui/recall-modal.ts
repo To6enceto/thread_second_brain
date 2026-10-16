@@ -27,9 +27,10 @@ export class RecallModal extends ThreadModal {
       const requestedFilters=structuredClone(filters);
       try{
         if(!requestedVault&&!settings.selectedProject)throw new Error("Select a project in Thread Settings first.");
-        if(force||!this.plugin.index.ready)await this.plugin.rebuildIndex();
+        if(force){await this.plugin.resetTextIndex();this.status?.setText("Text index rebuilt. Find passages again.");return;}
+        if(!this.plugin.index.ready)await this.plugin.rebuildIndex();
         if(this.closed||this.epoch!==epoch||!this.plugin.index.ready||JSON.stringify(settings)!==JSON.stringify(this.plugin.settings))return;
-        const result=await this.plugin.searchEvidence(requestedQuery,requestedVault,requestedFilters,method.hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch);
+        const result=await this.plugin.searchEvidence(requestedQuery,requestedVault,requestedFilters,method.hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch,paths=>this.watchPaths(paths));
         if(controller.signal.aborted||this.closed||epoch!==this.epoch)return;
         const hits=result.hits;
         this.resultEl?.empty();this.status?.setText(`Keyword lane: ${searchCoverageText(result.coverage)}${result.hybrid?" "+hybridCoverageText(result.hybrid):""}`);

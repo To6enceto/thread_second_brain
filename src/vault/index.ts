@@ -6,7 +6,7 @@ import { searchEntries, keywordTerms, type SearchResult, type SearchFilters } fr
 export interface IndexEntry {
   path: string; id?: string; title: string; metadata: Record<string, unknown>;
   hash: string; modifiedAt: number; chunks: {heading: string; excerpt: string}[];
-  links: string[]; truncated: boolean; output?:OutputProvenance;
+  links: string[]; linkTexts?: string[]; truncated: boolean; output?:OutputProvenance;
 }
 export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; matchedTerms?: string[]; requiredPhrases?: string[]; }
 export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean): string {
@@ -40,6 +40,7 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
   return {path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
     title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata,...(projected.output?{output:projected.output}:{}),
     hash:await contentHash(note.text),modifiedAt:note.modifiedAt,chunks,
+    linkTexts:linkTargets(text),
     links:[...new Set(linkTargets(text).map(resolve).filter((p):p is string=>Boolean(p)))],
     truncated:body.length>50000};
 }
@@ -55,7 +56,7 @@ export class LocalIndex {
   replace(entries:IndexEntry[],scope:ReadScope):void{
     const allowed=entries.filter(e=>readableText(e.path,scope));
     const graph=new FreshnessGraph(allowed,scope,this.renames);
-    this.entries=allowed.map(e=>e.output&&!graph.assess(e.path).usable?{...e,chunks:[],links:[]}:e);this.ready=true;
+    this.entries=allowed.map(e=>e.output&&!graph.assess(e.path).usable?{...e,chunks:[],links:[],linkTexts:[]}:e);this.ready=true;
   }
   clear(): void {this.entries=[];this.ready=false;this.revision++;}
   projectEntries(scope:ReadScope,project:string|null): IndexEntry[] {

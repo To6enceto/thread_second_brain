@@ -3,7 +3,7 @@ import type ThreadPlugin from "../main.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { briefingPrompt, validateBriefing, SECTION_KEYS, type Briefing, type Claim, type SectionKey } from "../intelligence/briefing.ts";
 import { recordedBriefing, composeBriefing } from "../intelligence/recorded.ts";
-import { readableText } from "../vault/scope.ts";
+import { readableText,isWithin } from "../vault/scope.ts";
 import { contextCoverageText, type Evidence, type EvidenceBundle } from "../vault/evidence.ts";
 import { permittedProjects, projectHome, type ProjectHome, type HomeItem } from "../vault/project-home.ts";
 
@@ -47,6 +47,12 @@ export class BriefingView extends ItemView {
     this.homeLoading = false;
     if (!preserveHome) this.home = null;
     if (!this.closed) this.render();
+  }
+
+  sourcesChanged(paths:Set<string>):void {
+    if(!this.bundle||Object.keys(this.bundle.noteHashes).some(path=>paths.has(path))){this.invalidate("Supporting source notes changed. Resume to refresh.");return;}
+    const homePaths=this.home?[...this.home.sessions,...this.home.decisions,...this.home.questions].map(item=>item.path):[];
+    if([...paths].some(path=>isWithin(path,this.plugin.settings.selectedProject)||homePaths.includes(path))){this.home=null;if(!this.closed)this.render();}
   }
 
   render(): void {

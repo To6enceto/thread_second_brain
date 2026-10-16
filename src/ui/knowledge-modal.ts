@@ -63,6 +63,7 @@ export class KnowledgeModal extends ThreadModal {
         const bundle=await this.plugin.evidenceFromPaths(approved.paths,settings,controller.signal);
         if(!bundle.sources.length)throw new Error("No usable text in the selected sources.");
         const prompt=answerPrompt(`Synthesize a ${approved.type} about ${approved.title}. ${approved.focus} Separate supported facts, interpretations and suggestions; explain disagreements and gaps.`,bundle);
+        this.watchBundle(bundle,[target,...(approved.projectLink?[approved.projectLink]:[])]);
         const raw=await new OllamaClient(settings.endpoint,settings.timeoutMs).generate(settings.model,prompt,controller.signal,ANSWER_SCHEMA);
         const answer=validateAnswer(raw,bundle);if(!answer.supported)throw new Error(answer.gaps.join(" "));
         if(!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Selected evidence changed. Generate again.");

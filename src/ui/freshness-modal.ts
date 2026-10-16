@@ -59,6 +59,7 @@ export class FreshnessModal extends ThreadModal{
         if(!this.plugin.changePathAllowed(target))throw new Error("Allow the mapped Reviews destination in read paths and keep it outside exclusions.");if(this.app.vault.getAbstractFileByPath(target))throw new Error("That version name already exists. Choose a new name.");
         const bundle=await this.plugin.evidenceFromPaths(approved.paths,settings,controller.signal);if(!bundle.sources.length)throw new Error("No usable current text in selected sources.");if(!current())return;
         this.status?.setText("Generating a refreshed synthesis locally from selected current sources...");
+        this.watchBundle(bundle,[original.path,target]);
         const raw=await new OllamaClient(settings.endpoint,settings.timeoutMs).generate(settings.model,answerPrompt(`Synthesize current evidence for ${title}. Preserve uncertainty and distinguish facts, interpretations and suggestions.`,bundle),controller.signal,ANSWER_SCHEMA);
         const answer=validateAnswer(raw,bundle);if(!answer.supported)throw new Error(answer.gaps.join(" "));
         if(!current()||!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Sources changed. Generate again.");if(!current())return;

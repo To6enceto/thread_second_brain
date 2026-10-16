@@ -270,3 +270,27 @@ settings, refuses collisions/exclusions, and grants no read access. Select its
 folder separately and review the grants if you want to try Resume or Ask on it.
 Install Ollama and download free models yourself; Thread never starts services,
 installs system software, downloads weights or switches to a paid/cloud model.
+
+
+Ordinary allowed-note edits now coalesce into incremental indexing. Changed
+entries disappear immediately; generated outputs depending on them have cached
+text and links scrubbed before queued reads. Only changed notes and affected
+output/identity dependencies are reread. Current link targets are resolved from
+bounded retained link tokens, without rereading unrelated note bodies. New
+retrieval waits for the queue to settle, including edits arriving during reads.
+
+Find, Ask, Resume and selected generation workflows track known supporting paths.
+Unrelated edits can leave captured work running; supporting-source or dependency
+changes clear/cancel it. Before display or saving, actual raw hashes, current
+scope and dependency freshness are checked after indexing settles. Unknown
+selections and write/CAS contexts stay conservative. New identity collisions can
+invalidate additional work once the changed metadata is read.
+
+Startup, folder changes, scope/settings edits and explicit index resets still
+rebuild the eligible index in full. Scope changes immediately clear in-memory
+entries/vectors and queue a scrubbed derived cache write; excluded notes are
+never read. Incremental changes purge affected vectors and retain unrelated
+ones. Index reset preserves notes and durable import/rename/change history.
+This reduces note reads; it still recomputes dependency/link state across the eligible index and writes a
+derived cache snapshot. It is not a large-vault benchmark or a
+persistent vector database. Rebuild explicitly from settings if indexing fails.

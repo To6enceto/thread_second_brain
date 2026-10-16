@@ -56,3 +56,8 @@ test("derived cache remains bounded across model revisions",async()=>{
  }
  assert.equal(cache.size,512);
 });
+test("path invalidation retains unrelated source vectors and purges affected ones",async()=>{
+ const entries=[await note("P/A.md","budget 20 euros"),await note("P/B.md","garden")],cache=new SemanticSearch(),fake=embedding();
+ await cache.search(entries,"funding",{},"embed",fake.port,signal(),()=>true);assert.equal(cache.size,2);cache.invalidate(new Set(["P/A.md"]));assert.equal(cache.size,1);
+ const before=fake.calls.length;await cache.search([entries[1]!],"funding",{},"embed",fake.port,signal(),()=>true);assert.equal(fake.calls.length,before+1);
+});

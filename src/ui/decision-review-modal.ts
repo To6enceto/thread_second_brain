@@ -61,6 +61,7 @@ export class DecisionReviewModal extends ThreadModal {
         const bundle=decisionComparison(await this.plugin.evidenceFromPaths([path,...paths],settings,controller.signal),path);
         if(!bundle.sources.some(s=>s.path===path)||!bundle.sources.some(s=>s.path!==path))throw new Error("The evidence budget must include both the decision and selected evidence. Select smaller notes.");
         this.status?.setText("Comparing selected evidence locally...");
+        this.watchBundle(bundle);
         const raw=await new OllamaClient(settings.endpoint,settings.timeoutMs).generate(settings.model,answerPrompt("Does the selected later evidence support revisiting this decision, and which constraints remain? Explain the specific tension and uncertainty.",bundle),controller.signal,ANSWER_SCHEMA);
         const answer=reviewObservations(validateAnswer(raw,bundle),bundle,path);
         if(!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Evidence changed. Assess again.");

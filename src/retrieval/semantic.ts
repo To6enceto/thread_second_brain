@@ -48,9 +48,10 @@ function cosine(a: number[], b: number[]): number {
 }
 function hitKey(hit: RecallHit): string { return JSON.stringify([hit.entry.path, hit.heading, hit.excerpt]); }
 export class SemanticSearch {
-  private vectors = new Map<string, number[]>();
+  private vectors = new Map<string, {path:string; vector:number[]}>();
   private epoch = 0;
   clear(): void { this.epoch++; this.vectors.clear(); }
+  invalidate(paths: Set<string>): void { for (const [key,value] of this.vectors) if (paths.has(value.path)) this.vectors.delete(key); }
   get size(): number { return this.vectors.size; }
   async search(entries: IndexEntry[], query: string, filters: SearchFilters, model: string, port: EmbeddingPort,
     signal: AbortSignal, current: () => boolean): Promise<SearchResult> {
@@ -63,7 +64,7 @@ export class SemanticSearch {
       const identity = await port.embeddingIdentity(model, signal); assertCurrent();
       const queryVector = validateVectors(await port.embed(identity, [query.slice(0, 1000)], signal, current), 1)[0]!; assertCurrent();
       const keys = await Promise.all(candidates.map(hit => contentHash(JSON.stringify([identity.digest, hit.entry.path, hit.entry.hash, hit.heading, hit.excerpt])))); assertCurrent();
-      const vectors: (number[] | undefined)[] = keys.map(key => this.vectors.get(key));
+      const vectors: (number[] | undefined)[] = keys.map(key => this.vectors.get(key)?.vector);
       const missing = candidates.map((_, i) => i).filter(i => !vectors[i]);
       for (let start = 0; start < missing.length; start += 8) {
         assertCurrent();
@@ -73,7 +74,7 @@ export class SemanticSearch {
         batch.forEach((i, offset) => {
           const vector = result[offset]!;
           cosine(queryVector, vector); vectors[i] = vector;
-          this.vectors.delete(keys[i]!); this.vectors.set(keys[i]!, vector);
+          this.vectors.delete(keys[i]!); this.vectors.set(keys[i]!, {path:candidates[i]!.entry.path,vector});
           if (this.vectors.size > 512) this.vectors.delete(this.vectors.keys().next().value!);
         });
       }

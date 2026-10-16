@@ -32,6 +32,7 @@ export class WeeklyModal extends ThreadModal {
         const bundle=weeklyEvidence(await this.plugin.evidenceFromPaths(entries.slice(0,80).map(e=>e.path),settings,controller.signal),period);
         if(!bundle.sources.length)throw new Error("No usable records dated on or before the selected end date. Try another period or scope.");
         if(!current()||!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Records changed. Generate again.");
+        this.watchBundle(bundle,settings.roles.reviews?[`${settings.roles.reviews}/${filename}.md`]:[]);
         const raw=await new OllamaClient(settings.endpoint,settings.timeoutMs).generate(settings.model,weeklyPrompt(bundle,period),controller.signal,WEEKLY_SCHEMA);
         const result=validateWeekly(raw,bundle,period);if(entries.length>80)result.gaps.push("Only the 80 most recently modified eligible notes were considered.");
         if(!current()||!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Records changed. Generate again.");if(!current())return;

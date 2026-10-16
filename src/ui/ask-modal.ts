@@ -39,9 +39,10 @@ export class AskModal extends ThreadModal {
     this.status?.setText("Finding allowed evidence and generating locally...");
     try{
       if(!this.plugin.index.ready)await this.plugin.rebuildIndex();controller.signal.throwIfAborted();
-      const search=await this.plugin.searchEvidence(question,vault,filters,hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch);
+      const search=await this.plugin.searchEvidence(question,vault,filters,hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch,paths=>this.watchPaths(paths));
       const bundle=this.plugin.withDependencies({...await buildEvidence(hitsToNotes(search.hits)),searchCoverage:search.coverage,hybridCoverage:search.hybrid},settings);controller.signal.throwIfAborted();
       if(!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Supporting sources changed. Ask again.");controller.signal.throwIfAborted();
+      this.watchBundle(bundle);
       let answer:Answer;
       if(!bundle.sources.length)answer={supported:false,answer:[],gaps:["No matching eligible passages. Try more specific words or change the allowed scope."]};
       else{
