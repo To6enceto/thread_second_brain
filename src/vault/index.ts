@@ -1,13 +1,14 @@
 import { outputProjection,FreshnessGraph,type OutputProvenance,type RenameMap } from "./freshness.ts";
 import { noteSections, type SourceNote } from "./evidence.ts";
 import { contentHash, isWithin, readableText, type ReadScope } from "./scope.ts";
+import { searchEntries, keywordTerms, type SearchResult, type SearchFilters } from "../retrieval/search.ts";
 
 export interface IndexEntry {
   path: string; id?: string; title: string; metadata: Record<string, unknown>;
   hash: string; modifiedAt: number; chunks: {heading: string; excerpt: string}[];
   links: string[]; truncated: boolean; output?:OutputProvenance;
 }
-export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; }
+export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; matchedTerms?: string[]; requiredPhrases?: string[]; }
 export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean): string {
   if(!ready)throw new Error("Project evidence is still loading. Refresh and preview again.");
   if(!project)throw new Error("Select a project in Settings first.");
@@ -29,6 +30,8 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
   const text=body.slice(0,50000);
   const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output"]);
   const metadata=Object.fromEntries(Object.entries(note.metadata).filter(([key,value])=>fields.has(key)&&typeof value==="string"));
+  const aliases = typeof note.metadata.aliases === "string" ? [note.metadata.aliases] : note.metadata.aliases;
+  if (Array.isArray(aliases)) metadata.aliases = aliases.filter((value): value is string => typeof value === "string").slice(0, 20).map(value => value.slice(0, 100));
   const chunks=noteSections(text).flatMap(section=>{
     const result: {heading:string;excerpt:string}[]=[];
     for(let start=0;start<section.excerpt.length;start+=1000)result.push({heading:section.heading,excerpt:section.excerpt.slice(start,start+1200)});
@@ -40,9 +43,8 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
     links:[...new Set(linkTargets(text).map(resolve).filter((p):p is string=>Boolean(p)))],
     truncated:body.length>50000};
 }
-const stopWords=new Set(["the","a","an","and","or","is","to","of","in","for","what","how","we","our","was","are","did","does","why","with"]);
 export function queryTerms(query: string): string[] {
-  return [...new Set((query.slice(0,500).toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu)??[]).filter(t=>t.length>1&&!stopWords.has(t)))];
+  return keywordTerms(query.slice(0,1000)).slice(0,40);
 }
 export class LocalIndex {
   entries: IndexEntry[]=[];
@@ -65,16 +67,10 @@ export class LocalIndex {
     return project?eligible.filter(e=>isWithin(e.path,project)||linked.has(e.path)||(typeof e.metadata.project==="string"&&ids.has(e.metadata.project))):eligible;
   }
   recall(query: string, scope: ReadScope, project: string | null, limit=20): RecallHit[] {
-    const terms=queryTerms(query);if(!terms.length)return [];
-    const candidates=this.projectEntries(scope,project);
-    const hits=candidates.flatMap(entry=>entry.chunks.flatMap(chunk=>{
-      const body=chunk.excerpt.toLocaleLowerCase();const heading=chunk.heading.toLocaleLowerCase();const title=entry.title.toLocaleLowerCase();
-      const matched=terms.filter(t=>body.includes(t)||heading.includes(t)||title.includes(t));
-      if(!matched.length)return [];
-      const score=matched.reduce((n,t)=>n+(body.includes(t)?1:0)+(heading.includes(t)?3:0)+(title.includes(t)?5:0),0)+matched.length/terms.length;
-      return [{entry,...chunk,score}];
-    }));
-    return hits.sort((a,b)=>b.score-a.score||a.entry.path.localeCompare(b.entry.path)||a.heading.localeCompare(b.heading)).slice(0,Math.max(0,Math.min(limit,50)));
+    return this.search(query,scope,project,{},limit).hits;
+  }
+  search(query:string,scope:ReadScope,project:string|null,filters:SearchFilters={},limit=20):SearchResult{
+    return searchEntries(this.projectEntries(scope,project),query,filters,limit);
   }
 }
 export function hitsToNotes(hits: RecallHit[]): SourceNote[] {
@@ -82,8 +78,8 @@ export function hitsToNotes(hits: RecallHit[]): SourceNote[] {
   for(const hit of hits){
     const chunk=`${hit.heading?`## ${hit.heading}\n`:""}${hit.excerpt}\n`;
     const existing=notes.get(hit.entry.path);
-    if(existing)existing.text+=chunk;
-    else notes.set(hit.entry.path,{path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash});
+    if(existing){existing.text+=chunk;existing.focusTerms=[...new Set([...(existing.focusTerms??[]),...(hit.matchedTerms??[])])];existing.focusPhrases=[...new Set([...(existing.focusPhrases??[]),...(hit.requiredPhrases??[])])];}
+    else notes.set(hit.entry.path,{path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash,relevance:hit.score,focusTerms:hit.matchedTerms??[],focusPhrases:hit.requiredPhrases??[]});
   }
   return [...notes.values()];
 }

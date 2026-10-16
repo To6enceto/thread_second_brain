@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildEvidence, noteSections, readMetadata } from "./evidence.ts";
+import { contentHash } from "./scope.ts";
 
 test("headings in fences and frontmatter do not become section boundaries", () => {
   const sections = noteSections("---\ntype: project\n---\n# Objective\nBuild it.\n```md\n# Example\n```\n## Questions\nHow?");
@@ -71,4 +72,29 @@ test("current local calendar day is eligible just after midnight",async()=>{
  assert.equal(bundle.baseline?.path,"P/Today.md");
  const future=await buildEvidence([{path:"P/Tomorrow.md",text:"Future record",metadata:{type:"session",recorded_on:"2026-10-16"},modifiedAt:now}],now);
  assert.equal(future.baseline,undefined);
+});
+
+test("ranked context preserves relevance and rotates across notes before later sections", async () => {
+ const bundle = await buildEvidence([
+  {path:"P/Overview.md",text:Array.from({length:40},(_,n)=>`## Distractor ${n}\n${"Unrelated text ".repeat(70)}`).join("\n"),metadata:{type:"project"},modifiedAt:100,relevance:1},
+  {path:"P/Relevant.md",text:"## Funding\nThe grant is 20 euros.",metadata:{type:"source"},modifiedAt:1,relevance:10},
+  ...Array.from({length:5},(_,n)=>({path:`P/Alternative-${n}.md`,text:`## Evidence\nAlternative source ${n}.`,metadata:{},modifiedAt:1,relevance:2}))
+ ]);
+ assert.equal(bundle.sources[0]?.path,"P/Relevant.md");
+ assert.equal(new Set(bundle.sources.map(s=>s.path)).size,7);
+ assert.equal(bundle.coverage?.includedNotes,7);
+ assert(bundle.coverage!.includedPassages < bundle.coverage!.availablePassages);
+ assert(bundle.truncated);
+ assert(JSON.stringify(bundle.sources).length<=16000);
+ for(const source of bundle.sources)assert.equal(source.contentHash,await contentHash(source.excerpt));
+});
+
+test("Resume reserves recognized objective and latest report ahead of long introductions", async () => {
+ const bundle=await buildEvidence([
+  {path:"P/Overview.md",text:`# Intro\n${"Background ".repeat(3000)}\n## Objective\nMeasure urban heat.`,metadata:{type:"project"},modifiedAt:1},
+  {path:"P/Session.md",text:`# Intro\n${"Earlier context ".repeat(2000)}\n## User-reported progress\nMeasured one block.`,metadata:{type:"session",recorded_on:"2026-10-14"},modifiedAt:2}
+ ],Date.parse("2026-10-15T12:00:00Z"));
+ assert.equal(bundle.sources[0]?.heading,"User-reported progress");
+ assert.equal(bundle.sources[1]?.heading,"Objective");
+ assert.equal(bundle.sources[1]?.excerpt,"Measure urban heat.");
 });

@@ -1,12 +1,14 @@
 import { Setting } from "obsidian";
 import { ThreadModal } from "./thread-modal.ts";
 import { NewNoteModal } from "./new-note-modal.ts";
-import { buildEvidence, type EvidenceBundle } from "../vault/evidence.ts";
+import { buildEvidence, contextCoverageText, type EvidenceBundle } from "../vault/evidence.ts";
 import { hitsToNotes } from "../vault/index.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { ANSWER_SCHEMA, answerPrompt, validateAnswer, answerMarkdown, type Answer } from "../intelligence/answer.ts";
 import { localDay, noteName } from "../vault/workspace.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
+import { searchFilters } from "./search-filters.ts";
+import { searchCoverageText, type SearchFilters } from "../retrieval/search.ts";
 
 export class AskModal extends ThreadModal {
   answer: Answer | null=null;
@@ -19,13 +21,14 @@ export class AskModal extends ThreadModal {
     let question="";let vault=false;
     new Setting(el).setName("Question").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Question");t.inputEl.maxLength=1000;t.onChange(v=>{question=v;this.invalidate("Question changed. Ask again.");});});
     new Setting(el).setName("Answer scope").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Answer scope");d.addOption("project","Selected project").addOption("vault","All allowed paths").onChange(v=>{vault=v==="vault";this.invalidate("Scope changed. Ask again.");});});
+    const filters=searchFilters(el,()=>this.invalidate("Filters changed. Ask again."));
     this.status=el.createEl("p",{attr:{role:"status","aria-live":"polite"}});
     this.askButton=el.createEl("button",{text:"Ask locally",cls:"mod-cta"});
     el.createEl("button",{text:"Cancel"}).onclick=()=>this.invalidate("Generation canceled. You can ask again.");
     this.resultEl=el.createDiv();
-    this.askButton.onclick=()=>{void this.run(question.trim(),vault);};
+    this.askButton.onclick=()=>{void this.run(question.trim(),vault,structuredClone(filters));};
   }
-  async run(question:string,vault:boolean): Promise<void> {
+  async run(question:string,vault:boolean,filters:SearchFilters={}): Promise<void> {
     if(this.closed)return;
     this.invalidate();const epoch=this.epoch;const settings=structuredClone(this.plugin.settings);
     if(!question||question.length>1000){this.status?.setText("Enter a question of up to 1000 characters.");return;}
@@ -34,8 +37,8 @@ export class AskModal extends ThreadModal {
     this.status?.setText("Finding allowed evidence and generating locally...");
     try{
       if(!this.plugin.index.ready)await this.plugin.rebuildIndex();controller.signal.throwIfAborted();
-      const hits=this.plugin.index.recall(question,settings,vault?null:settings.selectedProject);
-      const bundle=this.plugin.withDependencies(await buildEvidence(hitsToNotes(hits)),settings);controller.signal.throwIfAborted();
+      const search=this.plugin.index.search(question,settings,vault?null:settings.selectedProject,filters);
+      const bundle=this.plugin.withDependencies({...await buildEvidence(hitsToNotes(search.hits)),searchCoverage:search.coverage},settings);controller.signal.throwIfAborted();
       if(!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Supporting sources changed. Ask again.");controller.signal.throwIfAborted();
       let answer:Answer;
       if(!bundle.sources.length)answer={supported:false,answer:[],gaps:["No matching eligible passages. Try more specific words or change the allowed scope."]};
@@ -53,6 +56,8 @@ export class AskModal extends ThreadModal {
   }
   private renderAnswer(question:string,vault:boolean,answer:Answer,bundle:EvidenceBundle,settings:ThreadSettings,epoch:number): void {
     const root=this.resultEl!;root.empty();
+    if(bundle.searchCoverage)root.createEl("p",{text:searchCoverageText(bundle.searchCoverage),cls:"thread-meta"});
+    root.createEl("p",{text:contextCoverageText(bundle),cls:"thread-meta"});
     for(const claim of answer.answer){
       root.createEl("p",{text:`${claim.kind}: ${claim.text}`});
       for(const id of claim.sourceIds){const source=bundle.sources.find(s=>s.id===id)!;

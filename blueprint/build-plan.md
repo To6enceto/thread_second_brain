@@ -38,7 +38,7 @@ features 13-21 are the approved local improvements.
 - [x] 13. **Repeatable answer-quality evaluation** - Reusable synthetic fixtures and an opt-in local evaluation command covering missing evidence, conflicts, decision status, section placement and cited support, with honest baseline reports.
 - [x] 14. **Dependable recorded briefings** - Show sourced recorded project context before inference, separate AI interpretation, expose supporting excerpts and keep recorded context usable without Ollama.
 - [x] 15. **Project home and quick switching** - Switch among permitted projects directly in Thread and show recent sessions, decisions, questions and pending reviews without silently granting read access.
-- [ ] 16. **Ranked evidence search** - Improve keyword ranking, phrases/aliases and explicit filters, preserve relevance and source diversity in bounded context, and explain coverage limits.
+- [x] 16. **Ranked evidence search** - Improve keyword ranking, phrases/aliases and explicit filters, preserve relevance and source diversity in bounded context, and explain coverage limits.
 - [ ] 17. **Optional local semantic search** - Offer explicit opt-in local embeddings and hybrid retrieval while preserving scoped keyword search without an embedding model or paid services.
 - [ ] 18. **Editable change review** - Highlight changed lines, permit draft edits followed by renewed exact previews and validation, preserve dependent operation groups and give actionable recovery explanations.
 - [ ] 19. **Guided local setup** - Guide local-only connection, compatible downloaded model selection, folder grants and an optional sample; show actionable diagnostics without installing services or downloading models silently.

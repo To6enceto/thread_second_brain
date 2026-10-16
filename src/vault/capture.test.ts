@@ -20,6 +20,14 @@ test("identical imports serialize concurrent saves, retain history and permit mi
  await r.run("a".repeat(64),"Sources/b.md",()=>false,async()=>{},async()=>{});assert.equal(r.records["a".repeat(64)],"Sources/b.md");
  const restored=new ImportRegistry();restored.load({schemaVersion:1,records:r.records});assert.deepEqual(restored.records,r.records);
 });
+
+test("project suggestions treat ordinary quotation marks as prose, not search syntax", async () => {
+ const project = await indexNote({path:"P/Research/Overview.md",text:'Research budget for a 27" monitor',metadata:{type:"project"},modifiedAt:1},()=>null);
+ assert.equal(suggestProject('Research budget for a 27" monitor',[project])?.path,project.path);
+ assert.equal(suggestProject('Research budget "unfinished prose',[project])?.path,project.path);
+ assert.equal(suggestProject('Research budget '+ '"quoted" '.repeat(20),[project])?.path,project.path);
+ assert.equal(suggestProject('Research budget',[project])?.path,project.path);
+});
 test("registry failures name the saved note and failed creation never records an import",async()=>{
  const r=new ImportRegistry();const hash="b".repeat(64);
  await assert.rejects(r.run(hash,"Sources/x.md",()=>false,async()=>{throw new Error("no disk")},async()=>{}),/no disk/);assert.equal(r.records[hash],undefined);

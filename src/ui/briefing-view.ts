@@ -4,7 +4,7 @@ import { OllamaClient } from "../intelligence/ollama.ts";
 import { briefingPrompt, validateBriefing, SECTION_KEYS, type Briefing, type Claim, type SectionKey } from "../intelligence/briefing.ts";
 import { recordedBriefing, composeBriefing } from "../intelligence/recorded.ts";
 import { readableText } from "../vault/scope.ts";
-import type { Evidence, EvidenceBundle } from "../vault/evidence.ts";
+import { contextCoverageText, type Evidence, type EvidenceBundle } from "../vault/evidence.ts";
 import { permittedProjects, projectHome, type ProjectHome, type HomeItem } from "../vault/project-home.ts";
 
 export const THREAD_VIEW = "thread-briefing";
@@ -104,6 +104,7 @@ export class BriefingView extends ItemView {
     root.createEl("h3", { text: "Evidence gaps and limits" });
     const gaps = root.createEl("ul");
     for (const gap of this.result.gaps) gaps.createEl("li", { text: gap });
+    gaps.createEl("li", { text: contextCoverageText(this.bundle) });
     const details = root.createEl("details", { cls: "thread-evidence" });
     details.createEl("summary", { text: `Evidence used (${this.bundle.sources.length} passages)` });
     for (const source of this.bundle.sources) {
