@@ -37,3 +37,9 @@ test('question evidence provenance markers survive reviewed body drafts and nati
  const revised=draftContent(original,body);assert.ok(revised.includes('<!-- thread:question-evidence -->\r\n'));assert.ok(revised.endsWith('<!-- /thread:question-evidence -->\r\n'));
  assert.throws(()=>draftContent(original,body.replace('<!-- /thread:question-evidence -->\n','')),/provenance/);
 });
+
+test('review snapshot marker pairs remain protected through native body draft normalization',()=>{
+ const original='---\r\ntype: review-event\r\n---\r\nHuman reason\r\n<!-- thread:review-evidence -->\r\nPrivate target snapshot\r\n<!-- /thread:review-evidence -->\r\n',body=editableBody(original).body.replaceAll('\r\n','\n').replace('Human reason','Revised human reason');
+ const revised=draftContent(original,body);assert.ok(revised.includes('<!-- thread:review-evidence -->\r\n'));assert.ok(revised.endsWith('<!-- /thread:review-evidence -->\r\n'));
+ assert.throws(()=>draftContent(original,body.replace('<!-- /thread:review-evidence -->\n','')),/provenance/);
+});

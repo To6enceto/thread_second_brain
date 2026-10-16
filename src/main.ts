@@ -1,4 +1,5 @@
 import { QuestionsModal } from "./ui/questions-modal.ts";
+import { questionReviewReferences } from "./vault/review-events.ts";
 import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal, type Editor } from "obsidian";
 import { SelectionModal } from "./ui/selection-modal.ts";
 import { savedSelection,selectionAvailable,selectionEvidence,type SelectionAction } from "./vault/selection.ts";
@@ -122,6 +123,14 @@ export default class ThreadPlugin extends Plugin {
   openDecisionReview(path=""):void{const modal=new DecisionReviewModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}
   openFreshness(path=""):void{const modal=new FreshnessModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}
   openReviewQueue():void{const modal=new ReviewQueueModal(this);this.modals.add(modal);modal.open();}
+  async questionReviewReferences(path:string,hash:string){
+    if(!readableText(path,this.settings))throw new Error("Question is unavailable in the current read scope.");
+    const file=this.app.vault.getAbstractFileByPath(path);
+    if(!(file instanceof TFile))throw new Error("Question is missing. Refresh the queue.");
+    const raw=await this.app.vault.read(file);
+    if(file.path!==path||!readableText(path,this.settings)||await contentHash(raw)!==hash)throw new Error("Question changed. Refresh the queue.");
+    return questionReviewReferences(raw,parseYaml);
+  }
   openWeekly():void{const modal=new WeeklyModal(this);this.modals.add(modal);modal.open();}
   openSession():void{const modal=new SessionModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}

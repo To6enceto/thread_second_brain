@@ -6,8 +6,8 @@ import { readableText } from "./scope.ts";
 import { localDay } from "./workspace.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
 
-export const queueKinds = ["changed-source","decision-evidence","revisit-date","revisit-condition","open-question","stale-output"] as const;
-export type QueueKind = typeof queueKinds[number];
+import { queueKinds, type QueueKind } from "./review-provenance.ts";
+export { queueKinds, type QueueKind } from "./review-provenance.ts";
 export const queueLabels:Record<QueueKind,string>={"changed-source":"Changed recorded sources","decision-evidence":"Decisions needing evidence review","revisit-date":"Due revisit dates","revisit-condition":"Conditions requiring judgment","open-question":"Recorded open questions","stale-output":"Saved outputs needing freshness review"};
 export interface QueueSource { path:string;hash:string; }
 export interface QueueItem extends QueueSource { kind:QueueKind;heading:string;text:string;related:QueueSource[]; }
@@ -22,7 +22,8 @@ function excerpts(entry:IndexEntry,heading:RegExp):{heading:string;text:string}[
   seen.add(text);return [{heading:chunk.heading,text:text.slice(0,400)}];
  }));
 }
-export function projectReviewQueue(index:LocalIndex,settings:ThreadSettings,day=localDay()):ReviewQueue{
+export function projectReviewQueue(index:LocalIndex,settings:ThreadSettings,day=localDay(),perKindLimit=20):ReviewQueue{
+ if(!Number.isInteger(perKindLimit)||perKindLimit<1||perKindLimit>200)throw new Error("Invalid review candidate limit.");
  if(!calendarDate(day))throw new Error("Invalid review day.");
  if(!index.ready)throw new Error("Project index is updating. Refresh the queue afterward.");
  if(!settings.selectedProject)throw new Error("Select a permitted project first.");
@@ -65,10 +66,10 @@ export function projectReviewQueue(index:LocalIndex,settings:ThreadSettings,day=
  const unique=[...new Map(items.map(item=>[JSON.stringify([item.kind,item.path,item.heading,item.text]),item])).values()];
  unique.sort((a,b)=>a.path.localeCompare(b.path)||a.heading.localeCompare(b.heading)||a.text.localeCompare(b.text));
  const counts=Object.fromEntries(queueKinds.map(kind=>[kind,unique.filter(item=>item.kind===kind).length])) as Record<QueueKind,number>;
- return{project:settings.selectedProject,day,baseline:baseline?{path:baseline.path,hash:baseline.hash}:null,items:queueKinds.flatMap(kind=>unique.filter(item=>item.kind===kind).slice(0,20)),counts,records:records.length,
+ return{project:settings.selectedProject,day,baseline:baseline?{path:baseline.path,hash:baseline.hash}:null,items:queueKinds.flatMap(kind=>unique.filter(item=>item.kind===kind).slice(0,perKindLimit)),counts,records:records.length,
   limits:[baseline?`Comparison baseline: ${baseline.path}. Source changes also use recorded decision/output references.`:"No readable saved review baseline. Source changes are shown only when recorded decision/output references establish an earlier snapshot.",
    "Only reviews with a valid nonfuture recorded generation date can be comparison baselines. Older retained stale versions can remain listed until explicitly reconciled in the authoritative records.",
-   "This is an on-demand indexed snapshot, not an exhaustive change feed. Uncited changes, unrecognized legacy structure and content beyond the first 50000 body characters per note can be missing. At most 20 items per category and five related sources per item are shown.",
+   `This is an on-demand indexed snapshot, not an exhaustive change feed. Uncited changes, unrecognized legacy structure and content beyond the first 50000 body characters per note can be missing. At most ${perKindLimit} candidates per category and five related sources per item are shown.`,
    "Opening or refreshing the queue does not resolve questions, satisfy conditions, accept decisions or change notes. Use explicit existing review workflows or edit the authoritative record yourself.",
    ...(invalidDates?[`${invalidDates} invalid revisit dates cannot be scheduled; use an explicit YYYY-MM-DD property.`]:[]),...(unavailable?[`${unavailable} unavailable reference occurrences have their paths and excerpts hidden.`]:[])]};
 }

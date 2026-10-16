@@ -30,7 +30,7 @@ export function editableBody(text: string): { prefix: string; body: string } {
   const prefix = /^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0] ?? (text.startsWith("\uFEFF") ? "\uFEFF" : "");
   return { prefix, body: text.slice(prefix.length) };
 }
-const protectedMarkers=/^<!-- \/?thread:(?:output|question-evidence)\b[^\n]*(?:\n|$)/gm;
+const protectedMarkers=/^<!-- \/?thread:(?:output|question-evidence|review-evidence)\b[^\n]*(?:\n|$)/gm;
 function markers(text: string): string[] { return text.match(protectedMarkers) ?? []; }
 export function draftContent(proposed: string, body: string): string {
   const { prefix } = editableBody(proposed);

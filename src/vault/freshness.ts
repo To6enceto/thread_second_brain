@@ -1,5 +1,6 @@
 import { object } from "../settings/settings.ts";
 import { readableText,vaultPath,type ReadScope } from "./scope.ts";
+import { reviewProvenance } from "./review-provenance.ts";
 
 export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;}
 export interface OutputProvenance{refs:SourceReference[];invalid:boolean;title:string;}
@@ -27,6 +28,16 @@ function sourceLines(text:string):{lines:string[];starts:number[]}{
   for(const line of lines){starts.push(at);at+=line.length+(text[at+line.length]==="\r"?2:text[at+line.length]==="\n"?1:0);}
   return {lines,starts};
 }
+const privateMarker=/<!--\s*(\/\s*)?thread\s*:\s*(question|review)-evidence/i;
+function bodyStart(text:string):number{return /^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0].length??0;}
+function privateMarkers(body:string):{kinds:Set<string>;malformed:boolean}{
+  const kinds=new Set<string>();let malformed=false;
+  for(const marker of body.matchAll(new RegExp(privateMarker.source,"gi"))){
+    const kind=marker[2]!.toLowerCase(),at=marker.index!,canonical=`<!-- ${marker[1]?"/":""}thread:${kind}-evidence -->`,after=at+canonical.length;kinds.add(kind);
+    if((at>0&&body[at-1]!=="\n")||!body.startsWith(canonical,at)||!(after===body.length||body[after]==="\n"||body[after]==="\r"&&body[after+1]==="\n"))malformed=true;
+  }
+  return{kinds,malformed};
+}
 function decisionUserText(text:string):{text:string;ranges:SourceRange[]}{
   let dropping=false;let fence="";const result:string[]=[],ranges:SourceRange[]=[];const {lines,starts}=sourceLines(text);
   for(const [i,line] of lines.entries()){
@@ -41,32 +52,45 @@ function decisionUserText(text:string):{text:string;ranges:SourceRange[]}{
   return {text:result.join("\n"),ranges};
 }
 
-function questionUserText(text:string,version:unknown):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
-  const {lines,starts}=sourceLines(text),kept:string[]=[],ranges:SourceRange[]=[];let dropping=false,blocks=0,invalid=version!=="1";
-  const bodyFrom=/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0].length??0;
+function privateRecordText(text:string,version:unknown,kind:"question"|"review",malformed:boolean):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
+  const {lines,starts}=sourceLines(text),kept:string[]=[],ranges:SourceRange[]=[];let dropping=false,blocks=0,invalid=version!=="1"||malformed;
+  const bodyFrom=bodyStart(text);
   // These markers are reserved in managed records, including inside fences.
   // User-entered text escapes them; machine evidence must never become prose.
   for(const [i,line]of lines.entries()){
     if(starts[i]!<bodyFrom)continue;
-    if(line.trim().startsWith("<!-- thread:question-evidence")){
-      if(dropping||line!=="<!-- thread:question-evidence -->")invalid=true;dropping=true;blocks++;continue;
+    const marker=privateMarker.exec(line),sameKind=marker?.[2]?.toLowerCase()===kind;
+    if(sameKind&&!marker![1]){
+      if(dropping||line!==`<!-- thread:${kind}-evidence -->`)invalid=true;dropping=true;blocks++;continue;
     }
-    if(line.trim().startsWith("<!-- /thread:question-evidence")){
-      if(!dropping||line!=="<!-- /thread:question-evidence -->")invalid=true;dropping=false;continue;
+    if(sameKind&&marker![1]){
+      if(!dropping||line!==`<!-- /thread:${kind}-evidence -->`)invalid=true;dropping=false;continue;
     }
     if(dropping)continue;
     kept.push(line);const from=starts[i]!,to=starts[i+1]??text.length,last=ranges.at(-1);
     if(last?.to===from)last.to=to;else if(to>from)ranges.push({from,to});
   }
-  if(invalid||dropping||!blocks)return{text:"",ranges:[],output:{refs:[],invalid:true,title:"Unsupported managed question evidence blocks"}};
+  if(invalid||dropping||!blocks)return{text:"",ranges:[],output:{refs:[],invalid:true,title:`Unsupported managed ${kind} evidence blocks`}};
   return{text:kept.join("\n"),ranges};
 }
 
 export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
   const whole={text,ranges:[{from:0,to:text.length}]};
-  const managedQuestion=metadata.thread_question_version!==undefined||/^\s*(?:thread_question_version|["']thread_question_version["'])\s*:/m.test(text)
-    ||/^\s*<!--\s*\/?thread:question-evidence\b/m.test(text)||metadata.type==="question"&&metadata.thread_sources!==undefined;
-  if(managedQuestion)return questionUserText(text,metadata.type==="question"?metadata.thread_question_version:undefined);
+  // Dispatch and line validation share recognition; only standalone canonical
+  // markers are valid. Frontmatter is already private in managed records.
+  const body=text.slice(bodyStart(text)),markers=privateMarkers(body),markerKinds=markers.kinds;
+  const managedQuestion=metadata.thread_question_version!==undefined||/^[\t ]*(?:thread_question_version|["']thread_question_version["'])\s*:/im.test(text)
+    ||markerKinds.has("question")||metadata.type==="question"&&metadata.thread_sources!==undefined;
+  const managedReview=["thread_review_version","thread_review_key","thread_review_snapshot"].some(key=>metadata[key]!==undefined)
+    ||/^[\t ]*(?:thread_review_(?:version|key|snapshot)|["']thread_review_(?:version|key|snapshot)["'])\s*:/im.test(text)||markerKinds.has("review");
+  if(managedQuestion&&managedReview||(managedQuestion||managedReview)&&/<!--\s*(?:\/\s*)?thread\s*:\s*output/i.test(body)){
+    return{text:"",ranges:[],output:{refs:[],invalid:true,title:"Conflicting managed record formats need manual normalization"}};
+  }
+  if(managedQuestion)return privateRecordText(text,metadata.type==="question"?metadata.thread_question_version:undefined,"question",markers.malformed);
+  if(managedReview){
+    try{reviewProvenance(text,metadata);return privateRecordText(text,metadata.type==="review-event"?metadata.thread_review_version:undefined,"review",markers.malformed);}
+    catch{return{text:"",ranges:[],output:{refs:[],invalid:true,title:"Unsupported managed review record"}};}
+  }
   if(metadata.type==="source")return whole;
   if(metadata.type==="decision")return decisionUserText(text);
   const generated=["answer","review","session","concept","comparison","briefing"].includes(String(metadata.type))&&(metadata.thread_sources!==undefined||metadata.thread_model!==undefined||metadata.generated_on!==undefined);

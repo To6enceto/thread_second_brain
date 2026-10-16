@@ -1,9 +1,11 @@
+import { reviewProvenance, reviewManifestHash } from "./review-provenance.ts";
 import { outputProjection,FreshnessGraph,readSourceReferences,type OutputProvenance,type RenameMap,type SourceReference } from "./freshness.ts";
 import { noteSections, type SourceNote } from "./evidence.ts";
 import { contentHash, isWithin, readableText, type ReadScope } from "./scope.ts";
 import { searchEntries, keywordTerms, type SearchResult, type SearchFilters } from "../retrieval/search.ts";
 
 export interface IndexEntry {
+  reviewManifestHash?:string;
   decisionSources?: {refs:SourceReference[];invalid:boolean};
   path: string; id?: string; title: string; metadata: Record<string, unknown>;
   hash: string; modifiedAt: number; chunks: {heading: string; excerpt: string}[];
@@ -29,7 +31,7 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
   const projected=outputProjection(note.text,note.metadata);
   const body=projected.text.replace(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,"");
   const text=body.slice(0,50000);
-  const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version"]);
+  const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version","thread_review_version","thread_review_key","thread_review_snapshot","action"]);
   const metadata=Object.fromEntries(Object.entries(note.metadata).filter(([key,value])=>fields.has(key)&&typeof value==="string"));
   const aliases = typeof note.metadata.aliases === "string" ? [note.metadata.aliases] : note.metadata.aliases;
   if (Array.isArray(aliases)) metadata.aliases = aliases.filter((value): value is string => typeof value === "string").slice(0, 20).map(value => value.slice(0, 100));
@@ -45,7 +47,8 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
       decisionSources={refs:readSourceReferences(note.metadata.thread_sources,true).map(ref=>({...ref,heading:""})),invalid:false};
     }catch{decisionSources={refs:[],invalid:true};}
   }
-  return {path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
+  const review=note.metadata.type==="review-event"&&note.metadata.thread_review_version==="1"&&!projected.output?.invalid?reviewProvenance(note.text,note.metadata):undefined;
+  return {...(review?{reviewManifestHash:await reviewManifestHash(review.kind,review.target,review.hashes)}:{}),path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
     ...(decisionSources?{decisionSources}:{}),
     title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata,...(projected.output?{output:projected.output}:{}),
     hash:await contentHash(note.text),modifiedAt:note.modifiedAt,chunks,
