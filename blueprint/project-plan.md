@@ -99,7 +99,7 @@ Save generated answers and briefings as new notes only after a user action.
 Edits to established notes always use the reviewed-change workflow. During an
 early feature that cannot safely persist an output yet, keep it in the panel.
 
-### Explicitly deferred capabilities
+### Initial-release deferrals and approved follow-ups
 
 Mobile AI execution, cross-device inference, team collaboration, autonomous
 background agents, cloud model APIs, semantic embeddings, model fine-tuning,
@@ -107,7 +107,10 @@ email/calendar integrations, a custom browser extension, audio transcription,
 PDF extraction/OCR, arbitrary web browsing, billing, and hosted dashboards are
 outside this release. Add them only after the core workflow is evaluated and a
 separate scope decision is recorded. Weekly reviews run on demand; they do not
-require a scheduler or a computer that stays on overnight.
+require a scheduler or a computer that stays on overnight. The approved follow-up
+sections below supersede only the local semantic-search deferral (features
+13-21) and selectable-text PDF extraction/import (features 31-32). OCR, audio,
+remote fetching and the other deferred capabilities still require separate scope.
 
 ## 4. Data - What are we storing?
 
@@ -369,7 +372,7 @@ useful summaries and clear evidence over a decorative knowledge graph.
 ## 8. Deployment - Where and how will this ship?
 
 This is a desktop Obsidian plugin installed on the user's computer. No web host,
-domain, remote database, login server, worker, or cron job is required.
+domain, remote database, login server, remotely hosted worker, or cron job is required.
 
 - Build command: `npm run build`.
 - Output: `main.js` in the repository root; ship it with `manifest.json` and
@@ -396,8 +399,8 @@ require later user decisions. Do not publish or deploy as part of setup.
 - Personal desktop use, one user and one active vault per plugin instance.
 - Linux is the current development environment; target desktop Obsidian on
   Linux, macOS, and Windows. Claim support only for platforms actually verified.
-- The scaffold declares `minAppVersion: 1.8.0`; this is provisional until the
-  selected APIs and actual compatibility checks establish the release minimum.
+- The completed 0.2.0 manifest requires Obsidian 1.14.4, its tested minimum.
+  New APIs or platforms require evidence before changing compatibility claims.
 - No Internet-facing inference endpoint. Local inference must use loopback.
 - Original notes may contain sensitive personal information and imported text.
   Eligibility filtering and reviewed writes are required boundaries.
@@ -448,12 +451,13 @@ runtime dependency. Recheck versions and terms when implementing integrations.
 - [AI Blueprint](https://github.com/aiblueprinthq/ai-blueprint)
 
 
-## Approved improvements - local 0.2.0 target
+## Approved improvements - completed local 0.2.0
 
 Approved on 2026-10-15. Preserve completed features 1-12 and their archives.
 This follow-up supersedes the initial-release deferral of optional local semantic
 search only; cloud inference, autonomous writes, publishing and paid services
-remain outside scope. Features 13-21 follow the ordered build plan.
+remain outside scope. Features 13-21 follow the ordered build plan and are now
+complete; their verified specs and review receipts remain in immutable history.
 
 - Evaluate answer quality with tracked synthetic notes/questions, explicit known
   expectations and opt-in real local-model runs. Baselines may disclose model
@@ -491,5 +495,151 @@ qwen3:4b-instruct on the available laptop. Development requires Node 22.15+.
 The 0.1.0 release uses minAppVersion 1.14.4. Other platforms/models and large
 vault performance require their own evidence. Test only synthetic vaults.
 Local model and optional embedding downloads, storage, memory and power remain
-real costs; no mandatory paid runtime is introduced. Package the final private
-0.2.0 build after the complete approved queue is verified.
+real costs; no mandatory paid runtime is introduced. Features 1-21 form the
+verified private 0.2.0 baseline for the next approved queue.
+
+## Approved improvements - daily research and project portability
+
+The user approved all ten additional proposals on 2026-10-16. Build-plan features
+22-34 retain them all. The larger retrieval, PDF and portability proposals are
+each split into two serial features. This approval changes the plans, not the
+completion state: features 22-34 are pending and the current runtime remains
+0.2.0 until implementation and release verification establish its successor.
+
+### Everyday evidence and follow-up (22-25)
+
+- **22. Editor selection actions:** Offer native commands for Ask about this,
+  Find related evidence, and preparing question/decision drafts from permitted
+  selected text. Carry source identity and a current snapshot into the workflow.
+  Selection does not silently authorize the rest of a note or widen grants;
+  changed/unsaved source text must be reconciled before durable citation/save.
+  A draft never accepts a decision or edits the original selection implicitly.
+- **23. Evidence workbench:** Show retrieved passages together before Ask; let
+  users include, exclude or pin evidence for that request and inspect the final
+  bounded context. Compare answer claims with cited passages side by side. Pins
+  cannot bypass scope, current hashes, stale-output filtering or context budgets.
+  Show omissions and uncertainty rather than fabricated support/confidence scores.
+- **24. Managed project questions:** Store optional new question records as
+  readable Markdown with stable ID, project, explicit open/investigating/answered
+  state, recorded dates, question, optional answer and evidence. Answering and
+  reopening require a user action; preserve prior answers/reasons and link
+  related decisions. Existing question sections continue to work. Conversion is
+  optional and previewed; never bulk-rewrite a vault or automatically resolve prose.
+- **25. Review acknowledgements and snoozing:** Save explicit reviewed/no-change
+  or revisit-date records linked to current target/source snapshots. Offer
+  follow-up question and decision-review drafts. New relevant hashes/identities
+  resurface an item even if an older snapshot was reviewed or snoozed. These
+  actions do not make derived output current, validate a claim, accept a decision
+  or resolve a question. No scheduler, notifications or autonomous actions.
+
+### Project context and vault compatibility (26-28)
+
+- **26. Project timeline:** Combine recorded sessions, saved reviews, explicit
+  milestones and decision/supersession links in chronological order. Distinguish
+  event dates from capture/modification dates, label unknown chronology and open
+  only currently permitted sources. Never reconstruct unsaved earlier note
+  contents or imply a complete historical event log. Milestones are user records.
+- **27. Multi-project overview:** Aggregate recorded activity, questions, due
+  reviews and visible proposals across already permitted projects. Filter
+  active/paused/archived records, switch projects without new grants and allow
+  explicit next-action selection through a previewed record change. Display
+  counts/coverage and transparent sorting, not inferred priority/health scores.
+  The default overview needs no model and does not silently launch inference.
+- **28. Vault health and compatibility:** On demand, diagnose duplicate IDs,
+  invalid dates, unresolved references, missing project associations and headings
+  that recorded-context parsing cannot recognize. Explain each practical effect
+  and coverage limit. Offer one reviewed repair at a time only within existing
+  write policy; give manual guidance for protected original sources. No automatic
+  cleanup, migrations, ID reassignment or widening of read permissions.
+
+### Broader local evidence (29-32)
+
+- **29. Section-aware long-note indexing:** Replace silent prefix-only coverage
+  with bounded section processing, configurable limits, visible indexed/omitted
+  coverage, progress and cancellation. Preserve immediate exclusions, incremental
+  dependency invalidation and source hashes. Measure responsiveness, read counts
+  and memory-related budgets on larger synthetic fixtures; do not promise an
+  arbitrary vault size or remove bounds. Derived cache upgrades may rebuild;
+  authoritative records and durable journals/settings must remain compatible.
+- **30. Broader hybrid retrieval:** Build on section indexing to examine a wider,
+  explicitly budgeted candidate set, with balanced selection and a user-triggered
+  search-more action when relevant evidence may be omitted. Keep bounded model
+  context, finite memory/work and honest coverage. Keyword-only retrieval remains
+  usable without embeddings. Reuse local model-digest/vector checks, cancellation
+  and scope guards; no mandatory vector database, remote service, automatic model
+  download or unattended whole-vault embedding job.
+- **31. Local PDF extraction:** Read only explicitly selected local PDFs with
+  explicit binary-read consent; existing Markdown/text grants alone must not
+  silently turn on PDF reads. Enforce current exclusions and preview import/copy
+  destinations. Preserve originals and reject collisions. Preview bounded page
+  text before saving a derived Markdown source with original identity/hash,
+  extraction version, page mapping and limitations. Start with selectable text;
+  image-only, encrypted or unsupported files need clear handling, not guessed
+  content. A local appropriately licensed parser such as PDF.js is an approved
+  dependency candidate; verify compatibility/license at implementation. Bundle
+  required worker/assets locally in an explicitly verified package inventory;
+  never fetch a CDN, linked URL, remote font or document script at runtime.
+- **32. PDF evidence and page citations:** Make approved extracted text useful
+  to Find, Ask, Resume and explicit review workflows, with page references and
+  current original-file verification before opening/reusing evidence. Preserve
+  extraction provenance and distinguish extracted text from a model summary.
+  Changes, removal or exclusions of original PDFs invalidate their extracted
+  evidence/dependent output immediately; cached copies must not bypass consent
+  or scope. Re-extraction is explicit and must preserve originals and prior
+  approved notes. Demonstrate actual PDF page navigation and offline packaged use.
+
+### Portable project context (33-34)
+
+- **33. Project exports and checkpoints:** Explicitly select a project and its
+  permitted records/supporting files, inspect an inventory and omissions, then
+  create a non-overwriting local package. A versioned manifest records package
+  identity, creation time, project identity and vault-relative entries with type,
+  byte length and hash, plus safe provenance/link information. Recheck scope and
+  snapshots before export. Omit scope-invalid/stale derived evidence by default
+  and do not enumerate excluded reference paths in manifests. Never include
+  plugin settings/secrets, caches, recovery originals, models or runtime files
+  automatically. Markdown remains readable without Thread; document that this
+  selected checkpoint is not a full vault backup or permanent change journal.
+- **34. Reviewed project package import:** Treat every package as untrusted input.
+  Validate version, supported types, normalized relative paths, file counts,
+  compressed/expanded sizes and hashes before any writes. Refuse path traversal,
+  links/unsupported executable assets and malformed packages. Preview new-copy
+  destinations, link/identity mapping, duplicate identities and all collisions.
+  Default to a new folder; never overwrite existing notes or silently rewrite
+  their IDs. Changes to imported copies require the exact reviewed preview.
+  Revalidate destinations during apply, preserve partial-failure recovery and
+  leave imported folders outside Thread read grants until explicitly selected.
+  No destructive restore mode. Demonstrate offline export/import round trips,
+  source/provenance safety, collision/concurrent-edit refusal and recovery.
+
+### Shared contracts, costs and verification
+
+Keep new durable questions, review events, milestones and chosen next actions in
+readable Markdown. Review-event records must be distinguishable from AI-generated
+review baselines so acknowledgement is never mistaken for new evidence. Derived
+indexes, candidate vectors and diagnostics remain rebuildable. Freeze exact
+validated schemas and namespace choices in each feature spec, with compatibility
+tests before later consumers depend on them. No forced conversion of legacy notes.
+
+All ten proposals must remain usable with no required API/hosting/subscription
+charge. Non-AI surfaces work without Ollama; AI uses the existing cloud-disabled
+loopback provider. Larger indexes, PDFs and project packages use real storage,
+memory, CPU time and electricity. Development assistant costs are separate.
+No mobile inference, audio/OCR, web fetching, collaboration, background agents,
+paid model provider or public distribution is introduced by this approval.
+
+Use project-local appropriately licensed dependencies only where justified.
+Run Verify, meaningful logic tests and required independent reviews for each
+feature. Native Obsidian acceptance must use synthetic vaults, including real
+local text/embedding inference where relevant, direct keyboard/theme checks,
+current source/page links, cancellation, exclusions and stale-data races. Use
+authored synthetic PDFs/packages for extraction, malformed-input, traversal,
+resource-limit, collision and partial-write cases; never test on personal notes.
+Extend reusable quality fixtures when retrieval/evidence formats change.
+
+Preserve features 1-21, their archive bytes, note conventions and durable import,
+rename and change history. Keep raw sources unchanged and require exact renewed
+approval before writes. Package and install the final new version only after its
+feature queue passes; record the actual artifact inventory, reproducibility,
+offline behavior, model/runtime versions and platform/scale limits. Previous
+release artifacts/history are evidence, not permission to claim new support.

@@ -4,7 +4,9 @@ Thread's first release follows the scope in `project-plan.md`. Each numbered
 checkbox is one feature to spec and verify through Blueprint. Scaffold creation
 and Blueprint installation are already performed setup, not completed features.
 Keep these IDs stable. Features 1-12 preserve the completed 0.1.0 release;
-features 13-21 are the approved local improvements.
+features 13-21 preserve the completed 0.2.0 improvements. Features 22-34 are the
+next approved local improvements; all ten proposals are retained, with retrieval,
+PDF support and project portability split into two features each.
 
 ## Milestone A - Resume a project with local evidence
 
@@ -45,12 +47,46 @@ features 13-21 are the approved local improvements.
 - [x] 20. **Incremental dependency indexing** - Reindex changed notes and affected dependencies, avoid unnecessary invalidation, and preserve immediate exclusion removal, cancellation and stale-source guards.
 - [x] 21. **Project review queue** - Connect changed sources, affected decisions, explicit revisit dates/conditions, questions and stale outputs in an on-demand review queue; changes and resolutions remain explicit.
 
+## Milestone G - Work directly with evidence and follow-up
+
+- [ ] 22. **Editor selection actions** - Add native commands for asking about permitted selected text, finding related evidence and preparing question/decision drafts, retaining current source identity without changing notes or read grants implicitly.
+- [ ] 23. **Evidence workbench** - Inspect retrieved passages, include/exclude/pin current evidence before Ask, and compare generated claims with their supporting passages while showing context limits and preserving scope/freshness checks.
+- [ ] 24. **Managed project questions** - Create durable Markdown questions with explicit open/investigating/answered states, cited answers and preserved reopening history; optionally convert legacy questions through previews without automatic resolution.
+- [ ] 25. **Review acknowledgements and snoozing** - Record explicit reviewed/no-change or revisit-date actions against source snapshots, link follow-up questions and decision drafts, and resurface new changes without treating acknowledgement as freshness or decision acceptance.
+
+## Milestone H - Understand projects and existing vaults
+
+- [ ] 26. **Project timeline** - Show recorded sessions, reviews, milestones and decision/supersession history chronologically with current source navigation, clear event-date versus modification-date labels and honest historical gaps.
+- [ ] 27. **Multi-project overview** - Summarize already permitted projects, recorded activity, questions, due reviews and proposals, with explicit next-action selection and active/paused/archived filtering; no read grants or inferred priority scores.
+- [ ] 28. **Vault health and compatibility** - Diagnose duplicate IDs, invalid dates, unresolved references, project associations and unrecognized record headings in permitted notes, explaining consequences and offering individual reviewed repairs only where writes are allowed.
+
+## Milestone I - Expand local evidence coverage
+
+- [ ] 29. **Section-aware long-note indexing** - Index more than the existing note prefix through bounded section processing, with configurable budgets, progress, cancellation, meaningful coverage and measured synthetic performance while preserving incremental invalidation.
+- [ ] 30. **Broader hybrid retrieval** - Extend candidate coverage across eligible sections using explicit bounded search budgets, balanced selection and search-more controls; retain keyword-only operation, local embedding identity checks and immediate exclusions.
+- [ ] 31. **Local PDF extraction** - Explicitly import/select local PDFs, preserve originals, preview bounded page text and save non-overwriting source notes with extraction provenance; package required local assets, with no remote fetch, OCR or silent binary read grants.
+- [ ] 32. **PDF evidence and page citations** - Integrate approved extracted PDF text into retrieval, answers and reviews with verified page references, current original-file hashes and exclusions; changed/missing/excluded PDFs invalidate dependent cached evidence and outputs.
+
+## Milestone J - Preserve and move project context
+
+- [ ] 33. **Project exports and checkpoints** - Preview and explicitly create portable local project packages of selected permitted notes and eligible supporting files, with a versioned hash manifest, clear omissions and no plugin secrets/caches/journal originals or implicit whole-vault backup claim.
+- [ ] 34. **Reviewed project package import** - Validate package types, paths, sizes and hashes, preview destinations/links/identities and collisions, then import new copies without overwriting notes or granting reads; prove recovery, portability and the final packaged offline workflow.
+
 ## Build discipline
 
 The first feature includes only the connection and read boundaries necessary for
 its briefing. It reads current notes directly; the reusable index arrives in
 feature 3. Text-only imports keep the local release achievable without paid
-services. Optional local semantic search is approved in feature 17; advanced import formats remain deferred.
+services. Optional local semantic search is approved in feature 17. Selectable-text
+PDF import is now approved in features 31-32; scanned-document OCR, audio and
+arbitrary web fetching remain deferred.
+
+Questions precede review acknowledgements because follow-up records need stable
+identities. Section-aware indexing precedes broader hybrid search and PDF
+retrieval. Export precedes import; a checkpoint is a user-selected project
+snapshot, not a replacement for an independent vault backup. Keep completed
+features 1-21, their IDs, archives and durable history unchanged. New features
+remain unchecked until individually implemented, demonstrated and reviewed.
 
 Introduce focused logic tests explicitly with the first logic-bearing feature,
 then include the configured test command in Verify. Demonstrate UI behavior in
