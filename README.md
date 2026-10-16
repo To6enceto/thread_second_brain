@@ -348,3 +348,7 @@ decisions also need your choice and reasoning and remain **proposed**. Inspect
 and explicitly save the exact new-note preview. Existing notes and original
 selections remain untouched; collisions refuse saving. Supported selection
 answers can be previewed as new notes under the mapped Knowledge folder.
+
+### Evidence workbench
+
+**Ask your vault** now starts with **Retrieve evidence**, without text generation. Inspect the passages, choose Include/Exclude/Pin first for this request, and expand **Exact source context sent to the model**. Pins order eligible passages within the existing context budget; they do not add omitted search results or bypass permissions. Choose **Generate from chosen evidence** when ready. Each claim appears beside its cited excerpts; inspect their support before previewing a new answer note. Question, scope, filter or choice changes cancel older answers and invalidate their previews. Source changes or exclusions clear affected workbench data. Nothing is saved without the exact new-note preview.

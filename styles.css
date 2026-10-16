@@ -32,3 +32,4 @@
 .thread-queue-item { margin: 12px 0; padding: var(--size-4-3); border-left: 2px solid var(--background-modifier-border); }
 
 .thread-queue-group > summary { cursor: pointer; font-weight: var(--font-semibold); margin: 16px 0; }
+.thread-claim-evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 16px 0; border-top: 1px solid var(--background-modifier-border); }

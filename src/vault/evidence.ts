@@ -42,7 +42,7 @@ export interface EvidenceBundle {
   hybridCoverage?: HybridCoverage;
 }
 
-const MAX_CONTEXT = 16000;
+export const MAX_CONTEXT = 16000;
 const MAX_NOTE = 50000;
 
 export function readMetadata(text: string, parse: (yaml: string) => unknown): Record<string, unknown> {
