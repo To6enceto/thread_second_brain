@@ -31,7 +31,7 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
   const projected=outputProjection(note.text,note.metadata);
   const body=projected.text.replace(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,"");
   const text=body.slice(0,50000);
-  const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version","thread_review_version","thread_review_key","thread_review_snapshot","action"]);
+  const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version","thread_review_version","thread_review_key","thread_review_snapshot","action","event_on","thread_milestone_version"]);
   const metadata=Object.fromEntries(Object.entries(note.metadata).filter(([key,value])=>fields.has(key)&&typeof value==="string"));
   const aliases = typeof note.metadata.aliases === "string" ? [note.metadata.aliases] : note.metadata.aliases;
   if (Array.isArray(aliases)) metadata.aliases = aliases.filter((value): value is string => typeof value === "string").slice(0, 20).map(value => value.slice(0, 100));

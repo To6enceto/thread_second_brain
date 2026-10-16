@@ -374,3 +374,11 @@ Review acknowledgements require valid version-1 metadata, a nonempty Reason and 
 Do not combine question, review-event and generated-synthesis private formats inside one managed record. Conflicting private namespaces fail closed until manually normalized; Thread preserves the raw note. Ordinary single-format questions and review events remain supported.
 
 Private marker prefixes are reserved even with malformed capitalization, spacing, suffixes or inline/multiline placement. Extra malformed blocks make the managed record unusable for derived evidence until manually normalized. Literal examples inside already private frontmatter remain private; canonical question/review records remain compatible.
+
+### Recorded project timeline
+
+Open **Thread: Project timeline**, also under Project home's More actions. It shows recognized sessions, generated reviews, explicit review events, milestones and decisions with dated evidence-review headings. Each row labels its source date field, capture date and file modification date separately. Decision status is the current status, not a reconstructed past status. Unknown chronology is explicit; stale generated contents are hidden with Source freshness guidance. The timeline works without Ollama and changes nothing on open/refresh.
+
+Expand **Record a user-reported milestone** to enter your title, detail and event date on/before today. Inspect the exact new note before saving. New `type: milestone` / `thread_milestone_version: "1"` records keep stable identity, project, `event_on` and separate capture dates. They are user reports, not independently verified achievements. Collisions, changed inputs/project identity, excluded paths and protected write locations refuse saving.
+
+Coverage is bounded to 200 events from the 2000 most recently modified project records and indexed sections (currently the first 50000 body characters). Repeated dated headings combine entries; later replacement links after long reasons may be omitted. A replacement button opens a current permitted decision at the recorded path. Legacy links do not archive replacement identities/hashes, so they cannot prove historical identity or follow renames reliably. No unsaved earlier note contents or complete historical event log is reconstructed.

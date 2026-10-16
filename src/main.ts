@@ -1,4 +1,5 @@
 import { QuestionsModal } from "./ui/questions-modal.ts";
+import { TimelineModal } from "./ui/timeline-modal.ts";
 import { questionReviewReferences } from "./vault/review-events.ts";
 import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal, type Editor } from "obsidian";
 import { SelectionModal } from "./ui/selection-modal.ts";
@@ -74,6 +75,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
+    this.addCommand({id:"project-timeline",name:"Project timeline",callback:()=>this.openTimeline()});
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
     this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
@@ -117,6 +119,7 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
+  openTimeline():void{const modal=new TimelineModal(this);this.modals.add(modal);modal.open();}
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}

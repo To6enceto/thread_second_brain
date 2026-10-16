@@ -1,0 +1,30 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { defaultSettings } from "../settings/settings.ts";
+import { indexNote, LocalIndex } from "./index.ts";
+import { calendarDay, milestoneMarkdown, milestoneRecord, projectTimeline } from "./timeline.ts";
+const settings={...defaultSettings(),selectedProject:"P",allowedPaths:["P","Other"],excludedPaths:["Other/EXCLUDED.md"]},day="2026-10-16";
+const entry=(path:string,text:string,metadata:Record<string,unknown>={},modifiedAt=Date.parse(day+'T12:00:00Z'))=>indexNote({path,text,metadata,modifiedAt},()=>null);
+const metadata=(raw:string)=>Object.fromEntries(/^---\n([\s\S]*?)\n---/.exec(raw)![1]!.split('\n').map(line=>{const at=line.indexOf(': ');return[line.slice(0,at),JSON.parse(line.slice(at+2))];}));
+test("chronology uses explicit recorded fields, labels captures separately and never assigns modification dates to missing events",async()=>{
+ const index=new LocalIndex();index.replace(await Promise.all([
+ entry('P/Session.md','User progress',{type:'session',recorded_on:'2026-10-10',generated_on:'2026-10-11'}),entry('P/Review.md','review',{type:'review',generated_on:'2026-10-12'}),entry('P/Decision.md','## Choice\nA',{type:'decision',status:'superseded',decided_on:'2026-10-09',created:'2026-10-11'}),entry('P/Unknown.md','unknown',{type:'session',recorded_on:'2026-02-30'}),entry('P/Unknown2.md','unknown',{type:'session'})
+ ]),settings);const result=projectTimeline(index,settings,day);assert.deepEqual(result.events.map(e=>e.day),['2026-10-12','2026-10-10','2026-10-09',null,null]);assert.equal(result.unknown,2);assert.ok(result.events.find(e=>e.kind==='decision')?.text.includes('current status: superseded'));assert.equal(result.events.find(e=>e.kind==='session')?.capture,'generated_on: 2026-10-11');assert.ok(result.events.every(e=>e.modified===day));assert.equal(calendarDay('2026-10-10T00:00:00.000Z'),'2026-10-10');assert.equal(calendarDay('2026-02-30'),null);
+});
+test("dated decision review and replacement links require current permitted unambiguous targets, with no excluded path leakage",async()=>{
+ const target=await entry('Other/Replacement.md','## Choice\nB',{id:'replacement',type:'decision',status:'accepted'}),old=await entry('P/Old.md','## Evidence review - 2026-10-08\nUser action: **supersede**.\nReplacement decision: [Open replacement](<Other/Replacement.md>)\n## Evidence review - 2026-10-09\nReplacement decision: [Open replacement](<Other/EXCLUDED.md>)',{type:'decision',status:'superseded',decided_on:'2026-10-01'}),index=new LocalIndex();index.replace([old,target],settings);let timeline=projectTimeline(index,settings,day);assert.equal(timeline.events.find(e=>e.heading.endsWith('08'))?.related?.path,target.path);assert.ok(!JSON.stringify(timeline).includes('EXCLUDED'));assert.ok(timeline.limits.some(v=>v.includes('1 unavailable')));
+ index.replace([old,target,{...target,path:'Other/Duplicate.md'}],settings);timeline=projectTimeline(index,settings,day);assert.ok(!timeline.events.some(e=>e.related));
+ const fenced=await entry('P/Fenced.md','## Evidence review - 2026-10-08\n```md\nReplacement decision: [Open replacement](<Other/Replacement.md>)\n```',{type:'decision'});index.replace([fenced,target],settings);assert.ok(!projectTimeline(index,settings,day).events.some(e=>e.related));
+});
+test("milestones preserve user text with separate event/capture dates and reject unsupported schemas or future achievements",async()=>{
+ const raw=milestoneMarkdown('project','Prototype ready','User-reported <script>detail</script>','2026-10-01',day),m=metadata(raw);assert.ok(milestoneRecord(m,day));assert.ok(raw.includes('event_on: "2026-10-01"'));assert.ok(raw.includes('recorded_on: "2026-10-16"'));assert.ok(raw.includes('\\<script\\>'));assert.ok(!raw.includes('thread_sources'));
+ for(const [title,detail,date]of [['','detail',day],['title','',day],['title','detail','2026-02-30'],['title','detail','2026-10-17']])assert.throws(()=>milestoneMarkdown('p',title!,detail!,date!,day));assert.equal(milestoneRecord({...m,thread_milestone_version:'2'},day),false);assert.equal(milestoneRecord({...m,event_on:day+'T00:00:00.000Z'},day),true);
+ const index=new LocalIndex();index.replace([await entry('P/M.md',raw,m)],settings);let event=projectTimeline(index,settings,day).events[0]!;assert.equal(event.day,'2026-10-01');assert.equal(event.capture,'created: 2026-10-16');assert.ok(event.text.includes('Prototype ready'));index.replace([await entry('P/M.md',raw,{...m,thread_milestone_version:'2'})],settings);event=projectTimeline(index,settings,day).events[0]!;assert.equal(event.day,null);assert.ok(event.text.includes('unsupported'));
+});
+test("stale generated records expose only safe metadata labels, and exclusions remove paths before display",async()=>{
+ const index=new LocalIndex(),stale=await entry('P/Stale.md','PRIVATE_STALE_CONTENT',{type:'session',recorded_on:day,thread_model:'m',thread_sources:JSON.stringify([{path:'Other/EXCLUDED.md',heading:'PRIVATE_HEADING',hash:'a'.repeat(64),noteHash:'a'.repeat(64)}])});index.replace([stale],settings);let timeline=projectTimeline(index,settings,day);assert.equal(timeline.events[0]?.usable,false);assert.ok(!JSON.stringify(timeline).includes('PRIVATE'));assert.ok(!JSON.stringify(timeline).includes('EXCLUDED'));
+ index.replace([stale],{...settings,excludedPaths:['P/Stale.md']});assert.throws(()=>projectTimeline(index,settings,day),/visible/);index.ready=false;assert.throws(()=>projectTimeline(index,settings,day),/updating/);
+});
+test("timeline bounds, transparent unknown counts and deterministic date ordering remain visible",async()=>{
+ const index=new LocalIndex();index.replace(await Promise.all(Array.from({length:230},(_,i)=>entry(`P/S${i}.md`,'record',{type:'session',...(i<210?{recorded_on:day}:{})}))),settings);const first=projectTimeline(index,settings,day);assert.equal(first.events.length,200);assert.equal(first.total,230);assert.equal(first.unknown,20);index.entries.reverse();assert.deepEqual(projectTimeline(index,settings,day),first);assert.throws(()=>projectTimeline(index,{...settings,selectedProject:''},day),/Select/);
+});

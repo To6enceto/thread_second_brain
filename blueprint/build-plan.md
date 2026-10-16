@@ -56,7 +56,7 @@ PDF support and project portability split into two features each.
 
 ## Milestone H - Understand projects and existing vaults
 
-- [ ] 26. **Project timeline** - Show recorded sessions, reviews, milestones and decision/supersession history chronologically with current source navigation, clear event-date versus modification-date labels and honest historical gaps.
+- [x] 26. **Project timeline** - Show recorded sessions, reviews, milestones and decision/supersession history chronologically with current source navigation, clear event-date versus modification-date labels and honest historical gaps.
 - [ ] 27. **Multi-project overview** - Summarize already permitted projects, recorded activity, questions, due reviews and proposals, with explicit next-action selection and active/paused/archived filtering; no read grants or inferred priority scores.
 - [ ] 28. **Vault health and compatibility** - Diagnose duplicate IDs, invalid dates, unresolved references, project associations and unrecognized record headings in permitted notes, explaining consequences and offering individual reviewed repairs only where writes are allowed.
 

@@ -80,6 +80,7 @@ export class BriefingView extends ItemView {
     for (const [label, action] of [
       ["Find evidence", () => this.plugin.openRecall()], ["Capture", () => this.plugin.openCapture()],
       ["Questions", () => this.plugin.openQuestions()], ["Decisions", () => this.plugin.openDecisions()], ["Review decisions", () => this.plugin.openDecisionReview()],
+      ["Timeline", () => this.plugin.openTimeline()],
       ["Knowledge", () => this.plugin.openKnowledge()], ["Source freshness", () => this.plugin.openFreshness()],
       ["Weekly review", () => this.plugin.openWeekly()], ["Changes", () => this.plugin.openChanges()],
       ["Workspaces", () => this.plugin.openWorkspace()], ["Settings", () => this.plugin.openSetup()]
