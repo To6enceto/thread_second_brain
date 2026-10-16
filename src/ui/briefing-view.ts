@@ -70,6 +70,7 @@ export class BriefingView extends ItemView {
     resume.disabled = this.controller !== null;
     resume.addEventListener("click", () => { void this.resume(); });
     if (this.controller) actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => { void this.cancelGeneration(); });
+    actions.createEl("button",{text:"All projects"}).onclick=()=>this.plugin.openProjectOverview();
     actions.createEl("button",{text:"Ask"}).onclick=()=>this.plugin.openAsk();
     actions.createEl("button",{text:"Review queue"}).onclick=()=>this.plugin.openReviewQueue();
     actions.createEl("button",{text:"Wrap up"}).onclick=()=>this.plugin.openSession();

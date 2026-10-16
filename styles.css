@@ -33,3 +33,5 @@
 
 .thread-queue-group > summary { cursor: pointer; font-weight: var(--font-semibold); margin: 16px 0; }
 .thread-claim-evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 16px 0; border-top: 1px solid var(--background-modifier-border); }
+.thread-project-card { margin: 20px 0; padding-top: 12px; border-top: 1px solid var(--background-modifier-border); overflow-wrap: anywhere; }
+.thread-project-card > button { max-width: 100%; height: auto; white-space: normal; text-align: left; overflow-wrap: anywhere; margin: 4px 4px 4px 0; }
