@@ -58,3 +58,38 @@ test("timeout produces an actionable failure and aborts the local request", asyn
   await assert.rejects(new OllamaClient("http://127.0.0.1:11434", 20, fetcher)
     .check("qwen3:4b", new AbortController().signal), /took too long/);
 });
+
+const digest = "a".repeat(64);
+const localEmbedding = [{cloud:{disabled:true}},{capabilities:["embedding"],model_info:{architecture:"qwen"}},{models:[{name:"embed:latest",digest}]}];
+test("embedding transport validates capability, local identity and vectors before reuse", async () => {
+  const calls: string[] = [];
+  const client = new OllamaClient("http://localhost:11434", 1000, fake([...localEmbedding,
+    {model:"embed",embeddings:[[1,0],[0,1]]}, ...localEmbedding], calls));
+  assert.deepEqual(await client.embed({model:"embed",digest},["a","b"],new AbortController().signal),[[1,0],[0,1]]);
+  assert.equal(calls.filter(url=>url.endsWith("/api/embed")).length,1);
+  for (const vectors of [[[0,0]],[[null,1]],[[1],[1,2]],[],[[1e309]]]) {
+    const c = new OllamaClient("http://localhost:11434",1000,fake([...localEmbedding,{model:"embed",embeddings:vectors}],[]));
+    await assert.rejects(c.embed({model:"embed",digest},["a"],new AbortController().signal),/embedding/);
+  }
+});
+test("no note text is sent after scope changes during embedding preflight or model retag", async () => {
+  for (const changedDigest of [false,true]) {
+    const calls: string[]=[];let current=true;
+    const fetcher=fake(localEmbedding.map((value,i)=>i===2&&changedDigest?{models:[{name:"embed:latest",digest:"b".repeat(64)}]}:value),calls);
+    const c=new OllamaClient("http://localhost",1000,async(url,options)=>{const response=await fetcher(url,options);if(String(url).endsWith("/api/tags")&&!changedDigest)current=false;return response;});
+    await assert.rejects(c.embed({model:"embed",digest},["private"],new AbortController().signal,()=>current),changedDigest?/model changed/:{name:"AbortError"});
+    assert.equal(calls.some(url=>url.endsWith("/api/embed")),false);
+  }
+});
+test("embedding models need embedding capability, a valid digest and bounded input", async()=>{
+  const signal=new AbortController().signal;
+  for(const responses of [[{cloud:{disabled:false}}],[localEmbedding[0],{capabilities:["completion"],model_info:{x:1}}],
+    [localEmbedding[0],{remote_model:"remote",capabilities:["embedding"],model_info:{x:1}}],
+    [localEmbedding[0],localEmbedding[1],{models:[{name:"embed",digest:"bad"}]}]]){
+    const calls:string[]=[];const c=new OllamaClient("http://localhost",1000,fake(responses,calls));
+    await assert.rejects(c.embeddingIdentity("embed",signal));assert.equal(calls.some(url=>url.endsWith("/api/embed")),false);
+  }
+  const calls:string[]=[];const c=new OllamaClient("http://localhost",1000,fake([],calls));
+  for(const input of [[],[""],["x".repeat(2001)],Array(9).fill("x")])await assert.rejects(c.embed({model:"embed",digest},input,signal));
+  assert.equal(calls.length,0);
+});

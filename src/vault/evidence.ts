@@ -1,4 +1,5 @@
 import { contentHash } from "./scope.ts";
+import type { HybridCoverage } from "../retrieval/semantic.ts";
 import type { SearchCoverage } from "../retrieval/search.ts";
 import { tokenSpans } from "../retrieval/tokens.ts";
 
@@ -38,6 +39,7 @@ export interface EvidenceBundle {
   newEvidenceIds?: string[];
   coverage?: { availableNotes: number; includedNotes: number; availablePassages: number; includedPassages: number };
   searchCoverage?: SearchCoverage;
+  hybridCoverage?: HybridCoverage;
 }
 
 const MAX_CONTEXT = 16000;

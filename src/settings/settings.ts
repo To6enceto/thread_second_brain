@@ -14,6 +14,8 @@ export interface ThreadSettings extends ReadScope {
   schemaVersion: 1;
   endpoint: string;
   model: string;
+  semanticSearch: boolean;
+  embeddingModel: string;
   selectedProject: string;
   timeoutMs: number;
   roles: FolderRoles;
@@ -31,7 +33,7 @@ export function localEndpoint(input: string): string {
 
 export function defaultSettings(): ThreadSettings {
   return {
-    schemaVersion: 1, endpoint: "http://127.0.0.1:11434", model: "",
+    schemaVersion: 1, endpoint: "http://127.0.0.1:11434", model: "", semanticSearch: false, embeddingModel: "",
     allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000,
     roles: loadRoles({})
   };
@@ -55,6 +57,8 @@ export function loadSettings(value: unknown): ThreadSettings {
   settings.roles = loadRoles(data.roles);
   try { if (typeof data.endpoint === "string") settings.endpoint = localEndpoint(data.endpoint); } catch { /* Invalid endpoints reset to loopback. */ }
   if (typeof data.model === "string") settings.model = data.model.trim();
+  settings.semanticSearch = data.semanticSearch === true;
+  if (typeof data.embeddingModel === "string") settings.embeddingModel = data.embeddingModel.trim();
   settings.allowedPaths = validPaths(data.allowedPaths);
   settings.excludedPaths = validPaths(data.excludedPaths);
   if (data.excludedPaths !== undefined && (!Array.isArray(data.excludedPaths)

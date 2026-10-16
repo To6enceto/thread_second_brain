@@ -202,3 +202,28 @@ Resume loads **Recorded context** before contacting Ollama. Recognized Objective
 Thread opens to a **Project home** with recent sessions, explicit decision statuses, recorded questions and visible pending proposals. The Project selector switches among already permitted projects without changing read grants. Refresh home reloads its bounded snapshot without AI. Resume, Ask and Wrap up stay directly available; other tools are under More actions.
 
 Find and Ask rank keyword matches using titles, headings, explicit note aliases and passage text. Use double quotes for required phrases and Search filters for type, status, path and record dates. Filters only narrow your permitted scope. Keyword search works without a model. Results balance notes, keep relevance in bounded AI context and show omitted coverage; only the first 50000 body characters per note are indexed. Record dates can fall back to modification dates and never establish when an event happened.
+
+
+Optional local semantic search is off by default. In Thread settings, enable
+Optional semantic search and select the exact name of an already downloaded
+embedding model, such as `qwen3-embedding:0.6b`. Save, open Find evidence or Ask,
+and choose Hybrid (local). Keyword is always the initial method and works
+without any model. If embeddings are unavailable or invalid, Hybrid shows an
+explicit keyword fallback. Thread never downloads models or runs background
+embedding jobs. The local runtime and embedding model are free; downloads need
+disk space and inference uses your hardware and electricity.
+
+Hybrid combines keyword and cosine similarity ranks. It considers at most 128
+350-character passages, cycling through eligible notes before taking extras;
+filters and required quoted phrases still apply. Results and saved answers show
+candidate counts, model digest and coverage limits. The fixed 0.45 similarity
+threshold is a conservative heuristic tested with the example model, not a
+universal relevance score. Large vaults can have relevant passages outside this
+bounded candidate set. Missing evidence and incorrect matches remain possible.
+
+At most 512 source vectors stay in memory, keyed by local model digest, full
+note hash, path and exact passage. They clear on index/scope/model changes and
+plugin unload; no vector database or persistent embedding files are created.
+All embedding calls use the same cloud-disabled loopback checks as generation.
+References and semantic similarity do not establish factual support: inspect
+the quoted source before relying on an answer.

@@ -25,3 +25,14 @@ export function searchFilters(parent: HTMLElement, changed: () => void): SearchF
   }
   return filters;
 }
+
+export function searchMethod(parent: HTMLElement, enabled: boolean, changed: () => void): { hybrid: boolean } {
+  const state = { hybrid: false };
+  new Setting(parent).setName("Search method").setDesc(enabled ? "Hybrid uses the selected local embedding model for this search." : "Optional hybrid retrieval can be enabled in Thread settings.")
+    .addDropdown(dropdown => {
+      dropdown.selectEl.setAttribute("aria-label", "Search method"); dropdown.addOption("keyword", "Keyword");
+      if (enabled) dropdown.addOption("hybrid", "Hybrid (local)");
+      dropdown.onChange(value => { state.hybrid = value === "hybrid"; changed(); });
+    });
+  return state;
+}

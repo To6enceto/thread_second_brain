@@ -39,7 +39,7 @@ features 13-21 are the approved local improvements.
 - [x] 14. **Dependable recorded briefings** - Show sourced recorded project context before inference, separate AI interpretation, expose supporting excerpts and keep recorded context usable without Ollama.
 - [x] 15. **Project home and quick switching** - Switch among permitted projects directly in Thread and show recent sessions, decisions, questions and pending reviews without silently granting read access.
 - [x] 16. **Ranked evidence search** - Improve keyword ranking, phrases/aliases and explicit filters, preserve relevance and source diversity in bounded context, and explain coverage limits.
-- [ ] 17. **Optional local semantic search** - Offer explicit opt-in local embeddings and hybrid retrieval while preserving scoped keyword search without an embedding model or paid services.
+- [x] 17. **Optional local semantic search** - Offer explicit opt-in local embeddings and hybrid retrieval while preserving scoped keyword search without an embedding model or paid services.
 - [ ] 18. **Editable change review** - Highlight changed lines, permit draft edits followed by renewed exact previews and validation, preserve dependent operation groups and give actionable recovery explanations.
 - [ ] 19. **Guided local setup** - Guide local-only connection, compatible downloaded model selection, folder grants and an optional sample; show actionable diagnostics without installing services or downloading models silently.
 - [ ] 20. **Incremental dependency indexing** - Reindex changed notes and affected dependencies, avoid unnecessary invalidation, and preserve immediate exclusion removal, cancellation and stale-source guards.
@@ -50,7 +50,7 @@ features 13-21 are the approved local improvements.
 The first feature includes only the connection and read boundaries necessary for
 its briefing. It reads current notes directly; the reusable index arrives in
 feature 3. Text-only imports keep the local release achievable without paid
-services. Semantic search and advanced import formats remain deferred.
+services. Optional local semantic search is approved in feature 17; advanced import formats remain deferred.
 
 Introduce focused logic tests explicitly with the first logic-bearing feature,
 then include the configured test command in Verify. Demonstrate UI behavior in

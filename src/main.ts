@@ -23,6 +23,9 @@ import { ThreadSettingTab, ThreadSetupModal } from "./ui/settings-tab.ts";
 import { BriefingView, THREAD_VIEW } from "./ui/briefing-view.ts";
 import { isWithin, readableText, contentHash, affectsProject } from "./vault/scope.ts";
 import { buildEvidence, readMetadata, type SourceNote, type EvidenceBundle } from "./vault/evidence.ts";
+import { OllamaClient } from "./intelligence/ollama.ts";
+import { SemanticSearch, semanticCandidates } from "./retrieval/semantic.ts";
+import { filterEntries, searchEntries, type SearchFilters, type SearchResult } from "./retrieval/search.ts";
 
 export default class ThreadPlugin extends Plugin {
   settings: ThreadSettings = defaultSettings();
@@ -30,6 +33,7 @@ export default class ThreadPlugin extends Plugin {
   setupModal: ThreadSetupModal | null = null;
   modals = new Set<Modal>();
   index=new LocalIndex();
+  semantic=new SemanticSearch();
   indexController: AbortController | null=null;
   indexTimer: ReturnType<typeof setTimeout> | null=null;
   cacheWrite: Promise<void>=Promise.resolve();
@@ -87,6 +91,7 @@ export default class ThreadPlugin extends Plugin {
   onunload(): void {
     this.active=false;
     this.index.clear();
+    this.semantic.clear();
     this.indexController?.abort();if(this.indexTimer)clearTimeout(this.indexTimer);
     for (const modal of this.modals) modal.close();
     this.setupModal?.close(); this.settingsTab?.hide();
@@ -201,6 +206,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private scheduleIndex(): void {
+    this.semantic.clear();
     this.indexController?.abort();this.index.clear();
     this.cacheWrite=this.cacheWrite.catch(()=>{}).then(()=>this.app.vault.adapter.write(this.indexPath(),JSON.stringify({schemaVersion:1,entries:[]})))
       .catch(()=>{new Notice("Thread could not clear its derived index cache. Check vault write access and rebuild.");});
@@ -218,6 +224,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   async rebuildIndex(): Promise<void> {
+    this.semantic.clear();
     if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
     this.indexController?.abort();const controller=new AbortController();this.indexController=controller;
     const settings=structuredClone(this.settings);const entries:IndexEntry[]=[];
@@ -325,6 +332,27 @@ export default class ThreadPlugin extends Plugin {
       }
     }
     return {...bundle,noteHashes};
+  }
+  async searchEvidence(query:string,vault:boolean,filters:SearchFilters,hybrid:boolean,settings:ThreadSettings,
+    signal:AbortSignal,isCurrent:()=>boolean=()=>true):Promise<SearchResult>{
+    if(!this.index.ready)await this.rebuildIndex();
+    const revision=this.index.revision;
+    const current=()=>this.active&&isCurrent()&&this.index.ready&&revision===this.index.revision&&JSON.stringify(settings)===JSON.stringify(this.settings);
+    const assertCurrent=()=>{signal.throwIfAborted();if(!current())throw new DOMException("Search changed. Search again.","AbortError");};
+    assertCurrent();
+    const entries=this.index.projectEntries(settings,vault?null:settings.selectedProject);
+    if(!hybrid||!settings.semanticSearch)return searchEntries(entries,query,filters);
+    // Hash only the bounded candidate notes before transmitting their passages.
+    const candidates=semanticCandidates(filterEntries(entries,filters),query).candidates;
+    for(const entry of new Map(candidates.map(hit=>[hit.entry.path,hit.entry])).values()){
+      assertCurrent();
+      if(!readableText(entry.path,this.settings))throw new Error("Search source is outside read scope.");
+      const file=this.app.vault.getAbstractFileByPath(entry.path);
+      if(!(file instanceof TFile))throw new Error("Search source is missing. Refresh the index.");
+      const hash=await contentHash(await this.app.vault.read(file));assertCurrent();
+      if(file.path!==entry.path||hash!==entry.hash)throw new Error("Search source changed. Refresh the index.");
+    }
+    return this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current);
   }
   async evidence(settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
     if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();

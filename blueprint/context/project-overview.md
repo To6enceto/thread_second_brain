@@ -1,6 +1,6 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash 17ae17886623a5af4a5cb6ce65d3f5de50d86d66e2a04c2bf98430babf7df7ee -->
+<!-- blueprint:source-hash 75cf42e3be6f54310498fcdf50643a4fabf76fdc0d41968c28e2ab43705242f4 -->
 
 > A desktop Obsidian plugin that helps individuals resume projects, recover
 > decision reasoning, and connect research through a local AI model.

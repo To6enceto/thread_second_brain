@@ -13,6 +13,8 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   containerEl.createEl("p", { text: "Choose a project and a downloaded local model. Thread checks that Ollama cloud features are disabled before inference." });
   let endpoint = plugin.settings.endpoint;
   let model = plugin.settings.model;
+  let semanticSearch = plugin.settings.semanticSearch;
+  let embeddingModel = plugin.settings.embeddingModel;
   let project = plugin.settings.selectedProject;
   let exclusions = plugin.settings.excludedPaths.join("\n");
   let allowed = plugin.settings.allowedPaths.join("\n");
@@ -22,6 +24,10 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Local Ollama endpoint"); text.setValue(endpoint).onChange((value) => { endpoint = value; }); });
   new Setting(containerEl).setName("Downloaded model").setDesc("Use the exact model name from ollama list. Tested: qwen3:4b-instruct.")
     .addText((text) => { text.inputEl.setAttribute("aria-label", "Downloaded model"); text.setValue(model).setPlaceholder("qwen3:4b-instruct").onChange((value) => { model = value; }); });
+  new Setting(containerEl).setName("Optional semantic search").setDesc("Off by default. Enables Hybrid as an explicit search choice; no background inference or downloads.")
+    .addToggle(toggle => { toggle.toggleEl.setAttribute("aria-label", "Optional semantic search"); toggle.setValue(semanticSearch).onChange(value => { semanticSearch = value; }); });
+  new Setting(containerEl).setName("Downloaded embedding model").setDesc("Separate from the text model; e.g. qwen3-embedding:0.6b. Derived vectors stay in bounded memory.")
+    .addText(text => { text.inputEl.setAttribute("aria-label", "Downloaded embedding model"); text.setValue(embeddingModel).onChange(value => { embeddingModel = value; }); });
   new Setting(containerEl).setName("Project folder").setDesc("Selecting and saving explicitly allows Thread to read Markdown and text in this folder.")
     .addDropdown((dropdown) => {
       dropdown.addOption("", "Choose a folder");
@@ -48,7 +54,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
       if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error("Use a timeout from 1 to 600 seconds.");
       const selectedProject = project ? vaultPath(project) : "";
       await plugin.updateSettings({ ...plugin.settings, endpoint: localEndpoint(endpoint),
-        model: model.trim(), selectedProject, allowedPaths: [...new Set([...allowed.split(/\r?\n/).filter(v=>v.trim()).map(vaultPath),...(selectedProject?[selectedProject]:[])])],
+        model: model.trim(), semanticSearch, embeddingModel: embeddingModel.trim(), selectedProject, allowedPaths: [...new Set([...allowed.split(/\r?\n/).filter(v=>v.trim()).map(vaultPath),...(selectedProject?[selectedProject]:[])])],
         excludedPaths: exclusions.split(/\r?\n/).filter((value) => value.trim()).map(vaultPath), timeoutMs,
         roles:Object.fromEntries(roleNames.map(role=>[role,roles[role].trim()?vaultPath(roles[role]):""])) as FolderRoles });
       feedback.setText("Settings saved. Open Thread and choose Resume project.");

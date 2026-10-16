@@ -1,3 +1,4 @@
+import type { HybridCoverage } from "./semantic.ts";
 import type { IndexEntry, RecallHit } from "../vault/index.ts";
 import { isWithin, vaultPath } from "../vault/scope.ts";
 import { localDay } from "../vault/workspace.ts";
@@ -9,7 +10,7 @@ export interface SearchCoverage {
   eligibleNotes: number; filteredNotes: number; matchedNotes: number; matchedPassages: number;
   returnedPassages: number; truncatedNotes: number; limited: boolean; queryTruncated: boolean;
 }
-export interface SearchResult { hits: RecallHit[]; coverage: SearchCoverage; }
+export interface SearchResult { hits: RecallHit[]; coverage: SearchCoverage; hybrid?: HybridCoverage; }
 const stopWords = new Set("the a an and or is to of in for what how we our was are did does why with has have can which when where from be it on as by".split(" "));
 export function keywordTerms(text: string): string[] { return [...new Set(tokens(text).filter(term => !stopWords.has(term)))]; }
 

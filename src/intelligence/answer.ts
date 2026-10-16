@@ -1,6 +1,7 @@
 import { object } from "../settings/settings.ts";
 import { claimSchema, type Claim } from "./briefing.ts";
 import { contextCoverageText, type EvidenceBundle } from "../vault/evidence.ts";
+import { hybridCoverageText } from "../retrieval/semantic.ts";
 import { searchCoverageText } from "../retrieval/search.ts";
 import { frontmatter, localDay } from "../vault/workspace.ts";
 
@@ -33,7 +34,7 @@ export function sourceReferences(bundle:EvidenceBundle): Record<string,string>[]
 export function outputMarkdown(type:string,title:string,body:string,bundle:EvidenceBundle,model:string,project=""): string {
   return frontmatter({id:crypto.randomUUID(),type,generated_on:localDay(),thread_model:model,...(project?{project}:{}),thread_sources:JSON.stringify(sourceReferences(bundle))})
     +`# ${escapeMarkdown(title)}\n\n${body}\n\n## Evidence and provenance\n\nGenerated locally with ${escapeMarkdown(model)}. References identify passages; they do not prove semantic support.\n\n`
-    +`${escapeMarkdown(contextCoverageText(bundle))}\n\n${bundle.searchCoverage ? escapeMarkdown(searchCoverageText(bundle.searchCoverage))+"\n\n" : ""}`+evidenceMarkdown(bundle);
+    +`${escapeMarkdown(contextCoverageText(bundle))}\n\n${bundle.searchCoverage ? escapeMarkdown(searchCoverageText(bundle.searchCoverage))+"\n\n" : ""}`+(bundle.hybridCoverage?escapeMarkdown(hybridCoverageText(bundle.hybridCoverage))+"\n\n":"")+evidenceMarkdown(bundle);
 }
 export function evidenceMarkdown(bundle:EvidenceBundle): string {
   return bundle.sources.map(s=>`- ${s.id}: [${escapeMarkdown(s.path)}${s.heading?` › ${escapeMarkdown(s.heading)}`:""}](<${encodeURI(s.path).replace(/#/g,"%23")}${s.heading?`#${encodeURIComponent(s.heading)}`:""}>)`).join("\n")+"\n";
