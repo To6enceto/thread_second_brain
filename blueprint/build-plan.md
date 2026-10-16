@@ -43,7 +43,7 @@ features 13-21 are the approved local improvements.
 - [x] 18. **Editable change review** - Highlight changed lines, permit draft edits followed by renewed exact previews and validation, preserve dependent operation groups and give actionable recovery explanations.
 - [x] 19. **Guided local setup** - Guide local-only connection, compatible downloaded model selection, folder grants and an optional sample; show actionable diagnostics without installing services or downloading models silently.
 - [x] 20. **Incremental dependency indexing** - Reindex changed notes and affected dependencies, avoid unnecessary invalidation, and preserve immediate exclusion removal, cancellation and stale-source guards.
-- [ ] 21. **Project review queue** - Connect changed sources, affected decisions, explicit revisit dates/conditions, questions and stale outputs in an on-demand review queue; changes and resolutions remain explicit.
+- [x] 21. **Project review queue** - Connect changed sources, affected decisions, explicit revisit dates/conditions, questions and stale outputs in an on-demand review queue; changes and resolutions remain explicit.
 
 ## Build discipline
 

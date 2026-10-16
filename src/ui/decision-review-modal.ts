@@ -10,6 +10,7 @@ import type { ThreadSettings } from "../settings/settings.ts";
 import { localDay,noteName } from "../vault/workspace.ts";
 
 export class DecisionReviewModal extends ThreadModal {
+  initialPath="";
   generateButton:HTMLButtonElement|null=null;
   proposalButton:HTMLButtonElement|null=null;
   clearChoices:()=>void=()=>{};
@@ -36,6 +37,9 @@ export class DecisionReviewModal extends ThreadModal {
     new Setting(el).setName("Replacement note name").addText(t=>{t.inputEl.setAttribute("aria-label","Replacement note name");t.onChange(v=>replacementName=v);});
     const data:DecisionInput={question:"",choice:"",rationale:"",alternatives:"",constraints:"",revisit:"",status:"accepted",date:localDay()};
     for(const [key,label] of [["question","Replacement question"],["choice","Replacement choice"],["rationale","Replacement rationale"],["alternatives","Replacement alternatives"],["constraints","Replacement constraints"],["revisit","Replacement revisit condition"]] as const)new Setting(el).setName(label).addTextArea(t=>{t.inputEl.setAttribute("aria-label",label);t.inputEl.maxLength=5000;t.onChange(v=>data[key]=v);});
+    new Setting(el).setName("Replacement revisit date (optional)").addText(text=>{
+      text.inputEl.type="date";text.inputEl.setAttribute("aria-label","Replacement revisit date");text.onChange(value=>data.revisitOn=value);
+    });
     this.proposalButton=el.createEl("button",{text:"Preview decision action",cls:"mod-cta"});this.proposalButton.disabled=true;
     const load=async()=>{
       reset();const epoch=this.epoch;const settings=structuredClone(this.plugin.settings);
@@ -47,7 +51,8 @@ export class DecisionReviewModal extends ThreadModal {
           if(entry.metadata.type==="decision"&&settings.selectedProject&&this.plugin.changePathAllowed(entry.path))decisions.add(new Option(`${entry.path} · ${String(entry.metadata.status??"unknown")} · ${String(entry.metadata.decided_on??"date unknown")}`,entry.path));
           sources.add(new Option(`${entry.path} · ${String(entry.metadata.recorded_on??entry.metadata.captured_on??"modified "+localDay(new Date(entry.modifiedAt)))}`,entry.path));
         }
-        this.status?.setText("Choose a decision and evidence to compare.");
+        if(this.initialPath&&[...decisions.options].some(option=>option.value===this.initialPath))decisions.value=this.initialPath;
+        this.status?.setText("Choose a decision and evidence to compare. Review actions remain explicit.");
       }catch(e){this.status?.setText(e instanceof Error?e.message:"Could not load decisions.");}
     };
     el.createEl("button",{text:"Refresh decision review"}).onclick=()=>{void load();};

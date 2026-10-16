@@ -60,3 +60,9 @@ test("index metadata stores only retrieval fields, without arbitrary or cyclic u
  const entry=await indexNote({path:"P/Source.md",text:"# Body\nVisible body",metadata:{id:"s",type:"source",custom,thread_sources:"private provenance"},modifiedAt:1},()=>null);
  assert.deepEqual(entry.metadata,{id:"s",type:"source"});assert.doesNotThrow(()=>JSON.stringify(entry));
 });
+test("legacy empty and invalid decision references remain explicit without copying source excerpts",async()=>{
+ const empty=await indexNote({path:"P/D.md",text:"Human choice",metadata:{type:"decision",status:"proposed",thread_sources:"[]"},modifiedAt:1},()=>null);
+ assert.deepEqual(empty.decisionSources,{refs:[],invalid:false});assert.equal(empty.metadata.status,"proposed");
+ const invalid=await indexNote({path:"P/Bad.md",text:"Human choice",metadata:{type:"decision",thread_sources:'[{"excerpt":"SECRET_EXCERPT"}]'},modifiedAt:1},()=>null);
+ assert.deepEqual(invalid.decisionSources,{refs:[],invalid:true});assert.ok(!JSON.stringify(invalid).includes("SECRET_EXCERPT"));
+});

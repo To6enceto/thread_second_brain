@@ -12,7 +12,7 @@ export function affectedEntries(entries: IndexEntry[], paths: Iterable<string>, 
     for (const entry of entries) if (affected.has(entry.path) && entry.id) ids.add(entry.id);
     for (const entry of entries) {
       if (affected.has(entry.path)) continue;
-      if (entry.id && ids.has(entry.id) || entry.output?.refs.some(ref => affected.has(ref.path) || ref.id && ids.has(ref.id)
+      if (entry.id && ids.has(entry.id) || [...(entry.output?.refs??[]),...(entry.decisionSources?.refs??[])].some(ref => affected.has(ref.path) || ref.id && ids.has(ref.id)
         || affected.has(graph.resolve(ref).path ?? ""))) { affected.add(entry.path); changed = true; }
     }
   }

@@ -10,3 +10,8 @@ test("decisions preserve identity, explicit status, alternatives and revisit con
  assert.throws(()=>decisionMarkdown({...input,date:"2026-02-30"},"p",bundle),/valid decision date/);
  assert.throws(()=>decisionMarkdown({...input,status:"superseded" as "proposed"},"p",bundle),/status/);
 });
+test("optional revisit dates are explicit calendar properties and never change decision status",()=>{
+ assert.match(decisionMarkdown({...input,revisitOn:"2026-10-16"},"p",bundle),/revisit_on: "2026-10-16"/);assert.match(decisionMarkdown({...input,revisitOn:"2026-10-16"},"p",bundle),/status: "proposed"/);
+ assert.ok(!decisionMarkdown(input,"p",bundle).includes("revisit_on:"));
+ for(const revisitOn of ["2026-02-30","tomorrow","2026-13-01","2026-1-1"])assert.throws(()=>decisionMarkdown({...input,revisitOn},"p",bundle),/revisit date/);
+});

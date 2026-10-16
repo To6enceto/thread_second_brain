@@ -28,3 +28,7 @@
 .thread-diff-same { color: var(--text-muted); }
 .thread-modal textarea[aria-label^="Draft body"] { width: 100%; min-height: 12rem; font-family: var(--font-monospace); }
 .thread-modal .thread-draft-editor > .setting-item { display: block; }
+
+.thread-queue-item { margin: 12px 0; padding: var(--size-4-3); border-left: 2px solid var(--background-modifier-border); }
+
+.thread-queue-group > summary { cursor: pointer; font-weight: var(--font-semibold); margin: 16px 0; }

@@ -12,6 +12,7 @@ import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
 import { ChangeManager } from "./vault/changes.ts";
 import { ChangeReviewModal } from "./ui/change-review-modal.ts";
+import { ReviewQueueModal } from "./ui/review-queue-modal.ts";
 import { FreshnessModal } from "./ui/freshness-modal.ts";
 import { WeeklyModal } from "./ui/weekly-modal.ts";
 import { SessionModal } from "./ui/session-modal.ts";
@@ -72,6 +73,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
+    this.addCommand({id:"project-review-queue",name:"Project review queue",callback:()=>this.openReviewQueue()});
     this.addCommand({id:"source-freshness",name:"Source freshness",callback:()=>this.openFreshness()});
     this.addCommand({id:"weekly-review",name:"Weekly project review",callback:()=>this.openWeekly()});
     this.addCommand({id:"session-wrap-up",name:"Session wrap-up",callback:()=>this.openSession()});
@@ -106,8 +108,9 @@ export default class ThreadPlugin extends Plugin {
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
-  openDecisionReview():void{const modal=new DecisionReviewModal(this);this.modals.add(modal);modal.open();}
-  openFreshness():void{const modal=new FreshnessModal(this);this.modals.add(modal);modal.open();}
+  openDecisionReview(path=""):void{const modal=new DecisionReviewModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}
+  openFreshness(path=""):void{const modal=new FreshnessModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}
+  openReviewQueue():void{const modal=new ReviewQueueModal(this);this.modals.add(modal);modal.open();}
   openWeekly():void{const modal=new WeeklyModal(this);this.modals.add(modal);modal.open();}
   openSession():void{const modal=new SessionModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}

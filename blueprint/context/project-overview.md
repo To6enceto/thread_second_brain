@@ -256,7 +256,7 @@ Saved knowledge must remain readable after Thread is disabled.
 
 Community submission, a public repository/release, license selection, and
 publication are later user decisions. No publication is authorized by setup.
-The released local 0.1.0 manifest requires Obsidian 1.14.4, the tested minimum.
+The current private local 0.2.0 manifest requires Obsidian 1.14.4, the tested minimum.
 
 ## Open questions
 
@@ -273,4 +273,4 @@ remain in the project plan and do not block the current setup.
 
 ## Approved follow-up contracts
 
-Features 13-21 target a private local 0.2.0 build. Recorded facts precede AI interpretation, project switching never grants access, optional semantic search preserves keyword fallback, editable proposals require renewed exact approval, and indexing retains immediate privacy/freshness guards. The project review queue is on demand and never resolves questions or changes decisions automatically. Quality evaluations report observed strengths and failures rather than treating citations as semantic proof. Preserve original Markdown, durable history and the completed first-release archives.
+Features 13-21 form the private local 0.2.0 build. Recorded facts precede AI interpretation, project switching never grants access, optional semantic search preserves keyword fallback, editable proposals require renewed exact approval, and indexing retains immediate privacy/freshness guards. The project review queue is on demand and never resolves questions or changes decisions automatically. Quality evaluations report observed strengths and failures rather than treating citations as semantic proof. Preserve original Markdown, durable history and the completed first-release archives.

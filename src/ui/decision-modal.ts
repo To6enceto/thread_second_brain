@@ -19,6 +19,9 @@ export class DecisionModal extends ThreadModal {
     for(const [key,label] of fields)new Setting(el).setName(label).addTextArea(t=>{t.inputEl.setAttribute("aria-label",label);t.inputEl.maxLength=5000;t.onChange(v=>data[key]=v);});
     new Setting(el).setName("Decision status").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Decision status");d.addOption("proposed","Proposed").addOption("accepted","Accepted — I accept this choice").onChange(v=>{if(v==="proposed"||v==="accepted")data.status=v;});});
     new Setting(el).setName("Decision date").addText(t=>{t.inputEl.type="date";t.inputEl.setAttribute("aria-label","Decision date");t.setValue(data.date).onChange(v=>data.date=v);});
+    new Setting(el).setName("Revisit date (optional)").setDesc("An explicit calendar date; free-text conditions remain separate and need your judgment.").addText(text=>{
+      text.inputEl.type="date";text.inputEl.setAttribute("aria-label","Revisit date");text.onChange(value=>data.revisitOn=value);
+    });
     let entries:IndexEntry[]=[];let chosenPath="";const selected=new Map<string,IndexEntry>();
     const evidence=el.createDiv();const sourceSelect=document.createElement("select");sourceSelect.setAttribute("aria-label","Decision evidence");evidence.appendChild(sourceSelect);
     sourceSelect.onchange=()=>chosenPath=sourceSelect.value;

@@ -5,7 +5,7 @@ recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No
 account, API key, backend or paid model service is required.
 
-This is a **private local 0.1.0 build**, not a published Community plugin. It is
+This is a **private local 0.2.0 build**, not a published Community plugin. It is
 tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
 `qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
 use. Windows, macOS, other models and later versions need their own validation.
@@ -21,7 +21,7 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.1.0.zip` and `dist/thread/`. The ZIP contains exactly
+then creates `dist/thread-0.2.0.zip` and `dist/thread/`. The ZIP contains exactly
 `thread/main.js`, `thread/manifest.json` and `thread/styles.css`. No vault, model,
 settings or recovery data is included. Repeated builds of the same source and
 locked tools produce the same package bytes.
@@ -35,8 +35,8 @@ plugins**, allow Community plugins, reload Obsidian and enable **Thread**.
 explains where to find the plugins folder. Thread is not in the Browse directory.
 
 For an update, disable Thread, preserve its existing `data.json`, `changes.json`,
-`imports.json` and `renames.json`, replace only the three package files and enable
-it again. Keep an independent vault backup; the bounded change journal is not a
+`imports.json` and `renames.json`, replace only the three package files, reload Obsidian and enable
+Thread again. Reloading also refreshes the installed manifest version. Keep an independent vault backup; the bounded change journal is not a
 complete backup system.
 
 ## Set up the local model
@@ -176,8 +176,8 @@ are separate. They are not required to use Thread. This private source currently
 uses `UNLICENSED`; no public distribution license is asserted. Obsidian, Ollama
 and model weights retain their own licenses/terms and are not bundled.
 
-This release has bounded text context and local keyword/link retrieval. It does
-not include embeddings, PDF/OCR, audio, web fetching, mobile inference, cloud
+This release has bounded text context, local keyword/link retrieval and optional
+local embeddings. It does not include PDF/OCR, audio, web fetching, mobile inference, cloud
 fallback, autonomous background edits, scheduling, collaboration or cross-device
 sync. Small-model trials sometimes omitted objectives or put facts in the wrong briefing section. A blank section does not prove the notes lack that information. Model quality and speed vary; review important claims yourself. Testing
 covers a small synthetic vault, not production-scale vault performance or other
@@ -294,3 +294,36 @@ ones. Index reset preserves notes and durable import/rename/change history.
 This reduces note reads; it still recomputes dependency/link state across the eligible index and writes a
 derived cache snapshot. It is not a large-vault benchmark or a
 persistent vector database. Rebuild explicitly from settings if indexing fails.
+
+
+Open **Review queue** from project home or run **Thread: Project review queue**.
+Its six bounded categories connect changed recorded sources, decisions needing
+evidence review, due revisit dates, human-only revisit conditions, recorded open
+questions and stale saved outputs. Expand a category to inspect its records,
+open a current source, or enter Decision evidence review / Source freshness with
+the relevant record selected. Opening or refreshing the queue runs no inference
+and writes no notes, statuses, resolutions or review acknowledgements.
+
+New decisions and explicit replacement decisions can include an optional
+**Revisit date**, saved as `revisit_on: YYYY-MM-DD`. Proposed remains proposed
+unless you explicitly choose Accepted. Existing notes can use that same property;
+free-text Revisit when stays separate and is never interpreted as a satisfied
+condition. Superseded records are omitted from active date/condition reminders.
+Checked completed tasks are omitted from recognized Open/Unresolved questions;
+prose is not automatically treated as proof of resolution.
+
+Source-change items compare recorded decision/output references, with the latest
+readable saved review as a visible baseline when it has a valid nonfuture date.
+Uncited changes and unrecognized structure can be absent. Each category shows
+at most 20 items with total counts; each item shows at most five related sources.
+The existing 50000-character note index limit still applies. Missing/excluded
+reference paths and stale excerpts are hidden. Older retained stale outputs can
+remain listed: review is explicit and there is no automatic dismissal or history
+rewrite. The queue works with Ollama stopped; optional AI review flows still need
+your downloaded local text model.
+
+The private 0.2.0 package has no hosted runtime charge, subscription or API key.
+Obsidian, local Ollama and the tested Qwen models can run without a paid service.
+You supply storage, memory, hardware and electricity; initial downloads need
+internet. Synthetic Linux acceptance covers the documented runtime/model pair;
+large vaults, other models and other operating systems need their own validation.

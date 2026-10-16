@@ -10,9 +10,9 @@ export interface Freshness{state:FreshState;usable:boolean;references:ReferenceS
 export type RenameMap=Record<string,string>;
 const digest=(v:unknown):v is string=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v);
 
-function references(value:unknown):SourceReference[]{
+export function readSourceReferences(value:unknown,allowEmpty=false):SourceReference[]{
   const raw=typeof value==="string"?JSON.parse(value):value;
-  if(!Array.isArray(raw)||!raw.length||raw.length>100)throw new Error("Missing or oversized source provenance.");
+  if(!Array.isArray(raw)||(!raw.length&&!allowEmpty)||raw.length>100)throw new Error("Missing or oversized source provenance.");
   return raw.map(v=>{
     const r=object(v);if(typeof r.path!=="string"||r.path.length>4096||vaultPath(r.path)!==r.path||!digest(r.hash)||!digest(r.noteHash)||typeof r.heading!=="string"||r.heading.length>4000)throw new Error("Invalid source reference.");
     for(const key of ["id","noteType","noteStatus"] as const)if(r[key]!==undefined&&(typeof r[key]!=="string"||!r[key].trim()||r[key].length>200))throw new Error("Invalid source identity.");
@@ -54,12 +54,12 @@ export function outputProjection(text:string,metadata:Record<string,unknown>):{t
     if(malformed||text.length>1048576)throw new Error("Incomplete or oversized output provenance.");
     if(latest){
       const data=object(JSON.parse(latest.record));if(data.schemaVersion!==1||typeof data.title!=="string"||data.title.length>1000)throw new Error("Unknown synthesis record.");
-      const refs=references(data.sources);
+      const refs=readSourceReferences(data.sources);
       // Use only the latest generated version. Human prefix is retained for pre-existing notes.
       const prefix=!generated?lines.slice(0,first).join("\n")+"\n":"";
       return {text:prefix+latest.body,output:{refs,invalid:false,title:data.title}};
     }
-    return {text,output:{refs:references(metadata.thread_sources),invalid:false,title:""}};
+    return {text,output:{refs:readSourceReferences(metadata.thread_sources),invalid:false,title:""}};
   }catch{return {text:"",output:{refs:[],invalid:true,title:""}};}
 }
 

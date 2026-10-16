@@ -7,6 +7,7 @@ import { noteName } from "../vault/workspace.ts";
 import { readableText } from "../vault/scope.ts";
 
 export class FreshnessModal extends ThreadModal{
+  initialPath="";
   generateButton:HTMLButtonElement|null=null;
   clearChoices:()=>void=()=>{};
   override invalidate(message?:string):void{super.invalidate(message);this.clearChoices();if(this.generateButton)this.generateButton.disabled=true;}
@@ -31,8 +32,9 @@ export class FreshnessModal extends ThreadModal{
       const eligible=this.plugin.index.projectEntries(settings,null).filter(e=>e.path!==entry.path);
       for(const source of eligible)sources.add(new Option(source.path,source.path));
       for(const ref of state.references){
-        const row=this.resultEl!.createDiv();row.createEl("p",{text:`${ref.state}: ${ref.ref.path}${ref.path&&ref.path!==ref.ref.path?` → ${ref.path}`:""}. ${ref.reason}`});
-        if(ref.path&&ref.hash){const path=ref.path,hash=ref.hash;row.createEl("button",{text:`Open current source: ${path}`}).onclick=()=>{void this.plugin.openIndexedSource(path,hash,ref.ref.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};if(eligible.some(e=>e.path===path)&&selected.size<5)selected.add(path);}
+        const path=ref.path&&readableText(ref.path,settings)?ref.path:undefined;
+        const row=this.resultEl!.createDiv();row.createEl("p",{text:path?`${ref.state}: ${path}. ${ref.reason}`:`${ref.state}: Supporting source unavailable in the current scope. Choose a current replacement.`});
+        if(path&&ref.hash){const hash=ref.hash;row.createEl("button",{text:`Open current source: ${path}`}).onclick=()=>{void this.plugin.openIndexedSource(path,hash,ref.ref.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};if(eligible.some(e=>e.path===path)&&selected.size<5)selected.add(path);}
       }
       showSelected();this.generateButton!.disabled=false;this.status?.setText("Review source status. Select up to five current sources, including replacements for unavailable evidence. Generate a new reviewed synthesis in Reviews; the original output will be retained.");
     };
@@ -44,6 +46,7 @@ export class FreshnessModal extends ThreadModal{
         outputs.replaceChildren(new Option("Choose a generated output",""));const graph=this.plugin.index.graph(settings);let count=0;
         for(const entry of this.plugin.index.entries.filter(e=>e.output&&readableText(e.path,settings))){outputs.add(new Option(`${graph.assess(entry.path).state}: ${entry.path}`,entry.path));count++;}
         this.status?.setText(count?`${count} generated outputs checked. Choose one to inspect.`:"No tracked generated outputs in allowed paths yet.");
+        if(this.initialPath&&[...outputs.options].some(option=>option.value===this.initialPath)){outputs.value=this.initialPath;choose();}
       }catch(e){if(!this.closed)this.status?.setText(e instanceof Error?e.message:"Could not inspect freshness.");}
     };
     el.createEl("button",{text:"Refresh freshness status"}).onclick=()=>{void load();};
