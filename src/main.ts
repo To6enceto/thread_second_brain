@@ -1,3 +1,4 @@
+import { HealthModal } from "./ui/health-modal.ts";
 import { QuestionsModal } from "./ui/questions-modal.ts";
 import { ProjectOverviewModal } from "./ui/project-overview-modal.ts";
 import { TimelineModal } from "./ui/timeline-modal.ts";
@@ -76,6 +77,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
+    this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
     this.addCommand({id:"all-projects",name:"All permitted projects",callback:()=>this.openProjectOverview()});
     this.addCommand({id:"project-timeline",name:"Project timeline",callback:()=>this.openTimeline()});
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
@@ -121,6 +123,7 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
+  openHealth():void{const modal=new HealthModal(this);this.modals.add(modal);modal.open();}
   openProjectOverview():void{const modal=new ProjectOverviewModal(this);this.modals.add(modal);modal.open();}
   openTimeline():void{const modal=new TimelineModal(this);this.modals.add(modal);modal.open();}
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
