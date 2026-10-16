@@ -39,7 +39,7 @@ test('actual selection handlers abort edited requests, clear invalidated source 
   input('Selection question','A new question?');assert.equal(signal.aborted,true);assert.equal(run.disabled,false);await work;assert.equal(ask.resultEl?.textContent,'');
   ask.invalidate();assert.equal(rendered(ask.contentEl as unknown as Element).includes('SELECTED_PASSAGE'),false);assert.equal(rendered(ask.contentEl as unknown as Element).includes('SOURCE_PATH'),false);await run.onclick!();assert.equal(calls,1);
   const question=open('question');input('Selection question','What should we test?');input('Selection note name','Question draft');await button('Preview selection draft').onclick!();
-  const preview=[...plugin.modals][0] as unknown as import('./new-note-modal.ts').NewNoteModal;assert.ok(preview);assert.equal(created.length,0);assert.match(preview.note.content,/type: "questions"/);
+  const preview=[...plugin.modals][0] as unknown as import('./new-note-modal.ts').NewNoteModal;assert.ok(preview);assert.equal(created.length,0);assert.match(preview.note.content,/type: "question"/);
   input('Selection question','Changed after preview?');await preview.apply!.onclick!({} as PointerEvent);assert.equal(created.length,0);assert.match(preview.status!.textContent!,/changed/);
   assert.equal(question.closed,false);
   const fresh=open('question');input('Selection question','A current question?');input('Selection note name','New folder question');await button('Preview selection draft').onclick!();

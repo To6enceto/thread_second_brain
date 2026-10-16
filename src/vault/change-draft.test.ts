@@ -30,3 +30,10 @@ test("native textarea newline normalization preserves original provenance marker
  const revised=draftContent(original,body);
  assert.ok(revised.startsWith('---\r\ntype: concept\r\n---\r\n'));assert.ok(revised.includes('<!-- thread:output {"sources":[]} -->\r\n'));assert.ok(revised.endsWith('<!-- /thread:output -->\r\n'));assert.ok(revised.includes('new\n'));
 });
+
+test('question evidence provenance markers survive reviewed body drafts and native CRLF normalization',()=>{
+ const original='---\r\ntype: question\r\nthread_question_version: "1"\r\n---\r\nHuman question\r\n<!-- thread:question-evidence -->\r\nPrivate snapshot\r\n<!-- /thread:question-evidence -->\r\n';
+ const body=editableBody(original).body.replaceAll('\r\n','\n').replace('Human question','Edited human question');
+ const revised=draftContent(original,body);assert.ok(revised.includes('<!-- thread:question-evidence -->\r\n'));assert.ok(revised.endsWith('<!-- /thread:question-evidence -->\r\n'));
+ assert.throws(()=>draftContent(original,body.replace('<!-- /thread:question-evidence -->\n','')),/provenance/);
+});

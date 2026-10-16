@@ -1,3 +1,4 @@
+import { activeQuestion } from "./questions.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
 import { object } from "../settings/settings.ts";
 import type { ChangeProposal } from "./changes.ts";
@@ -60,7 +61,7 @@ export function projectHome(index: LocalIndex, settings: ThreadSettings, pending
   const entries = index.projectEntries(settings, settings.selectedProject);
   const sessions = entries.filter(entry => entry.metadata.type === "session").sort(recent("recorded_on"));
   const decisions = entries.filter(entry => entry.metadata.type === "decision").sort(recent("decided_on"));
-  const questions = entries.flatMap(entry => entry.chunks.filter(chunk => /^(?:open|unresolved) questions?$/i.test(chunk.heading.trim()))
+  const questions = entries.flatMap(entry => entry.chunks.filter(chunk => activeQuestion(entry.metadata.type,entry.metadata.status,chunk.heading))
     .map(chunk => ({ path: entry.path, hash: entry.hash, heading: chunk.heading, text: chunk.excerpt.slice(0, 500) })));
   return {
     project: settings.selectedProject,

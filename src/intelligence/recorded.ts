@@ -1,3 +1,4 @@
+import { activeQuestion } from "../vault/questions.ts";
 import { SECTION_KEYS, type Briefing, type Claim } from "./briefing.ts";
 import type { Evidence, EvidenceBundle } from "../vault/evidence.ts";
 import { localDay } from "../vault/workspace.ts";
@@ -17,7 +18,7 @@ export function recordedBriefing(bundle: EvidenceBundle, now = Date.now()): Brie
       || /^(?:project )?(?:objective|goal)s?$/i.test(source.heading.trim()))) {
       if (sections.objective.length < 3) sections.objective.push(fact(source));
     }
-    if (/^(?:open|unresolved) questions?$/i.test(source.heading.trim()) && sections.openQuestions.length < 6) {
+    if (activeQuestion(source.noteType,source.noteStatus,source.heading) && sections.openQuestions.length < 6) {
       sections.openQuestions.push(fact(source, "Recorded question: "));
     }
     if (source.noteType === "decision" && !decisions.has(source.path)) {

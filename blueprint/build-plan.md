@@ -51,7 +51,7 @@ PDF support and project portability split into two features each.
 
 - [x] 22. **Editor selection actions** - Add native commands for asking about permitted selected text, finding related evidence and preparing question/decision drafts, retaining current source identity without changing notes or read grants implicitly.
 - [x] 23. **Evidence workbench** - Inspect retrieved passages, include/exclude/pin current evidence before Ask, and compare generated claims with their supporting passages while showing context limits and preserving scope/freshness checks.
-- [ ] 24. **Managed project questions** - Create durable Markdown questions with explicit open/investigating/answered states, cited answers and preserved reopening history; optionally convert legacy questions through previews without automatic resolution.
+- [x] 24. **Managed project questions** - Create durable Markdown questions with explicit open/investigating/answered states, cited answers and preserved reopening history; optionally convert legacy questions through previews without automatic resolution.
 - [ ] 25. **Review acknowledgements and snoozing** - Record explicit reviewed/no-change or revisit-date actions against source snapshots, link follow-up questions and decision drafts, and resurface new changes without treating acknowledgement as freshness or decision acceptance.
 
 ## Milestone H - Understand projects and existing vaults

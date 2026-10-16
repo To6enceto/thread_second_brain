@@ -30,7 +30,8 @@ export function editableBody(text: string): { prefix: string; body: string } {
   const prefix = /^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0] ?? (text.startsWith("\uFEFF") ? "\uFEFF" : "");
   return { prefix, body: text.slice(prefix.length) };
 }
-function markers(text: string): string[] { return text.match(/^<!-- (?:thread:output\b|\/thread:output\b)[^\n]*(?:\n|$)/gm) ?? []; }
+const protectedMarkers=/^<!-- \/?thread:(?:output|question-evidence)\b[^\n]*(?:\n|$)/gm;
+function markers(text: string): string[] { return text.match(protectedMarkers) ?? []; }
 export function draftContent(proposed: string, body: string): string {
   const { prefix } = editableBody(proposed);
   let content = prefix + body;
@@ -40,7 +41,7 @@ export function draftContent(proposed: string, body: string): string {
   if (editableBody(content).prefix !== prefix || JSON.stringify(edited.map(withoutEnding)) !== JSON.stringify(originals.map(withoutEnding))) fail();
   // Native textareas normalize CRLF. Restore protected marker bytes after edits.
   let position = 0;
-  content = content.replace(/^<!-- (?:thread:output\b|\/thread:output\b)[^\n]*(?:\n|$)/gm, () => originals[position++]!);
+  content = content.replace(protectedMarkers, () => originals[position++]!);
   if (JSON.stringify(markers(content)) !== JSON.stringify(originals)) fail();
   return content;
 }

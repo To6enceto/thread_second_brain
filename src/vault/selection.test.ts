@@ -20,7 +20,7 @@ test("selection evidence contains no unselected properties and drafts retain exp
  const b=await selectionEvidence(s,{id:"source",type:"project",status:"active",objective:"UNSELECTED_PROPERTY",secret:"UNSELECTED_SECRET"},1);
  assert.ok(b.sources.length);assert.equal(JSON.stringify(b).includes("UNSELECTED_"),false);assert.equal(b.noteHashes[s.path],s.hash);
  const q=selectionQuery('"café" budget [tag] "unfinished');assert.equal(q,'café budget tag unfinished');assert.equal(selectionQuery("!!!"),"");
- const question=selectionDraft("question","Which budget?","","","project",b);assert.match(question,/type: "questions"/);assert.match(question,/## Open questions/);assert.doesNotMatch(question,/status: "answered"/);
+ const question=selectionDraft("question","Which budget?","","","project",b);assert.match(question,/type: "question"/);assert.match(question,/## Question/);assert.doesNotMatch(question,/status: "answered"/);
  const decision=selectionDraft("decision","Which model?","Local model","Free runtime","project",b);assert.match(decision,/status: "proposed"/);assert.doesNotMatch(decision,/status: "accepted"/);assert.match(decision,/thread_sources:/);
  assert.throws(()=>selectionDraft("decision","Why?","","","project",b),/choice/);assert.throws(()=>selectionDraft("question","Why?","","","",b),/project/);
 });

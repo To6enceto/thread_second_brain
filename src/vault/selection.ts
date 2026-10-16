@@ -1,9 +1,9 @@
 import { buildEvidence,type EvidenceBundle } from "./evidence.ts";
 import { contentHash,readableText,type ReadScope } from "./scope.ts";
 import { tokens } from "../retrieval/tokens.ts";
-import { frontmatter,localDay } from "./workspace.ts";
+import { localDay } from "./workspace.ts";
 import { decisionMarkdown } from "./decision.ts";
-import { escapeMarkdown,evidenceMarkdown,sourceReferences } from "../intelligence/answer.ts";
+import { questionMarkdown } from "./questions.ts";
 import type { SourceRange } from "./freshness.ts";
 
 export const MAX_SELECTION=4000;
@@ -39,6 +39,5 @@ export function selectionQuery(text:string):string{
 export function selectionDraft(action:"question"|"decision",question:string,choice:string,reason:string,project:string,bundle:EvidenceBundle):string{
   if(!project||!question.trim()||question.length>1000)throw new Error("Choose a project and enter a question of up to 1000 characters.");
   if(action==="decision")return decisionMarkdown({question,choice,rationale:reason,alternatives:"",constraints:"",revisit:"",status:"proposed",date:localDay()},project,bundle);
-  return frontmatter({id:crypto.randomUUID(),type:"questions",project,recorded_on:localDay(),thread_sources:JSON.stringify(sourceReferences(bundle))})
-    +`# Question draft\n\n## Open questions\n\n- ${escapeMarkdown(question.trim())}\n\n## Selected evidence\n\n${evidenceMarkdown(bundle)}\n\nRecorded manually; no answer or decision acceptance is implied.\n`;
+  return questionMarkdown(question,project,bundle);
 }

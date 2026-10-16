@@ -1,3 +1,4 @@
+import { activeQuestion } from "./questions.ts";
 import { calendarDate } from "./decision.ts";
 import { LocalIndex, type IndexEntry } from "./index.ts";
 import { type SourceReference } from "./freshness.ts";
@@ -56,7 +57,9 @@ export function projectReviewQueue(index:LocalIndex,settings:ThreadSettings,day=
     for(const condition of excerpts(entry,/^revisit when$/i))add(entry,"revisit-condition",`${status}: ${condition.text} Condition satisfaction requires your judgment.`,condition.heading,supporting.related);
    }
   }
-  if(graph.assess(entry.path).usable)for(const question of excerpts(entry,/^(?:open|unresolved) questions?$/i))add(entry,"open-question",question.text,question.heading);
+  if(graph.assess(entry.path).usable&&(entry.metadata.type!=="question"||activeQuestion(entry.metadata.type,entry.metadata.status,"Question"))){
+   for(const question of excerpts(entry,entry.metadata.type==="question"?/^question$/i:/^(?:open|unresolved) questions?$/i))add(entry,"open-question",question.text,question.heading);
+  }
  }
  items.push(...changed.values());
  const unique=[...new Map(items.map(item=>[JSON.stringify([item.kind,item.path,item.heading,item.text]),item])).values()];

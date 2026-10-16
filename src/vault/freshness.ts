@@ -41,8 +41,32 @@ function decisionUserText(text:string):{text:string;ranges:SourceRange[]}{
   return {text:result.join("\n"),ranges};
 }
 
+function questionUserText(text:string,version:unknown):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
+  const {lines,starts}=sourceLines(text),kept:string[]=[],ranges:SourceRange[]=[];let dropping=false,blocks=0,invalid=version!=="1";
+  const bodyFrom=/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.exec(text)?.[0].length??0;
+  // These markers are reserved in managed records, including inside fences.
+  // User-entered text escapes them; machine evidence must never become prose.
+  for(const [i,line]of lines.entries()){
+    if(starts[i]!<bodyFrom)continue;
+    if(line.trim().startsWith("<!-- thread:question-evidence")){
+      if(dropping||line!=="<!-- thread:question-evidence -->")invalid=true;dropping=true;blocks++;continue;
+    }
+    if(line.trim().startsWith("<!-- /thread:question-evidence")){
+      if(!dropping||line!=="<!-- /thread:question-evidence -->")invalid=true;dropping=false;continue;
+    }
+    if(dropping)continue;
+    kept.push(line);const from=starts[i]!,to=starts[i+1]??text.length,last=ranges.at(-1);
+    if(last?.to===from)last.to=to;else if(to>from)ranges.push({from,to});
+  }
+  if(invalid||dropping||!blocks)return{text:"",ranges:[],output:{refs:[],invalid:true,title:"Unsupported managed question evidence blocks"}};
+  return{text:kept.join("\n"),ranges};
+}
+
 export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
   const whole={text,ranges:[{from:0,to:text.length}]};
+  const managedQuestion=metadata.thread_question_version!==undefined||/^\s*(?:thread_question_version|["']thread_question_version["'])\s*:/m.test(text)
+    ||/^\s*<!--\s*\/?thread:question-evidence\b/m.test(text)||metadata.type==="question"&&metadata.thread_sources!==undefined;
+  if(managedQuestion)return questionUserText(text,metadata.type==="question"?metadata.thread_question_version:undefined);
   if(metadata.type==="source")return whole;
   if(metadata.type==="decision")return decisionUserText(text);
   const generated=["answer","review","session","concept","comparison","briefing"].includes(String(metadata.type))&&(metadata.thread_sources!==undefined||metadata.thread_model!==undefined||metadata.generated_on!==undefined);
