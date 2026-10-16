@@ -3,6 +3,7 @@ import { readableText,vaultPath,type ReadScope } from "./scope.ts";
 
 export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;}
 export interface OutputProvenance{refs:SourceReference[];invalid:boolean;title:string;}
+export interface SourceRange{from:number;to:number;}
 export interface FreshNote{path:string;id?:string;hash:string;metadata:Record<string,unknown>;output?:OutputProvenance;}
 export type FreshState="current"|"renamed"|"changed"|"unavailable"|"ambiguous"|"invalid"|"dependency";
 export interface ReferenceState{ref:SourceReference;state:FreshState;path?:string;hash?:string;reason:string;}
@@ -21,22 +22,31 @@ export function readSourceReferences(value:unknown,allowEmpty=false):SourceRefer
   });
 }
 
-function decisionUserText(text:string):string{
-  let dropping=false;let fence="";const result:string[]=[];
-  for(const line of text.split(/\r?\n/)){
+function sourceLines(text:string):{lines:string[];starts:number[]}{
+  const lines=text.split(/\r?\n/),starts:number[]=[];let at=0;
+  for(const line of lines){starts.push(at);at+=line.length+(text[at+line.length]==="\r"?2:text[at+line.length]==="\n"?1:0);}
+  return {lines,starts};
+}
+function decisionUserText(text:string):{text:string;ranges:SourceRange[]}{
+  let dropping=false;let fence="";const result:string[]=[],ranges:SourceRange[]=[];const {lines,starts}=sourceLines(text);
+  for(const [i,line] of lines.entries()){
     const marker=/^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];if(marker&&(!fence||marker[0]===fence[0]&&marker.length>=fence.length))fence=fence?"":marker;
     if(!fence&&/^### Local model observations \(/.test(line)){dropping=true;continue;}
     if(!fence&&/^##\s/.test(line))dropping=false;
-    if(!dropping)result.push(line);
+    if(!dropping){
+      result.push(line);const from=starts[i]!,to=starts[i+1]??text.length,last=ranges.at(-1);
+      if(last?.to===from)last.to=to;else if(to>from)ranges.push({from,to});
+    }
   }
-  return result.join("\n");
+  return {text:result.join("\n"),ranges};
 }
 
-export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;output?:OutputProvenance}{
-  if(metadata.type==="source")return {text};
-  if(metadata.type==="decision")return {text:decisionUserText(text)};
+export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
+  const whole={text,ranges:[{from:0,to:text.length}]};
+  if(metadata.type==="source")return whole;
+  if(metadata.type==="decision")return decisionUserText(text);
   const generated=["answer","review","session","concept","comparison","briefing"].includes(String(metadata.type))&&(metadata.thread_sources!==undefined||metadata.thread_model!==undefined||metadata.generated_on!==undefined);
-  const lines=text.split(/\r?\n/);let fence="";let start=-1;let first=-1;let record="";let latest:{record:string;body:string}|undefined;let malformed=false;
+  const {lines,starts}=sourceLines(text);let fence="";let start=-1;let first=-1;let record="";let latest:{record:string;body:string;range:SourceRange}|undefined;let malformed=false;
   for(let i=0;i<lines.length;i++){
     const line=lines[i]!;const marker=/^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];if(marker&&(!fence||marker[0]===fence[0]&&marker.length>=fence.length))fence=fence?"":marker;
     if(fence)continue;
@@ -45,11 +55,11 @@ export function outputProjection(text:string,metadata:Record<string,unknown>):{t
       const match=/^<!-- thread:output (.+) -->$/.exec(line);if(!match){malformed=true;continue;}
       if(first===-1)first=i;start=i;record=match[1]!;
     }else if(line==="<!-- /thread:output -->"){
-      if(start===-1){malformed=true;continue;}latest={record,body:lines.slice(start+1,i).join("\n")};start=-1;
+      if(start===-1){malformed=true;continue;}latest={record,body:lines.slice(start+1,i).join("\n"),range:{from:starts[start+1]!,to:starts[i]!}};start=-1;
     }
   }
   if(start!==-1)malformed=true;
-  if(!generated&&first===-1&&!malformed)return {text};
+  if(!generated&&first===-1&&!malformed)return whole;
   try{
     if(malformed||text.length>1048576)throw new Error("Incomplete or oversized output provenance.");
     if(latest){
@@ -57,10 +67,10 @@ export function outputProjection(text:string,metadata:Record<string,unknown>):{t
       const refs=readSourceReferences(data.sources);
       // Use only the latest generated version. Human prefix is retained for pre-existing notes.
       const prefix=!generated?lines.slice(0,first).join("\n")+"\n":"";
-      return {text:prefix+latest.body,output:{refs,invalid:false,title:data.title}};
+      return {text:prefix+latest.body,ranges:[...(!generated&&starts[first]!>0?[{from:0,to:starts[first]!}]:[]),latest.range],output:{refs,invalid:false,title:data.title}};
     }
-    return {text,output:{refs:readSourceReferences(metadata.thread_sources),invalid:false,title:""}};
-  }catch{return {text:"",output:{refs:[],invalid:true,title:""}};}
+    return {...whole,output:{refs:readSourceReferences(metadata.thread_sources),invalid:false,title:""}};
+  }catch{return {text:"",ranges:[],output:{refs:[],invalid:true,title:""}};}
 }
 
 export function loadRenames(value:unknown):RenameMap{

@@ -327,3 +327,24 @@ Obsidian, local Ollama and the tested Qwen models can run without a paid service
 You supply storage, memory, hardware and electricity; initial downloads need
 internet. Synthetic Linux acceptance covers the documented runtime/model pair;
 large vaults, other models and other operating systems need their own validation.
+
+## Editor selection actions
+
+Select 1-4000 characters in a saved, currently permitted Markdown/text note and
+use the command palette for **Thread: Ask about selected text**, **Find evidence
+related to selected text**, **Draft a question from selected text**, or **Draft a
+decision from selected text**. Empty/oversized selections and excluded notes do
+not enable these editor commands. Save unsaved edits first; stale generated
+sources and older synthesis/model-observation blocks cannot be reused.
+
+The command opens a dialog without inference or writes. Ask sends only selected
+text plus source identity/status/date metadata after you enter a question and
+choose Ask locally. Related search explicitly searches all allowed paths using
+keyword matching without a model. Source links verify current hashes. Source or
+permission changes clear the selection dialog; select current text again.
+
+Question/decision shortcuts require a selected project and your own question;
+decisions also need your choice and reasoning and remain **proposed**. Inspect
+and explicitly save the exact new-note preview. Existing notes and original
+selections remain untouched; collisions refuse saving. Supported selection
+answers can be previewed as new notes under the mapped Knowledge folder.

@@ -1,4 +1,6 @@
-import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal } from "obsidian";
+import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal, type Editor } from "obsidian";
+import { SelectionModal } from "./ui/selection-modal.ts";
+import { savedSelection,selectionAvailable,selectionEvidence,type SelectionAction } from "./vault/selection.ts";
 import { LocalIndex, indexNote, identityFromIndex, type IndexEntry } from "./vault/index.ts";
 import { IndexUpdates } from "./vault/index-updates.ts";
 import { RecallModal } from "./ui/recall-modal.ts";
@@ -78,6 +80,12 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"weekly-review",name:"Weekly project review",callback:()=>this.openWeekly()});
     this.addCommand({id:"session-wrap-up",name:"Session wrap-up",callback:()=>this.openSession()});
     this.addCommand({id:"knowledge-updates",name:"Knowledge updates",callback:()=>this.openKnowledge()});
+    for(const [action,name]of [["ask","Ask about selected text"],["related","Find evidence related to selected text"],["question","Draft a question from selected text"],["decision","Draft a decision from selected text"]] as const){
+      this.addCommand({id:`selection-${action}`,name,editorCheckCallback:(checking,editor,view)=>{
+        const file=view.file;if(!file||!this.active||!selectionAvailable(file.path,this.settings,()=>editor.getSelection()))return false;
+        if(!checking)void this.openSelection(action,editor,file).catch(error=>new Notice(error instanceof Error?error.message:"Could not use selected evidence."));return true;
+      }});
+    }
     this.registerEvent(this.app.vault.on("modify", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("delete", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
     this.registerEvent(this.app.vault.on("create", (file) => this.invalidatePath(file.path, file instanceof TFolder)));
@@ -114,6 +122,22 @@ export default class ThreadPlugin extends Plugin {
   openWeekly():void{const modal=new WeeklyModal(this);this.modals.add(modal);modal.open();}
   openSession():void{const modal=new SessionModal(this);this.modals.add(modal);modal.open();}
   openKnowledge():void{const modal=new KnowledgeModal(this);this.modals.add(modal);modal.open();}
+  async openSelection(action:SelectionAction,editor:Editor,file:TFile):Promise<void>{
+    const path=file.path,settings=structuredClone(this.settings);
+    if(!this.active||!readableText(path,settings))throw new Error("Select a currently permitted note first.");
+    const text=editor.getValue(),from=editor.posToOffset(editor.getCursor("from")),to=editor.posToOffset(editor.getCursor("to"));
+    await this.rebuildIndex();
+    const current=()=>this.active&&file.path===path&&readableText(path,this.settings)&&JSON.stringify(settings)===JSON.stringify(this.settings)&&editor.getValue()===text;
+    if(!current())throw new Error("Source or settings changed. Select saved text again.");
+    const entry=this.index.entries.find(entry=>entry.path===path);
+    if(!entry||!this.index.graph(settings).assess(path).usable)throw new Error("Selected source is unavailable or needs freshness review.");
+    const raw=await this.app.vault.read(file);if(!current())throw new Error("Source or settings changed. Select saved text again.");
+    const snapshot=await savedSelection(path,raw,text,from,to,settings,outputProjection(raw,readMetadata(raw,parseYaml)).ranges);
+    if(snapshot.hash!==entry.hash||!current())throw new Error("Source changed. Select saved text again.");
+    const bundle=this.withDependencies(await selectionEvidence(snapshot,entry.metadata,file.stat.mtime),settings);
+    if(!bundle.sources.length||!await this.evidenceCurrent(bundle,settings)||!current())throw new Error("Selected evidence changed or is empty. Select a current passage again.");
+    const modal=new SelectionModal(this);modal.sourceSnapshot=snapshot;modal.bundle=bundle;modal.action=action;this.modals.add(modal);modal.open();
+  }
   async readReviewedTarget(path:string):Promise<string|null>{return this.readChangeText(path);}
   changePathAllowed(path:string):boolean {try{this.checkChangePath(path);return true;}catch{return false;}}
   async openChangeTarget(path:string):Promise<void>{

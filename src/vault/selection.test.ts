@@ -1,0 +1,46 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { MAX_SELECTION,savedSelection,selectionAvailable,selectionEvidence,selectionQuery,selectionDraft } from "./selection.ts";
+import { outputProjection } from "./freshness.ts";
+const ranges=(text:string)=>outputProjection(text,{}).ranges;
+const scope={allowedPaths:["P"],excludedPaths:["P/Private"]};
+test("selection permission precedes editor access and exact saved ranges reject invalid/dirty inputs",async()=>{
+ let reads=0;const read=()=>{reads++;return "visible";};
+ assert.equal(selectionAvailable("P/Private/secret.md",scope,read),false);assert.equal(selectionAvailable("Other/note.md",scope,read),false);assert.equal(selectionAvailable("P/file.pdf",scope,read),false);assert.equal(reads,0);
+ assert.equal(selectionAvailable("P/note.md",scope,read),true);assert.equal(reads,1);
+ for(const[from,to]of [[-1,3],[0,99],[2,1],[0.5,2],[0,0]])await assert.rejects(savedSelection("P/n.md","abc","abc",from!,to!,scope,ranges("abc")));
+ await assert.rejects(savedSelection("P/n.md","old","new",0,3,scope,ranges("old")),/Save/);
+ await assert.rejects(savedSelection("P/n.md","x".repeat(MAX_SELECTION+1),"x".repeat(MAX_SELECTION+1),0,MAX_SELECTION+1,scope,ranges("x".repeat(MAX_SELECTION+1))),/characters/);
+ await assert.rejects(savedSelection("P/n.md","older synthesis","older synthesis",0,5,scope,[]),/eligible/);
+ await assert.rejects(savedSelection("P/n.md","😀","😀",0,1,scope,ranges("😀")),/Unicode/);
+ const raw="Before\r\ncafe\u0301 😀\r\nAfter",from=raw.indexOf("cafe");const s=await savedSelection("P/n.md",raw,raw,from,raw.indexOf("After"),scope,ranges(raw));assert.equal(s.text,"cafe\u0301 😀\r\n");assert.match(s.hash,/^[a-f0-9]{64}$/);
+});
+test("selection evidence contains no unselected properties and drafts retain explicit manual/proposed semantics",async()=>{
+ const s=await savedSelection("P/n.md","Budget 20 euros.","Budget 20 euros.",0,16,scope,ranges("Budget 20 euros."));
+ const b=await selectionEvidence(s,{id:"source",type:"project",status:"active",objective:"UNSELECTED_PROPERTY",secret:"UNSELECTED_SECRET"},1);
+ assert.ok(b.sources.length);assert.equal(JSON.stringify(b).includes("UNSELECTED_"),false);assert.equal(b.noteHashes[s.path],s.hash);
+ const q=selectionQuery('"café" budget [tag] "unfinished');assert.equal(q,'café budget tag unfinished');assert.equal(selectionQuery("!!!"),"");
+ const question=selectionDraft("question","Which budget?","","","project",b);assert.match(question,/type: "questions"/);assert.match(question,/## Open questions/);assert.doesNotMatch(question,/status: "answered"/);
+ const decision=selectionDraft("decision","Which model?","Local model","Free runtime","project",b);assert.match(decision,/status: "proposed"/);assert.doesNotMatch(decision,/status: "accepted"/);assert.match(decision,/thread_sources:/);
+ assert.throws(()=>selectionDraft("decision","Why?","","","project",b),/choice/);assert.throws(()=>selectionDraft("question","Why?","","","",b),/project/);
+});
+test("projection eligibility checks the selected occurrence, including CRLF editor offsets",async()=>{
+ const phrase="Use local models.\r\nKeep data local.";
+ const decision="## Choice\r\n"+phrase+"\r\n### Local model observations (old)\r\n"+phrase+"\r\n## Revisit\r\nLater";
+ const projected=outputProjection(decision,{type:"decision"}),editor=decision.replace(/\r\n/g,"\n"),normalized=phrase.replace(/\r\n/g,"\n");
+ const good=editor.indexOf(normalized),bad=editor.lastIndexOf(normalized);
+ const selected=await savedSelection("P/n.md",decision,editor,good,good+normalized.length,scope,projected.ranges);
+ assert.equal(selected.text,phrase);assert.equal(selected.from,decision.indexOf(phrase));assert.equal(selected.to,decision.indexOf(phrase)+phrase.length);
+ await assert.rejects(savedSelection("P/n.md",decision,editor,bad,bad+normalized.length,scope,projected.ranges),/eligible/);
+ await assert.rejects(savedSelection("P/n.md",decision,editor,good,bad+normalized.length,scope,projected.ranges),/eligible/);
+ await assert.rejects(savedSelection("P/n.md",decision,editor+"dirty",good,good+normalized.length,scope,projected.ranges),/Save/);
+ const ref={path:"P/source.md",heading:"",hash:"a".repeat(64),noteHash:"a".repeat(64)};
+ const block=(body:string)=>'<!-- thread:output '+JSON.stringify({schemaVersion:1,title:"Version",sources:[ref]})+' -->\r\n'+body+'\r\n<!-- /thread:output -->\r\n';
+ const versioned="Human prefix\r\n"+block(phrase)+block(phrase),v=outputProjection(versioned,{}),ve=versioned.replace(/\r\n/g,"\n");
+ const old=ve.indexOf(normalized),latest=ve.lastIndexOf(normalized);
+ await assert.rejects(savedSelection("P/n.md",versioned,ve,old,old+normalized.length,scope,v.ranges),/eligible/);
+ const current=await savedSelection("P/n.md",versioned,ve,latest,latest+normalized.length,scope,v.ranges);assert.equal(current.text,phrase);assert.equal(current.from,versioned.lastIndexOf(phrase));
+ const exact=await savedSelection("P/n.md",versioned,versioned,versioned.lastIndexOf(phrase),versioned.lastIndexOf(phrase)+phrase.length,scope,v.ranges);assert.equal(exact.text,phrase);
+ const invalid=outputProjection(block(phrase).replace('"schemaVersion":1','"schemaVersion":99'),{});assert.deepEqual(invalid.ranges,[]);
+ const source="```text\r\n### Local model observations (literal)\r\n😀\r\n```";const literal=outputProjection(source,{type:"decision"});assert.equal((await savedSelection("P/n.md",source,source,0,source.length,scope,literal.ranges)).text,source);
+});
