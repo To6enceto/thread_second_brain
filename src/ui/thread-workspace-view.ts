@@ -1,5 +1,7 @@
 import type { ViewStateResult } from "obsidian";
 import { BriefingView } from "./briefing-view.ts";
+import type { ActionSnapshot } from "../vault/action-board.ts";
+import { actionStates, actionLabels } from "../vault/action-record.ts";
 
 export const THREAD_WORKSPACE_VIEW = "thread-workspace";
 export type WorkspaceArea = "home" | "research" | "actions" | "reviews";
@@ -12,6 +14,31 @@ function restoredArea(state: unknown): WorkspaceArea {
 
 export class ThreadWorkspaceView extends BriefingView {
   area: WorkspaceArea = "home";
+  actionBoard: ActionSnapshot | null = null;
+
+  override invalidate(message: string, preserveHome = false): void {
+    this.actionBoard = null;
+    super.invalidate(message, preserveHome);
+  }
+  override sourcesChanged(paths: Set<string>): void {
+    if (this.area === "actions") this.invalidate("Action records or support changed. Refresh the action board.");
+    else super.sourcesChanged(paths);
+  }
+  async loadActionBoard(): Promise<void> {
+    if (this.closed || this.area !== "actions") return;
+    this.invalidate("Reading current permitted action records...");
+    const controller = new AbortController(); this.controller = controller;
+    const revision = this.revision, settings = structuredClone(this.plugin.settings);
+    const current = () => !this.closed && this.area === "actions" && revision === this.revision && !controller.signal.aborted && JSON.stringify(settings) === JSON.stringify(this.plugin.settings);
+    this.render();
+    try {
+      const snapshot = await this.plugin.actionSnapshot(settings, current, controller.signal);
+      if (!current()) return;
+      this.actionBoard = snapshot; this.bundle = snapshot.bundle;
+      this.message = `${snapshot.cards.length} current actions; ${snapshot.unavailable} unavailable; ${snapshot.omitted} omitted by the 100-record display limit. Indexed coverage can omit other notes.`;
+    } catch (error) { if (current()) this.message = error instanceof Error ? error.message : "Could not load action records. Refresh and inspect local diagnostics."; }
+    finally { if (this.controller === controller) { this.controller = null; if (!this.closed) this.render(); } }
+  }
 
   override getViewType(): string { return THREAD_WORKSPACE_VIEW; }
   override getDisplayText(): string { return "Thread workspace"; }
@@ -30,6 +57,7 @@ export class ThreadWorkspaceView extends BriefingView {
     this.invalidate("Choose an action. Current read permissions still apply.");
     this.app.workspace.requestSaveLayout();
     if (this.area === "home") await this.loadHome();
+    if (this.area === "actions") await this.loadActionBoard();
   }
 
   protected override renderNavigation(root: HTMLElement): void {
@@ -82,6 +110,33 @@ export class ThreadWorkspaceView extends BriefingView {
         ["Decisions", () => this.plugin.openDecisions()], ["All projects", () => this.plugin.openProjectOverview()],
         ["Workspaces", () => this.plugin.openWorkspace()]
       ]);
+      const heading = area.createDiv({ cls: "thread-actions" });
+      heading.createEl("h3", { text: "Recorded action board" });
+      const refresh = heading.createEl("button", { text: "Refresh action board" });
+      refresh.disabled = this.controller !== null; refresh.onclick = () => { void this.loadActionBoard(); };
+      area.createEl("p", { text: "Statuses and dates are explicit user reports, not independently verified events. Review action opens the existing form; moving a card requires a separate exact change preview.", cls: "thread-muted" });
+      const board = area.createDiv({ cls: "thread-action-board" });
+      for (const state of actionStates) {
+        const column = board.createEl("section", { cls: "thread-action-column", attr: { "aria-label": `${actionLabels[state]} actions` } });
+        const records = this.actionBoard?.cards.filter(c => c.record.status === state) ?? [];
+        column.createEl("h4", { text: `${actionLabels[state]}${this.actionBoard ? ` (${records.length})` : ""}` });
+        if (!records.length) column.createEl("p", { text: this.actionBoard ? "No current actions in this state." : "Refresh to load current records.", cls: "thread-muted" });
+        for (const item of records) {
+          const entry = column.createDiv({ cls: "thread-card" }), last = item.record.history.at(-1)!;
+          entry.createEl("h4", { text: item.record.title });
+          entry.createEl("p", { text: `${actionLabels[state]} · reported ${last.day}`, cls: "thread-meta" });
+          entry.createEl("p", { text: last.reason.slice(0, 300) + (last.reason.length > 300 ? "..." : "") });
+          entry.createEl("p", { text: `Recorded ${last.recordedAt}`, cls: "thread-meta" });
+          const revision = this.revision;
+          entry.createEl("button", { text: "Open action", attr: { "aria-label": `Open action ${item.record.title}` } }).onclick = () => {
+            void this.plugin.openIndexedSource(item.path, item.hash, "", () => !this.closed && revision === this.revision)
+              .catch(error => { if (!this.closed && revision === this.revision) this.invalidate(error instanceof Error ? error.message : "Action unavailable. Refresh."); });
+          };
+          entry.createEl("button", { text: "Review action", attr: { "aria-label": `Review action ${item.record.title}` } }).onclick = () => {
+            if (!this.closed && revision === this.revision) this.plugin.openActions(item.path);
+          };
+        }
+      }
     } else {
       card("Review explicitly", "Inspect changed sources, decisions and proposed note changes before applying anything.", [
         ["Review queue", () => this.plugin.openReviewQueue()], ["Review decisions", () => this.plugin.openDecisionReview()],

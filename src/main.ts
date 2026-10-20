@@ -17,6 +17,7 @@ import { indexCoverage, retainIndexEntries, type IndexReadStats } from "./vault/
 import { HealthModal } from "./ui/health-modal.ts";
 import { QuestionsModal } from "./ui/questions-modal.ts";
 import { ActionModal } from "./ui/action-modal.ts";
+import { actionSnapshot, type ActionSnapshot } from "./vault/action-board.ts";
 import { ProjectOverviewModal } from "./ui/project-overview-modal.ts";
 import { TimelineModal } from "./ui/timeline-modal.ts";
 import { questionReviewReferences } from "./vault/review-events.ts";
@@ -175,7 +176,20 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
-  openActions():void{const modal=new ActionModal(this);this.modals.add(modal);modal.open();}
+  openActions(path=""):void{const modal=new ActionModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}
+  async actionSnapshot(settings:ThreadSettings,current:()=>boolean,signal:AbortSignal):Promise<ActionSnapshot>{
+    const valid=()=>this.active&&current()&&JSON.stringify(settings)===JSON.stringify(this.settings);
+    if(!this.index.ready)await this.rebuildIndex();
+    return actionSnapshot(this.index,settings,{current:valid,parse:parseYaml,verify:bundle=>this.evidenceCurrent(this.withDependencies(bundle,settings),settings),
+      read:async path=>{
+        if(!valid()||!readableText(path,settings))throw Error("Action is outside the current read scope.");
+        const file=this.app.vault.getAbstractFileByPath(path);
+        if(!(file instanceof TFile)||file.stat.size>1048576)throw Error("Action is missing or exceeds 1 MiB.");
+        const raw=await this.app.vault.read(file);
+        if(!valid()||file.path!==path||!readableText(path,this.settings)||new TextEncoder().encode(raw).length>1048576)throw Error("Action changed or is outside scope.");
+        return raw;
+      }},signal);
+  }
   openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
   openProjectExport():void{const modal=new ExportModal(this);this.modals.add(modal);modal.open();}
   openProjectImport():void{const modal=new ProjectImportModal(this);this.modals.add(modal);modal.open();}

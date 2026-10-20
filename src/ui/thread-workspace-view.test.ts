@@ -6,6 +6,7 @@ import type ThreadPlugin from "../main.ts";
 import { defaultSettings } from "../settings/settings.ts";
 import { LocalIndex } from "../vault/index.ts";
 import { buildEvidence } from "../vault/evidence.ts";
+import type { ActionSnapshot } from "../vault/action-board.ts";
 
 // Exercise the actual shared lifecycle; native layout/navigation is checked in Obsidian.
 const compiled = await build({
@@ -36,7 +37,8 @@ function fixture() {
   const plugin = {
     settings, index, changes: { state: { pending: null } },
     evidence: async () => bundle, evidenceCurrent: async () => true,
-    updateSettings: async () => { settingsSaves++; }
+    updateSettings: async () => { settingsSaves++; },
+    actionSnapshot: async (): Promise<ActionSnapshot> => ({ cards: [], bundle, identity: "P", candidates: 0, unavailable: 0, omitted: 0 })
   };
   const view = new ThreadWorkspaceView({
     app: { workspace: { requestSaveLayout: () => { layoutSaves++; } } }
@@ -61,6 +63,30 @@ test("restored workspace state retains only known presentation areas without gra
   assert.equal(JSON.stringify(plugin.settings), before);
   assert.equal(requests, 0);
   assert.deepEqual(saves(), { layoutSaves: 0, settingsSaves: 0 });
+});
+
+test("action board uses current snapshots and clears immediately on source changes", async () => {
+  const { view, saves } = fixture();
+  await view.navigate("actions");
+  assert.ok(view.actionBoard); assert.equal(view.actionBoard.candidates, 0);
+  view.sourcesChanged(new Set(["P/Any changed action.md"]));
+  assert.equal(view.actionBoard, null); assert.match(view.message, /Refresh the action board/);
+  assert.equal(saves().settingsSaves, 0);
+});
+test("action board suppresses late records after scope change, navigation or close", async () => {
+  for (const change of ["scope", "navigation", "close"] as const) {
+    const { view, plugin } = fixture();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => release = resolve);
+    plugin.actionSnapshot = async () => { await gate; return { cards: [], bundle, identity: "P", candidates: 7, unavailable: 0, omitted: 0 }; };
+    const loading = view.navigate("actions");
+    assert.ok(view.controller);
+    if (change === "scope") { plugin.settings.allowedPaths = []; view.invalidate("Settings changed."); }
+    if (change === "navigation") await view.navigate("research");
+    if (change === "close") await view.onClose();
+    release(); await loading;
+    assert.equal(view.actionBoard, null, change); assert.equal(view.bundle, null, change);
+  }
 });
 
 test("workspace navigation aborts pending Resume and suppresses late evidence", async () => {

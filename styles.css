@@ -27,6 +27,12 @@
 .thread-workspace-nav .thread-workspace-sidebar { margin-inline-start: auto; }
 .thread-workspace .thread-project-selector { max-width: 600px; }
 .thread-workspace-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px; }
+.thread-action-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; margin-block: 16px; }
+.thread-action-column { min-width: 0; padding: 10px; border: 1px solid var(--thread-border); border-radius: var(--thread-radius); }
+.thread-action-column > .thread-card { margin-block: 10px; overflow-wrap: anywhere; }
+.thread-action-column button { min-height: 32px; margin: 4px; }
+.thread-progress-choice { display: flex; gap: 8px; align-items: center; min-height: 32px; padding-block: 6px; }
+.thread-progress-choice > input[type="checkbox"] { min-height: 0; flex-shrink: 0; }
 .thread-workspace .thread-workspace-area h3 { font: 23px/1.3 var(--thread-serif); }
 .thread-workspace .thread-home { display: block; }
 .thread-view h2 { margin-top: 0; }

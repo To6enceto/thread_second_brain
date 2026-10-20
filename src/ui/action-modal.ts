@@ -9,6 +9,7 @@ import type { IndexEntry } from "../vault/index.ts";
 import { questionRecord } from "../vault/questions.ts";
 
 export class ActionModal extends ThreadModal {
+  initialPath = "";
   private inputs = 0;
   private previews = new Set<NewNoteModal>();
   private clearChoices: () => void = () => {};
@@ -30,7 +31,9 @@ export class ActionModal extends ThreadModal {
       for (const preview of this.previews) preview.invalidate("Action inputs changed. Prepare a new preview.");
       watch(); if (ready) prepare.disabled = false;
     };
+    let operation: HTMLSelectElement;
     new Setting(el).setName("Action operation").addDropdown(d => {
+      operation = d.selectEl;
       d.selectEl.setAttribute("aria-label", "Action operation");
       d.addOption("new", "Create Planned action").addOption("transition", "Record a state transition").onChange(v => { mode = v; reset(); });
     });
@@ -91,6 +94,10 @@ export class ActionModal extends ThreadModal {
         records = all.filter(e => graph.assess(e.path).usable && e.id && this.plugin.index.idUnambiguous(e.id)).slice(0, 100);
         select.replaceChildren(new Option("Choose an action", ""));
         for (const entry of records) select.add(new Option(`${entry.path} - ${String(entry.metadata.status)}`, entry.path));
+        if (this.initialPath && records.some(e => e.path === this.initialPath)) {
+          mode = "transition"; operation.value = mode; select.value = this.initialPath;
+        }
+        this.initialPath = "";
         sources.replaceChildren(new Option("Choose current supporting note", ""));
         for (const entry of entries.slice(0, 500)) sources.add(new Option(`${entry.path} - ${String(entry.metadata.type ?? "note")}`, entry.path));
         ready = true; watch(); prepare.disabled = false;
