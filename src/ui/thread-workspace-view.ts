@@ -97,7 +97,7 @@ export class ThreadWorkspaceView extends BriefingView {
         ["Questions", () => this.plugin.openQuestions()]
       ]);
       card("Collect knowledge", "Capture sources and inspect their freshness. PDF access requires explicit consent.", [
-        ["Capture", () => this.plugin.openCapture()], ["Knowledge", () => this.plugin.openKnowledge()],
+        ["Capture", () => this.plugin.openCapture()], ["Review web clip", () => this.plugin.openClipper()], ["Knowledge", () => this.plugin.openKnowledge()],
         ["Source freshness", () => this.plugin.openFreshness()], ["Local PDF extraction", () => this.plugin.openPdf()]
       ]);
     } else if (this.area === "actions") {

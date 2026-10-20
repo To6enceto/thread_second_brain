@@ -784,3 +784,9 @@ and200 comparison rows. Text display is limited to50000 characters per side and
 200000 total, with explicit clipping notices; full-byte hashes remain visible.
 Source/package/input/settings changes or Cancel clear results. Recompare current
 content; importing copies is a separate explicit workflow, not a restore button.
+
+## Reviewed web clips
+
+Use **Review web clip** in Research (or **Thread: Review saved web clip**) to review a deliberately saved local clip, explicitly choose its project, inspect metadata and possible duplicates, then preview a new source copy. Publication, capture and intake dates stay separate; missing or ambiguous metadata stays unknown. The original clip is never overwritten, URLs are not fetched and no AI model is used. Changes require a fresh preview.
+
+Importable article/selection templates and detailed steps are in [the Web Clipper guide](integrations/clipper/README.md). Intake accepts original permitted local text up to2 MiB including saved provenance. The picker covers up to200 indexed notes; duplicate hints cover up to100 current permitted imported sources and do not establish complete coverage or duplicate identity. Browser-extension use remains a separate explicit user action.

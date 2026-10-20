@@ -34,6 +34,7 @@ import { verifyThenOpenSource } from "./vault/source-link.ts";
 import { AskModal } from "./ui/ask-modal.ts";
 import { DecisionReviewModal } from "./ui/decision-review-modal.ts";
 import { DecisionModal } from "./ui/decision-modal.ts";
+import { ClipperModal } from "./ui/clipper-modal.ts";
 import { CaptureModal } from "./ui/capture-modal.ts";
 import { ImportRegistry } from "./vault/capture.ts";
 import { ChangeManager } from "./vault/changes.ts";
@@ -137,6 +138,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"project-timeline",name:"Project timeline",callback:()=>this.openTimeline()});
     this.addCommand({ id:"decisions",name:"Project decisions",callback:()=>this.openDecisions() });
     this.addCommand({id:"decision-evidence-review",name:"Review decision evidence",callback:()=>this.openDecisionReview()});
+    this.addCommand({ id:"clipper-intake",name:"Review saved web clip",callback:()=>this.openClipper() });
     this.addCommand({ id:"capture",name:"Capture thought or source",callback:()=>this.openCapture() });
     this.addCommand({id:"review-changes",name:"Review changes and undo",callback:()=>this.openChanges()});
     this.addCommand({id:"project-review-queue",name:"Project review queue",callback:()=>this.openReviewQueue()});
@@ -242,6 +244,7 @@ export default class ThreadPlugin extends Plugin {
   openProjectOverview():void{const modal=new ProjectOverviewModal(this);this.modals.add(modal);modal.open();}
   openTimeline():void{const modal=new TimelineModal(this);this.modals.add(modal);modal.open();}
   openDecisions(): void {const modal=new DecisionModal(this);this.modals.add(modal);modal.open();}
+  openClipper(): void {const modal=new ClipperModal(this);this.modals.add(modal);modal.open();}
   openCapture(): void {const modal=new CaptureModal(this);this.modals.add(modal);modal.open();}
   openChanges():void {const modal=new ChangeReviewModal(this);this.modals.add(modal);modal.open();}
   openDecisionReview(path=""):void{const modal=new DecisionReviewModal(this);modal.initialPath=path;this.modals.add(modal);modal.open();}

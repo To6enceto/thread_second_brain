@@ -303,3 +303,7 @@
 
 .thread-comparison .thread-muted { overflow-wrap: anywhere; }
 .thread-comparison .thread-card { margin-block: 8px; }
+
+.thread-clip-fields { display: grid; gap: 12px; margin-block: 16px; }
+.thread-clip-fields label { display: grid; gap: 6px; min-width: 0; }
+.thread-clip-fields :is(input, select) { width: 100%; min-height: 32px; }

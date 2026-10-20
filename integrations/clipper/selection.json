@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "name": "Thread research selection",
+  "behavior": "create",
+  "noteNameFormat": "{{title}}",
+  "path": "Clippings",
+  "noteContentFormat": "{{selection}}",
+  "properties": [
+    {
+      "name": "title",
+      "value": "{{title}}",
+      "type": "text"
+    },
+    {
+      "name": "source",
+      "value": "{{url}}",
+      "type": "text"
+    },
+    {
+      "name": "author",
+      "value": "{{author}}",
+      "type": "text"
+    },
+    {
+      "name": "published",
+      "value": "{{published}}",
+      "type": "date"
+    },
+    {
+      "name": "created",
+      "value": "{{date}}",
+      "type": "date"
+    }
+  ],
+  "triggers": []
+}
