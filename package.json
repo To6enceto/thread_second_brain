@@ -9,6 +9,7 @@
     "node": ">=22.15.0"
   },
   "scripts": {
+    "launcher": "node --experimental-strip-types scripts/launch-thread.mjs",
     "dev": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",

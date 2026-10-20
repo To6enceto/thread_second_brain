@@ -94,6 +94,11 @@ is an explicit wider scope, not permission to read the entire vault. Legacy note
 need no migration. **Preview a new workspace** optionally creates UUID-tagged
 starter notes/templates without overwriting existing files.
 
+For a Fedora desktop shortcut, see [Launch Thread](docs/launcher.md). The optional
+Node helper generates a local shortcut artifact for a configured Obsidian vault;
+it never installs desktop integration automatically. Ollama startup is off unless
+you explicitly configure it. `npm run dev` remains a bundle watcher, not a launcher.
+
 ## Use Thread
 
 - **Resume project:** six sourced sections show objective, last recorded activity,

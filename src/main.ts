@@ -19,7 +19,7 @@ import { QuestionsModal } from "./ui/questions-modal.ts";
 import { ProjectOverviewModal } from "./ui/project-overview-modal.ts";
 import { TimelineModal } from "./ui/timeline-modal.ts";
 import { questionReviewReferences } from "./vault/review-events.ts";
-import { Plugin, TFile, TFolder, parseYaml, Notice, type Modal, type Editor } from "obsidian";
+import { Plugin, TFile, TFolder, FileSystemAdapter, parseYaml, Notice, type Modal, type Editor } from "obsidian";
 import { SelectionModal } from "./ui/selection-modal.ts";
 import { savedSelection,selectionAvailable,selectionEvidence,type SelectionAction } from "./vault/selection.ts";
 import { LocalIndex, indexNote, identityFromIndex, type IndexEntry } from "./vault/index.ts";
@@ -102,6 +102,16 @@ export default class ThreadPlugin extends Plugin {
       try{this.imports.load(JSON.parse(await this.app.vault.adapter.read(this.importsPath())));}catch{this.importsWarning="Import history is unavailable. Rebuild it from allowed source notes before importing.";}
     }
     this.registerView(THREAD_VIEW, (leaf) => new BriefingView(leaf, this));
+    this.registerObsidianProtocolHandler("thread", params => {
+      if (!(this.app.vault.adapter instanceof FileSystemAdapter)
+        || params.threadVault !== this.app.vault.adapter.getBasePath()) {
+        new Notice("Thread launcher vault path does not match. Check vaultPath and vaultId in launcher.json.");
+        return;
+      }
+      this.app.workspace.onLayoutReady(() => {
+        if (this.active) void this.openThread().catch(() => new Notice("Thread could not open. Use the Open Thread command to retry."));
+      });
+    });
     this.settingsTab = new ThreadSettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
     this.addRibbonIcon("book-open", "Open Thread", () => { void this.openThread(); });
