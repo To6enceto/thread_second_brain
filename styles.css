@@ -43,3 +43,4 @@
 .thread-pdf-picker select { width: 100%; max-width: 100%; min-width: 0; }
 .thread-package-inventory .setting-item-name { overflow-wrap: anywhere; }
 .thread-package-inventory .setting-item { align-items: flex-start; }
+.thread-project-import :is(p, summary) { overflow-wrap: anywhere; }

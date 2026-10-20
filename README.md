@@ -5,7 +5,7 @@ recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No
 account, API key, backend or paid model service is required.
 
-This is a **private local 0.2.0 build**, not a published Community plugin. It is
+This is a **private local 0.3.0 build**, not a published Community plugin. It is
 tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
 `qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
 use. Windows, macOS, other models and later versions need their own validation.
@@ -21,7 +21,7 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.2.0.zip` and `dist/thread/`. The ZIP contains
+then creates `dist/thread-0.3.0.zip` and version-specific staging `dist/thread-0.3.0/`. The ZIP contains
 `thread/main.js`, `thread/manifest.json`, `thread/styles.css`, the local PDF
 worker, `pdf-assets.json` and its explicitly listed CMap/font/license resources.
 The inventory is verified by path, byte size and SHA-256 before packaging. No vault, model,
@@ -37,7 +37,7 @@ plugins**, allow Community plugins, reload Obsidian and enable **Thread**.
 explains where to find the plugins folder. Thread is not in the Browse directory.
 
 For an update, disable Thread, preserve its existing `data.json`, `changes.json`,
-`imports.json` and `renames.json`, replace the package code/styles/manifest and inventoried PDF assets, reload Obsidian and enable
+`imports.json`, `project-imports.json` and `renames.json`, replace the package code/styles/manifest and inventoried PDF assets, reload Obsidian and enable
 Thread again. Reloading also refreshes the installed manifest version. Keep an independent vault backup; the bounded change journal is not a
 complete backup system.
 
@@ -327,7 +327,7 @@ remain listed: review is explicit and there is no automatic dismissal or history
 rewrite. The queue works with Ollama stopped; optional AI review flows still need
 your downloaded local text model.
 
-The private 0.2.0 package has no hosted runtime charge, subscription or API key.
+The private 0.3.0 package has no hosted runtime charge, subscription or API key.
 Obsidian, local Ollama and the tested Qwen models can run without a paid service.
 You supply storage, memory, hardware and electricity; initial downloads need
 internet. Synthetic Linux acceptance covers the documented runtime/model pair;
@@ -595,3 +595,56 @@ Files and IDs remain byte-exact. The manifest retains original-path mappings;
 relocating copies can leave fully qualified vault links and PDF original paths
 needing manual review or explicit re-extraction. Checkpoints never silently
 rewrite identities, source hashes or provenance to declare moved evidence fresh.
+
+## Import a project checkpoint
+
+Add a `.thread-project.json` file to a visible, non-excluded vault location using
+Obsidian. Run **Thread: Import project package and recovery** (also in Home's
+More actions). The picker lists at most200 names without reading contents.
+**Validate selected package and preview** explicitly reads that package, including
+any embedded PDF bytes. This grants no continuing access to the package or PDFs.
+No AI or network is involved.
+
+Only version1 uncompressed Thread JSON is accepted:1-100 Markdown/plain-text/PDF
+files,2 MiB/text,16 MiB/PDF,32 MiB expanded and48 MiB serialized. Compression,
+ZIP project packages, extra schema fields, unsupported assets, traversal, hidden,
+absolute, nonportable or colliding paths, noncanonical base64, invalid UTF-8,
+incorrect lengths/hashes and identity metadata inconsistent with note properties
+are rejected before writes. Integrity does not establish that a package is honest,
+that a claim is supported, or that copied evidence is current.
+
+Choose a new **top-level folder outside all text/PDF grants and exclusions**.
+Review every old-to-new destination, file size/hash, preserved ID/properties,
+readable text, link mapping and duplicate-ID warning. Existing identity coverage
+is limited to the permitted index; unpermitted identities remain unknown.
+Import creates byte-exact copies (including BOM/CRLF) and refuses existing roots,
+files, parent-file conflicts and case/Unicode collisions. Package, settings or
+indexed identity changes require a new preview. Writes are explicit; permissions
+and source notes never change. After inspection, explicitly grant only the project
+folders and PDFs you want to use.
+
+Links, project associations, IDs and provenance are not rewritten. Fully qualified
+links may still name original paths. Stable text IDs can resolve moved exact
+sources after a grant if unique. PDF provenance deliberately stays unavailable
+until you explicitly consent to the copied original and create a new extraction.
+Keep old extracted/output notes as history; importing never freshens them.
+
+Vault I/O is not atomic. A bounded plugin-local `project-imports.json` journal
+records intent, file hashes, completed copies and an uncertain write before each
+create. It retains up to100 receipts without automatic pruning; full or invalid
+history blocks imports with instructions to preserve it. One import/recovery can
+run at a time. Cancel, reload or disk failure can leave folders/files; nothing is
+automatically deleted. Reopen the command and validate the exact unchanged package
+to review recovery. Matching uncertain files can be explicitly adopted without
+claiming who created them; only missing reviewed copies are created. Later edits,
+foreign files or changed packages are refused. **Keep partial files and close
+recovery** preserves copies/history and permits a different new import. A folder
+created just before a journal failure may require this conservative path. Restore
+invalid journals only from your own known good backup; never reset history to
+force a retry. This is a new-copy import, not a destructive vault restore.
+
+Release0.3.0 includes191 explicitly inventoried files and preserves earlier build
+artifacts in version-specific staging. `node scripts/verify-package.mjs dist/thread-0.3.0.zip` checks exact paths, ZIP records/CRC, production bytes,
+PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
+from the installed plugin. This private build has no API/hosting subscription;
+local storage, compute and electricity still apply.

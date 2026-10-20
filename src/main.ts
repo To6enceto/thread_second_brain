@@ -1,5 +1,8 @@
 import {PdfModal} from "./ui/pdf-modal.ts";
 import {ExportModal} from "./ui/export-modal.ts";
+import {ProjectImportModal} from "./ui/import-modal.ts";
+import {emptyImports,loadProjectImports,importRoot,type ImportState,type ImportPort} from "./portability/import.ts";
+import {packagePath,byteHash} from "./portability/format.ts";
 import {PACKAGE_LIMITS} from "./portability/format.ts";
 import {exportDestination} from "./portability/write.ts";
 import type {ExportPort} from "./portability/export.ts";
@@ -74,6 +77,9 @@ export default class ThreadPlugin extends Plugin {
   imports=new ImportRegistry();
   importsWarning="";
   active=true;
+  projectImports:ImportState=emptyImports();
+  projectImportsText:string|null=null;
+  projectImportsWarning="";
   changes!:ChangeManager;
   changesWarning="";
   changesText="";
@@ -84,6 +90,8 @@ export default class ThreadPlugin extends Plugin {
   async onload(): Promise<void> {
     this.active=true;
     this.settings = loadSettings(await this.loadData());
+    try{if(await this.app.vault.adapter.exists(this.projectImportsPath())){const text=await this.app.vault.adapter.read(this.projectImportsPath());if(new TextEncoder().encode(text).length>16*1048576)throw Error('History exceeds metadata budget.');this.projectImports=loadProjectImports(JSON.parse(text));this.projectImportsText=text;}}
+    catch{this.projectImportsWarning="Project import history is invalid or unavailable. Preserve project-imports.json and restore a known good copy; Thread will not overwrite it.";}
     try{if(await this.app.vault.adapter.exists(this.renamesPath()))this.renames=loadRenames(JSON.parse(await this.app.vault.adapter.read(this.renamesPath())));}catch{new Notice("Thread legacy rename metadata is unavailable; stable source IDs still resolve. Check source freshness before reuse.");}
     this.index.renames=this.renames;
     this.changes=this.createChangeManager();
@@ -104,6 +112,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
     this.addCommand({id:"extract-pdf",name:"Extract local PDF",callback:()=>this.openPdf()});
     this.addCommand({id:"export-project",name:"Export project checkpoint",callback:()=>this.openProjectExport()});
+    this.addCommand({id:"import-project",name:"Import project package and recovery",callback:()=>this.openProjectImport()});
     this.addCommand({id:"index-coverage",name:"Text index coverage and budgets",callback:()=>this.openIndexCoverage()});
     this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
     this.addCommand({id:"all-projects",name:"All permitted projects",callback:()=>this.openProjectOverview()});
@@ -153,6 +162,24 @@ export default class ThreadPlugin extends Plugin {
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
   openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
   openProjectExport():void{const modal=new ExportModal(this);this.modals.add(modal);modal.open();}
+  openProjectImport():void{const modal=new ProjectImportModal(this);this.modals.add(modal);modal.open();}
+  projectImportsPath():string{return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/project-imports.json`;}
+  async saveProjectImports(state:ImportState):Promise<void>{
+    if(this.projectImportsWarning||!this.active)throw Error(this.projectImportsWarning||'Thread stopped.');
+    try{const exists=await this.app.vault.adapter.exists(this.projectImportsPath()),before=exists?await this.app.vault.adapter.read(this.projectImportsPath()):null;if(before!==this.projectImportsText)throw Error('History changed in another instance. Reload Thread.');loadProjectImports(state);const text=JSON.stringify(state);if(new TextEncoder().encode(text).length>16*1048576)throw Error('History metadata budget exceeded.');await this.app.vault.adapter.write(this.projectImportsPath(),text);this.projectImportsText=text;}
+    catch(error){this.projectImportsWarning='Project import history could not be saved safely. Preserve project-imports.json and partial copies, then reload Thread to inspect recovery.';throw error;}
+  }
+  acquireProjectImport():()=>void{
+    const app=this.app as typeof this.app&{[key:symbol]:unknown},key=Symbol.for('thread.project-import-lease');if(app[key])throw Error('Another project import or recovery operation is running. Wait for it to finish.');const token={};app[key]=token;return()=>{if(app[key]===token)delete app[key];};
+  }
+  async readProjectPackage(path:string,current:()=>boolean):Promise<Uint8Array>{
+    const check=()=>{packagePath(path);if(!path.endsWith('.thread-project.json')||this.settings.excludedPaths.some(p=>isWithin(path,p))||!this.active||!current())throw Error('Package is unavailable, excluded or changed. Select and validate again.');};check();const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile)||file.stat.size>PACKAGE_LIMITS.serializedBytes)throw Error('Select a visible package of at most48 MiB.');const bytes=new Uint8Array(await this.app.vault.readBinary(file));check();if(file.path!==path||this.app.vault.getAbstractFileByPath(path)!==file||bytes.length>PACKAGE_LIMITS.serializedBytes)throw Error('Selected package changed or exceeded its limit.');return bytes;
+  }
+  projectImportPort(current:()=>boolean):ImportPort{
+    const check=(root:string,entries:ImportState['receipts'][number]['entries'])=>{if(!this.active||!current())throw Error('Import preview changed.');importRoot(root,this.settings);const aliases=new Map<string,string>();for(const e of entries){packagePath(e.path);if(!isWithin(e.path,root))throw Error('Invalid destination root.');const parts=e.path.split('/');for(let n=1;n<=parts.length;n++){const path=parts.slice(0,n).join('/');aliases.set(path.toLowerCase(),path);}}
+      for(const file of this.app.vault.getAllLoadedFiles()){const expected=aliases.get(file.path.normalize('NFC').toLowerCase());if(expected&&expected!==file.path)throw Error('A destination collides by case or Unicode normalization. Choose a new folder.');}};
+    return{current,check,kind:path=>{const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?'file':file instanceof TFolder?'folder':null;},hash:async path=>{if(!current())throw Error('Import changed.');const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile)||file.stat.size>PACKAGE_LIMITS.pdfBytes)throw Error('Imported copy is missing or exceeds its limit.');const bytes=new Uint8Array(await this.app.vault.readBinary(file));if(!current()||file.path!==path||bytes.length>PACKAGE_LIMITS.pdfBytes)throw Error('Imported copy changed.');return byteHash(bytes);},persist:state=>this.saveProjectImports(state),folder:async path=>{if(!current())throw Error('Import changed.');await this.app.vault.createFolder(path);},create:async(path,bytes)=>{if(!current())throw Error('Import changed.');await this.app.vault.createBinary(path,Uint8Array.from(bytes).buffer);}};
+  }
   projectExportPort(current:()=>boolean):ExportPort{
     const settings=structuredClone(this.settings),snapshot=JSON.stringify(settings);
     const ready=()=>this.active&&current()&&snapshot===JSON.stringify(this.settings);
@@ -463,6 +490,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
+    for(const modal of this.modals)if(modal instanceof ProjectImportModal)modal.packageChanged(path,folder);
     if(!folder&&/\.pdf$/i.test(path)&&(mayReadPdf(path,this.settings)||this.index.binaries.has(path)||this.index.entries.some(e=>e.pdf?.path===path))){
       const affected=this.indexUpdates.invalidate([path],this.settings);this.notifySources(affected);void this.persistIndex().catch(()=>new Notice("Thread could not scrub PDF-derived cache. Check vault write access and rebuild."));this.queueIndex();return;
     }

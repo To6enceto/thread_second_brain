@@ -2,6 +2,8 @@ import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {crc32} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {verifiedPdfPackageFiles} from './pdf-assets.mjs';
+const args=process.argv.slice(2);if(args.length&&!(args.length===2&&args[0]==='--out-dir'))throw Error('Usage: package.mjs [--out-dir directory]');
+const out=args[1]??'dist';
 const manifest=JSON.parse(readFileSync('manifest.json','utf8'));
 const pkg=JSON.parse(readFileSync('package.json','utf8'));
 if(manifest.id!=='thread'||manifest.version!==pkg.version||!/^\d+\.\d+\.\d+$/.test(manifest.version)||manifest.isDesktopOnly!==true)throw new Error('Thread release metadata is inconsistent.');
@@ -16,5 +18,5 @@ for(const {name,bytes} of entries){
  const directory=Buffer.alloc(46);directory.writeUInt32LE(0x02014b50);directory.writeUInt16LE(20,4);directory.writeUInt16LE(20,6);directory.writeUInt16LE(33,14);directory.writeUInt32LE(crc,16);directory.writeUInt32LE(bytes.length,20);directory.writeUInt32LE(bytes.length,24);directory.writeUInt16LE(name.length,28);directory.writeUInt32LE(offset,42);central.push(directory,name);offset+=header.length+name.length+bytes.length;
 }
 const directory=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(directory.length,12);end.writeUInt32LE(offset,16);
-const archive=Buffer.concat([...local,directory,end]);mkdirSync('dist/thread',{recursive:true});for(let i=0;i<names.length;i++){const target='dist/thread/'+names[i];mkdirSync(target.slice(0,target.lastIndexOf('/')),{recursive:true});writeFileSync(target,entries[i].bytes);}
-const path=`dist/thread-${manifest.version}.zip`;writeFileSync(path,archive);console.log(`${path} | ${archive.length} bytes | SHA-256 ${createHash('sha256').update(archive).digest('hex')}`);
+const archive=Buffer.concat([...local,directory,end]);const staging=`${out}/thread-${manifest.version}`;mkdirSync(staging,{recursive:true});for(let i=0;i<names.length;i++){const target=staging+'/'+names[i];mkdirSync(target.slice(0,target.lastIndexOf('/')),{recursive:true});writeFileSync(target,entries[i].bytes);}
+const path=`${out}/thread-${manifest.version}.zip`;writeFileSync(path,archive);console.log(`${path} | ${archive.length} bytes | SHA-256 ${createHash('sha256').update(archive).digest('hex')}`);

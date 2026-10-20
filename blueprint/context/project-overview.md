@@ -23,8 +23,8 @@ and Claude Code are development assistants, not runtime prerequisites.
 
 ## Usage model
 
-Current verified baseline is private local 0.2.0 (features 1-21). The next queue
-is 22-34; planning approval does not claim those features are implemented.
+Private local0.3.0 extends the baseline through the approved22-34 queue.
+Exact verification and limits live in each immutable feature archive.
 
 - One user and one active vault per plugin instance; several projects per vault.
 - Current development is on Linux. Target desktop Linux, macOS, and Windows;
@@ -43,10 +43,9 @@ is 22-34; planning approval does not claim those features are implemented.
 
 ## Features
 
-IDs remain stable. Features 1-21 and their immutable archives are complete;
-22-34 are approved but pending. The ten proposals are retained, splitting retrieval,
-PDF support and portability into two features each. Questions precede review events;
-section indexing precedes broader retrieval/PDF evidence; export precedes import.
+IDs remain stable; preserve features1-21 and their immutable archive bytes.
+Questions precede review events; section indexing precedes broader retrieval/PDF
+evidence; export precedes import. Each completion requires native evidence.
 
 1. **Local project briefings** - Sourced Resume with facts, gaps, cancellation and local setup.
 2. **Reusable project workspaces** - Map folders or preview starter notes without overwrites.
@@ -185,8 +184,7 @@ Local cloud-disabled loopback Ollama supplies structured text and optional
 embeddings. Models/runtime are separate downloads, never silently installed.
 Use incremental text/link retrieval and bounded hybrid search with model-identity,
 vector, cancellation and lifecycle checks. No mandatory vector database/backend.
-A local appropriately licensed PDF parser such as PDF.js is approved as a candidate,
-subject to implementation verification. Bundle required workers/assets locally;
+PDF.js6.4.299 runs in an owned bounded local worker. Bundle required assets locally;
 no CDN, remote fonts/links, document scripts or runtime fetch dependency.
 
 Pipeline: current permitted sources -> bounded index/retrieval/explicit selection ->
@@ -221,10 +219,11 @@ contextual dialogs must not leak excluded paths or cached excerpts.
 ## Deployment
 
 Desktop plugin, no host/domain/remote database/cron/remote worker. Current private
-0.2.0 requires Obsidian 1.14.4 and ships main.js, manifest.json, styles.css in
-dist/thread-0.2.0.zip to <vault>/.obsidian/plugins/thread/. Ollama/model setup is
+0.3.0 requires Obsidian1.14.4 and ships191 inventoried files (main.js, manifest,
+styles, PDF worker/CMaps/fonts/licenses) in dist/thread-0.3.0.zip to <vault>/.obsidian/plugins/thread/. Ollama/model setup is
 separate and local-only; no silent install/download. Inference works offline after
-setup. Preserve data.json, changes.json, imports.json and renames.json on upgrade.
+setup. Preserve data.json, changes.json, imports.json, project-imports.json and
+renames.json on upgrade.
 Keep independent backups; writes are not atomic and the journal is bounded.
 Existing Git push authorization does not authorize force pushes, public release/
 license, deployment, paid services, system-wide installs or destructive actions.
@@ -236,67 +235,64 @@ license, deployment, paid services, system-wide installs or destructive actions.
 - Tested baseline: Linux, Obsidian 1.14.4, Ollama 0.40.4 and qwen3:4b-instruct.
   Other platforms/models need separate evidence. Personal vault grants and PDF
   consent remain explicit user choices.
-- The next private version and exact dependency/package inventory are established
-  during feature specs/release checks. Public licensing/distribution is deferred.
+- Private0.3.0 uses version-specific staging and ZIP/CRC/SHA/resource/license
+  verification. Public licensing/distribution is deferred.
 
 No unresolved product conflict blocks 22-34. The plans now explicitly approve local
 PDF extraction; OCR/audio/web/cloud and the remaining deferrals still apply.
 
-## Approved next-release data and contracts
+## Implemented contracts (22-34)
 
-Keep durable additions readable in Markdown; no forced legacy conversion. Freeze
-exact validated namespaced schemas/compatibility in each spec before consumers
-rely on them. Logical records derived from the plans:
+Exact schemas, budgets, evidence and limitations are frozen in feature archives.
+Keep records readable in Markdown and preserve raw history. No forced conversion.
 
-| Planned record | Fields and relationship |
-| --- | --- |
-| Question (24) | id, type:question, project, status:open/investigating/answered, recorded/updated dates, question, optional answer/evidence/decision links; preserve prior answers/reasons when explicitly reopened. |
-| Review event (25) | Stable identity, distinct review-event kind, project/date, reviewed/no-change or snoozed action, optional revisit date, target/source IDs and hashes, optional follow-up question. Never a generated review baseline. |
-| Milestone/next action (26-27) | Explicit user-recorded project text, date/identity and source link as needed. Preview chosen next-action writes; no inferred event history/priority. |
-| PDF extraction (31-32) | Original identity/path/binary hash, explicit read consent, extraction version, page/text mapping, limits and derived source identity. Pages retain original-file dependency. |
-| Project package (33) | Versioned manifest, package/project identity, creation time, relative entry paths/types/byte lengths/hashes, safe provenance/link mapping, inventory and omissions. |
-| Import preview (34) | Validated package entries bound to reviewed bytes, new destinations, identity/link mapping and collisions; imported copies receive no implicit read grants. |
+- Editor selections:1-4000 UTF-16 units, saved-buffer/raw-hash/range identity,
+  permission and dirty/stale-output checks. Selection grants no new access.
+- Workbench: retrieve, explicitly include/pin/exclude, inspect exact bounded context,
+  then Generate. Evidence/input changes revoke answers and save previews.
+- Questions: thread_question_version1 with explicit open/investigating/answered
+  states, append-only cited answers and reopening history. Exact scalar/CAS writes.
+- Review events: thread_review_event_version1, explicit reviewed/snoozed snapshots
+  and follow-ups. Acknowledgement never accepts decisions or freshens output.
+  Traverse all dependencies, including private history and PDF original hashes.
+- Timeline: event/capture/modified dates and current decision status are distinct.
+  Bound200 events/2000 records. Milestones/next actions need explicit new-note save.
+- Multi-project:20 projects/2000 records, permitted unique IDs, explicit status
+  filters; no inferred priority. Health:500 files,1 MiB/file,8 MiB total,200 results;
+  individual exact reviewed date/heading repairs retain CAS/undo/recovery guarantees.
+- Index profiles conservatively bound files/read bytes/sections/characters/chunks/
+  serialized metadata. Stat before reads and retain full raw SHA. Honest coverage,
+  cancellation/unready states, incremental unaffected retention and immediate
+  invalidation. Broader hybrid request budgets128/20,384/35,768/50; explicit
+  Search more never generates. Keyword stays usable without a model.
+- PDF schema thread_pdf_version1 binds full original SHA, parser/extraction version
+  and quoted pages. Exact pdfPaths consent never follows rename; exclusions win.
+  Offline owned PDF.js worker rejects encryption, malformed/image-only PDFs,
+  document URLs/scripts/XFA/Wasm/system fonts and corrupt assets. Limits16 MiB,
+  200 total accepted pages,first40 examined,8000 chars/page,100000 chars,30 seconds;
+  current-source verification10 originals/32 MiB. Cancel terminates/discards. All
+  source/page reuse and review snapshots verify transitive extraction/original
+  hashes. Original trust is volatile, never restored from persisted caches.
+- Export version1 uncompressed .thread-project.json:100 files,2 MiB/text,
+ 16 MiB/PDF,32 MiB expanded,48 MiB serialized. Portable NFC paths with case/folder
+  collision refusal. PDFs explicitly selected/off by default. Exact bytes/IDs.
+  All retained copied provenance must be supported/current/permitted, including
+  older synthesis blocks; whole-note omission otherwise. Manifest omissions are
+  generic; no excluded reference paths/settings/caches/journal originals/models.
+- Import validates exact schemas/types/paths/base64/UTF8/counts/sizes/SHA/identity
+  before writes. Explicit package read includes embedded PDF bytes but grants
+  nothing ongoing. Exact destination/ID/link mapping, duplicate IDs and limited
+  current-index coverage. New top-level folder outside all text/PDF grants and
+  exclusions. Preserve bytes/IDs/links/provenance; refuse all existing/concurrent
+  destinations and aliases. Changed package/settings/identities need renewed preview.
+  One app-wide lease; plugin-local project-imports.json version1 retains up to100
+  receipts (package SHA/destinations/hashes/created/inFlight intent before writes).
+  Invalid/full history blocks; no auto-pruning. Explicit recovery verifies unchanged
+  package/copies, can adopt matching uncertain files without ownership claims,
+  refuses later edits/foreign files. Keep-partial closes recovery without deletion.
+  No destructive restore, link rebasing or provenance freshening.
 
-- Editor selection is not a broader grant. Reconcile changed/unsaved text before
-  durable citation/save. Evidence pins cannot override scope, freshness or context
-  budgets. Show final included/omitted passages and actual claim support.
-- Queue review/snooze is explicit and snapshot-bound. New relevant changes resurface
-  even after snoozing; acknowledgement never accepts decisions, resolves questions
-  or makes stale output current. No scheduler or automatic resolution.
-- Timeline distinguishes recorded event dates from modification dates and leaves
-  historical gaps unknown. Portfolio and health checks use permitted records,
-  transparent counts/filters, no mandatory AI or fabricated priority/health scores.
-  Repair one permitted note at a time via preview; protected sources get manual guidance.
-- Current limits include 50000 body characters/note, 16000 context characters,
-  128 semantic candidates and 512 vectors. Features 29-30 replace prefix/candidate
-  coverage with explicit bounded section/search budgets, progress, cancellation,
-  search-more and measured responsiveness/read/resource use, not unlimited work.
-  Derived caches can rebuild; settings and durable journals stay compatible.
-- Existing Markdown/text grants do not silently enable binary PDF reads. Explicit
-  local selection/consent and exclusions apply before import/extraction/reuse.
-  Preview bounded selectable text; handle image-only/encrypted/unsupported files
-  visibly. Preserve originals; changes/removal/exclusions invalidate extracted
-  text/dependent output. Re-extraction is explicit; page navigation checks current
-  original hashes. No OCR or script execution.
-- Export explicitly selected permitted files with inventory/omissions and recheck
-  scopes/snapshots. Default to omitting scope-invalid/stale derived evidence.
-  Do not enumerate excluded reference paths or automatically include settings,
-  secrets, caches, recovery originals, models or runtime files. A selected
-  checkpoint supplements an independent backup, not the last-20 recovery journal.
-- Import treats packages as untrusted: validate version/types/relative paths,
-  file counts, compressed/expanded sizes and hashes before writes. Refuse traversal,
-  links/unsupported executable assets and malformed input. Preview new-folder copies,
-  link/ID mapping and collisions; never overwrite notes or silently rewrite existing
-  IDs. Revalidate destinations per write and preserve partial-failure recovery.
-- All ten proposals keep the free local runtime. Larger indexes/PDFs/packages use
-  storage, memory, CPU and power; labor/development assistant costs remain separate.
-  No required hosted API, subscription or new system-wide service.
-- Verify each feature with meaningful tests, required independent review and actual
-  synthetic Obsidian acceptance. Use authored synthetic PDFs/packages for malformed
-  inputs, limits, hashes, traversal, collisions and recovery. Extend quality fixtures
-  when evidence/retrieval changes; use real local inference where relevant and
-  prove cancellation, immediate exclusions and current source/page links.
-- Preserve 1-21 archives and durable note/import/rename/change history. Package and
-  install the exact final artifact after the queue passes; verify its actual inventory
-  (including PDF assets), reproducibility, offline operation and stated platform/
-  scale limits. Previous release evidence never proves untested new behavior.
+Verify is npm run verify. Offline evaluation/index/retrieval fixtures and opt-in
+live-local inference supplement actual synthetic Obsidian/PDF/package acceptance,
+keyboard/themes, permission/staleness/cancel/conflict/recovery races. Preserve
+prior artifacts/reports, notes and durable history. No public release is implied.
