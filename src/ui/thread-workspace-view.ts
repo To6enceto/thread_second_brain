@@ -74,6 +74,7 @@ export class ThreadWorkspaceView extends BriefingView {
       ]);
     } else if (this.area === "actions") {
       card("Record progress", "Wrap up a session or review the week. Saving a record remains explicit.", [
+        ["Project actions", () => this.plugin.openActions()],
         ["Wrap up", () => this.plugin.openSession()], ["Weekly review", () => this.plugin.openWeekly()],
         ["Timeline", () => this.plugin.openTimeline()]
       ]);

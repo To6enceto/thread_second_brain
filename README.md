@@ -1,5 +1,8 @@
 # Thread
 
+Project actions: use **Thread: Project actions** from the command palette, or **Project actions** in the sidebar's All tools / Routine group or the full workspace's Actions area. Choose a permitted project first. Enter a note name, title, reason and reported date, then **Preview action** and **Save previewed note** to create a Planned record. To change state, choose **Record a state transition**, select an action and a different state, enter your reason/date, then **Preview action** and review/apply the exact change in Changes. Every transition stays in the Markdown history; Done is your report, not independent verification. Supporting notes/questions/decisions are optional and never modified by this workflow. Stale references, duplicate IDs or edited/unsupported records require manual inspection before further transitions. History is bounded to 64 events/100 reference snapshots and never silently trimmed. Legacy chosen-next-action notes remain unchanged.
+
+
 Thread is a desktop Obsidian plugin for returning to projects, finding evidence,
 recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No

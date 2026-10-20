@@ -16,6 +16,7 @@ import { indexBudget } from "./settings/index-budget.ts";
 import { indexCoverage, retainIndexEntries, type IndexReadStats } from "./vault/index-coverage.ts";
 import { HealthModal } from "./ui/health-modal.ts";
 import { QuestionsModal } from "./ui/questions-modal.ts";
+import { ActionModal } from "./ui/action-modal.ts";
 import { ProjectOverviewModal } from "./ui/project-overview-modal.ts";
 import { TimelineModal } from "./ui/timeline-modal.ts";
 import { questionReviewReferences } from "./vault/review-events.ts";
@@ -123,6 +124,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
+    this.addCommand({id:"project-actions",name:"Project actions",callback:()=>this.openActions()});
     this.addCommand({id:"extract-pdf",name:"Extract local PDF",callback:()=>this.openPdf()});
     this.addCommand({id:"export-project",name:"Export project checkpoint",callback:()=>this.openProjectExport()});
     this.addCommand({id:"import-project",name:"Import project package and recovery",callback:()=>this.openProjectImport()});
@@ -173,6 +175,7 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
+  openActions():void{const modal=new ActionModal(this);this.modals.add(modal);modal.open();}
   openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
   openProjectExport():void{const modal=new ExportModal(this);this.modals.add(modal);modal.open();}
   openProjectImport():void{const modal=new ProjectImportModal(this);this.modals.add(modal);modal.open();}

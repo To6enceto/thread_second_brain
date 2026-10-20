@@ -105,7 +105,7 @@ export class BriefingView extends ItemView {
       ["Evidence", [["Find evidence", () => this.plugin.openRecall()], ["Questions", () => this.plugin.openQuestions()], ["Source freshness", () => this.plugin.openFreshness()], ["Local PDF extraction", () => this.plugin.openPdf()]]],
       ["Decisions", [["Decisions", () => this.plugin.openDecisions()], ["Review decisions", () => this.plugin.openDecisionReview()]]],
       ["Knowledge", [["Knowledge", () => this.plugin.openKnowledge()], ["Changes", () => this.plugin.openChanges()]]],
-      ["Routine", [["Timeline", () => this.plugin.openTimeline()], ["Weekly review", () => this.plugin.openWeekly()], ["Workspaces", () => this.plugin.openWorkspace()]]],
+      ["Routine", [["Project actions", () => this.plugin.openActions()], ["Timeline", () => this.plugin.openTimeline()], ["Weekly review", () => this.plugin.openWeekly()], ["Workspaces", () => this.plugin.openWorkspace()]]],
       ["Vault", [["Vault health", () => this.plugin.openHealth()], ["Index coverage", () => this.plugin.openIndexCoverage()]]],
       ["Packages", [["Export checkpoint", () => this.plugin.openProjectExport()], ["Import package / recovery", () => this.plugin.openProjectImport()]]]
     ] as const) {
