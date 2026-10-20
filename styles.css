@@ -288,6 +288,9 @@
   .thread-view .thread-resume { min-height: 84px; padding-bottom: 48px; }
 }
 .thread-conversation-history { margin-block: 12px; }
+.thread-conversation-choice { display: flex; align-items: center; gap: 8px; min-height: 32px; padding-block: 6px; }
+.thread-conversation-choice > input[type="checkbox"] { min-height: 0; flex-shrink: 0; }
+.thread-conversation-choice > span { overflow-wrap: anywhere; }
 .thread-conversation-turn { border: 1.5px dashed var(--thread-ai); border-radius: var(--thread-radius-sm); padding: 10px; margin-block: 8px; }
 .thread-conversation-turn > summary { cursor: pointer; min-height: 32px; overflow-wrap: anywhere; }
 .thread-conversation-turn .thread-source { white-space: normal; overflow-wrap: anywhere; min-height: 32px; }

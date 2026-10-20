@@ -1,6 +1,7 @@
 import { Setting } from "obsidian";
 import { ThreadModal } from "./thread-modal.ts";
 import { NewNoteModal } from "./new-note-modal.ts";
+import { ConversationSaveModal } from "./conversation-save-modal.ts";
 import { buildEvidence,contextCoverageText,type EvidenceBundle } from "../vault/evidence.ts";
 import { selectContext,type EvidenceChoice } from "../vault/workbench.ts";
 import { hitsToNotes } from "../vault/index.ts";
@@ -25,7 +26,8 @@ export class AskModal extends ThreadModal {
   private prepared:PreparedContext|null=null;
   private inputs=0;
   private corrections:ClaimCorrections={};
-  private previews=new Set<NewNoteModal>();
+  private previews=new Set<ThreadModal>();
+  private generatedAt="";
   private turns:ConversationTurn[]=[];
   private historyEl:HTMLElement|null=null;
   private questionInput:HTMLTextAreaElement|null=null;
@@ -39,7 +41,7 @@ export class AskModal extends ThreadModal {
   }
   private revokePreviews(message:string):void{for(const preview of this.previews)if(!preview.closed)preview.invalidate(message);this.previews.clear();}
   private resetCurrent(message="Retrieve evidence for this turn."):void{
-    super.invalidate(message);this.revokePreviews(message);this.corrections={};this.answer=null;this.bundle=null;this.prepared=null;
+    super.invalidate(message);this.revokePreviews(message);this.corrections={};this.answer=null;this.bundle=null;this.prepared=null;this.generatedAt="";
     this.watchPaths([]);if(!this.turns.length)this.dependencies=null;if(this.askButton)this.askButton.disabled=false;this.renderHistory();
   }
   override invalidate(message="Notes or settings changed. Start the conversation again."):void{
@@ -60,6 +62,18 @@ export class AskModal extends ThreadModal {
     if(this.reuseButton)this.reuseButton.disabled=!this.turns.length;
     const root=this.historyEl;if(!root)return;root.empty();
     root.createEl("p",{text:`Turn ${this.turns.length+1} of ${MAX_CONVERSATION_TURNS}. Earlier turns are held only in this open conversation.`,cls:"thread-meta"});
+    const save=root.createEl("button",{text:"Save conversation"});save.disabled=!this.turns.length&&!this.answer;
+    save.onclick=()=>{
+      if(this.closed||save.disabled)return;
+      try{
+        const turns=[...this.turns],prepared=this.prepared;
+        if(this.answer&&this.bundle&&prepared)turns.push(snapshotTurn({question:prepared.question,answer:this.answer,corrections:this.corrections,bundle:this.bundle,choices:prepared.choices,generatedAt:this.generatedAt,settings:prepared.settings,vault:prepared.vault,projectIdentity:prepared.projectIdentity},turns.length));
+        if(!turns.length)throw new Error("Generate an answer before saving a conversation.");
+        const revision=this.inputs,first=turns[0]!;
+        const draft=new ConversationSaveModal(this.plugin,turns,async()=>!this.closed&&this.inputs===revision&&await this.historyCurrent(turns,first.settings,first.vault,first.projectIdentity)&&!this.closed&&this.inputs===revision);
+        for(const old of this.previews)if(old.closed)this.previews.delete(old);this.previews.add(draft);this.plugin.modals.add(draft);draft.open();
+      }catch(error){this.status?.setText(error instanceof Error?error.message:"Could not prepare conversation save.");}
+    };
     for(const [index,turn] of this.turns.entries()){
       const details=root.createEl("details",{cls:"thread-conversation-turn"});details.createEl("summary",{text:`Earlier turn ${index+1}: ${turn.question}`});
       details.createEl("p",{text:`AI conversation context, not evidence. ${turn.generatedAt} · ${turn.settings.model}`,cls:"thread-meta"});
@@ -173,7 +187,7 @@ export class AskModal extends ThreadModal {
       top.createEl("button",{text:`Open evidence ${source.id}`,cls:"thread-source",attr:{title:source.path}}).onclick=()=>{if(!this.live(prepared))return;void this.plugin.openIndexedSource(source.path,prepared.candidates.noteHashes[source.path]!,source.heading,()=>this.live(prepared)).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
       new Setting(top).setName(`Use ${source.id}`).addDropdown(d=>{d.selectEl.setAttribute("aria-label",`Evidence choice ${source.id}`);d.addOption("include","Include").addOption("exclude","Exclude").addOption("pin","Pin first").setValue(prepared.choices[source.id]??"include").onChange(value=>{
         if(!this.live(prepared)||!["include","exclude","pin"].includes(value))return;
-        prepared.choices[source.id]=value as EvidenceChoice;this.inputs++;this.epoch++;this.controller?.abort();this.controller=null;this.revokePreviews("Evidence choices changed. Generate a new preview.");this.corrections={};this.answer=null;this.bundle=null;answerEl.empty();showContext();this.status?.setText("Evidence choices changed. Generate again from the renewed context.");
+        prepared.choices[source.id]=value as EvidenceChoice;this.inputs++;this.epoch++;this.controller?.abort();this.controller=null;this.revokePreviews("Evidence choices changed. Generate a new preview.");this.corrections={};this.answer=null;this.bundle=null;this.generatedAt="";this.renderHistory();answerEl.empty();showContext();this.status?.setText("Evidence choices changed. Generate again from the renewed context.");
       });});
       row.createEl("p",{text:`${source.path.split("/").pop()}${source.heading?` › ${source.heading}`:""}`,cls:"thread-evidence-path",attr:{title:source.path}});
       row.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
@@ -182,7 +196,7 @@ export class AskModal extends ThreadModal {
   }
   private async generate(prepared:PreparedContext,bundle:EvidenceBundle,answerEl:HTMLElement,button:HTMLButtonElement):Promise<void>{
     if(!bundle.sources.length||!this.live(prepared))return;
-    this.inputs++;this.revokePreviews("Generating a new answer. Generate a new preview afterward.");this.corrections={};this.answer=null;this.bundle=null;
+    this.inputs++;this.revokePreviews("Generating a new answer. Generate a new preview afterward.");this.corrections={};this.answer=null;this.bundle=null;this.generatedAt="";this.renderHistory();
     const epoch=this.epoch,controller=new AbortController();this.controller=controller;button.disabled=true;answerEl.empty();
     const current=()=>this.live(prepared)&&epoch===this.epoch&&!controller.signal.aborted;
     this.status?.setText("Generating locally from the chosen context...");
@@ -195,7 +209,7 @@ export class AskModal extends ThreadModal {
       const after=await this.plugin.evidenceCurrent(bundle,prepared.settings)&&await this.historyCurrent(this.turns,prepared.settings,prepared.vault,prepared.projectIdentity);
       if(!current())return;
       if(!after){this.invalidate("Evidence changed. Start again.");return;}
-      this.answer=answer;this.bundle=bundle;this.renderAnswer(prepared,answer,bundle,answerEl,epoch,new Date().toISOString());
+      this.answer=answer;this.bundle=bundle;this.generatedAt=new Date().toISOString();this.renderAnswer(prepared,answer,bundle,answerEl,epoch,this.generatedAt);this.renderHistory();
       this.status?.setText(answer.supported?"Answer ready. Compare each claim with the cited excerpts.":"The chosen evidence does not establish an answer.");
     }catch(error){if(current())this.status?.setText(error instanceof Error?error.message:"Could not answer.");}
     finally{if(this.controller===controller){this.controller=null;if(this.live(prepared))button.disabled=false;}}

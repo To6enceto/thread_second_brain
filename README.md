@@ -120,8 +120,25 @@ not token, limits. **Start new conversation**, Cancel, close, relevant source
 changes and scope/project/settings changes revoke affected conversation outputs.
 
 **Preview answer note** still saves only the current reviewed answer and its
-provenance. Earlier turns are held in memory, never saved automatically. Explicit
-conversation saves are the next planned feature.
+provenance. **Save conversation** opens a separate draft where you choose completed
+turns and a new note name. All captured turns start selected. Choose **Preview
+conversation note**, inspect its destination and exact Markdown, then **Save
+previewed note**. Project conversations go under `Project/Conversations/`; wider
+scope uses the mapped Knowledge folder. Changing the selection, name or parent
+answer requires a renewed preview. Existing filenames are never overwritten.
+
+Saved conversations retain original turn numbers, questions, model/time, original
+claims, corrections, gaps, chosen source excerpts and provenance. An earlier turn
+used as context but omitted from the save is explicitly identified. Records are
+limited to six selected turns, 100 distinct references, 256 KiB of structured
+metadata and 1 MiB per complete note; choose fewer turns if a limit is reached.
+Nothing is saved automatically.
+
+Open the saved Markdown normally in Obsidian to read it. This does not resume a
+model request. Thread tracks its source freshness but keeps conversation prose
+and copied excerpts out of retrieval and selection-as-evidence. Unknown versions
+or manual changes to managed records fail closed; preserve the note and create a
+new reviewed conversation. Saved project information never grants read access.
 
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.

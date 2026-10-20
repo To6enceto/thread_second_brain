@@ -18,7 +18,7 @@ const compiled=await build({entryPoints:[new URL('./ask-modal.ts',import.meta.ur
  `}));
 }}]});
 const {AskModal}=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0]!.text).toString('base64')}`) as typeof import('./ask-modal.ts');
-interface Element {textContent:string;value:string;disabled:boolean;children:Element[];changed?:(value:string)=>void;onclick?:()=>Promise<void>;}
+interface Element {textContent:string;value:string;checked?:boolean;onchange?:()=>void;disabled:boolean;children:Element[];changed?:(value:string)=>void;onclick?:()=>Promise<void>;}
 const rendered=(element:Element):string=>element.textContent+'\n'+element.children.map(rendered).join('\n');
 test('actual workbench handlers require reviewed generation and revoke changed choices/previews',async()=>{
  const form={elements:[] as Element[],fields:new Map<string,Element>()};Reflect.set(globalThis,'__workbenchForm',form);
@@ -164,5 +164,67 @@ test('late evidence-reuse check cannot clear a newer conversation',async()=>{
   let resolve!: (value:boolean)=>void;f.plugin.evidenceCurrent=()=>new Promise<boolean>(r=>{resolve=r;});const old=f.button('Reuse previous evidence').onclick!();
   await f.button('Start new conversation').onclick!();f.plugin.evidenceCurrent=async()=>true;await f.begin();const current=f.modal.answer;resolve(false);await old;
   assert.equal(f.modal.answer,current);assert.match(f.modal.status!.textContent!,/Answer ready/);
+ }finally{f.clean();}
+});
+
+function conversationDraftControls(f:Awaited<ReturnType<typeof conversationFixture>>){
+ const draft=[...f.plugin.modals].filter(m=>(m as import('./thread-modal.ts').ThreadModal).contentEl.textContent!==undefined&&!('note' in (m as object))).at(-1) as import('./conversation-save-modal.ts').ConversationSaveModal;
+ assert.ok(draft);
+ const elements=(e:Element):Element[]=>[e,...e.children.flatMap(elements)];
+ const button=(label:string)=>{const found=elements(draft.contentEl as unknown as Element).find(e=>e.textContent===label);assert.ok(found,label);return found;};
+ const choose=(number:number,checked:boolean)=>{const field=f.form.fields.get(`Save turn ${number}`);assert.ok(field);field.checked=checked;field.onchange!();};
+ const preview=()=>[...f.plugin.modals].filter(m=>'note' in (m as object)).at(-1) as import('./new-note-modal.ts').NewNoteModal;
+ return{draft,button,choose,preview};
+}
+
+test('selected conversation save uses immutable corrected turns and renewed exact previews, including own folder creation',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();f.input('Claim text 1','FIRST_CORRECTION_CANARY');await f.follow();await f.generate();f.input('Claim text 1','SECOND_CORRECTION_CANARY');
+  const calls=f.state.calls.length;await f.button('Save conversation').onclick!();const d=conversationDraftControls(f);
+  assert.equal(f.form.fields.get('Save turn 1')!.checked,true);assert.equal(f.form.fields.get('Save turn 2')!.checked,true);
+  d.choose(1,false);f.input('New conversation note name','Selected conversation');await d.button('Preview conversation note').onclick!();let preview=d.preview();assert.ok(preview);assert.equal(f.state.created.length,0);
+  assert.match(preview.note.content,/## Turn 2/);assert.ok(!preview.note.content.includes('FIRST_CORRECTION_CANARY'));assert.ok(preview.note.content.includes('SECOND_CORRECTION_CANARY'));
+  assert.match(preview.note.content,/not included in this save/);assert.equal(preview.note.path,'P/Conversations/Selected conversation.md');
+  const oldBytes=preview.note.content;f.input('New conversation note name','Renamed conversation');assert.equal(preview.apply!.disabled,true);assert.equal(preview.note.content,oldBytes);
+  await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+  await d.button('Preview conversation note').onclick!();preview=d.preview();const approved={...preview.note};
+  f.plugin.createNotes=async(notes,validate,current)=>{f.modal.invalidate();await validate();assert.ok(current());f.state.created.push(structuredClone(notes));};
+  await preview.apply!.onclick!({} as PointerEvent);assert.deepEqual(f.state.created,[[approved]]);assert.equal(f.state.calls.length,calls,'Saving must not generate');
+ }finally{f.clean();}
+});
+
+test('conversation selection edits, parent edits, stale sources and close revoke save previews',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.follow();await f.generate();await f.button('Save conversation').onclick!();let d=conversationDraftControls(f);
+  await d.button('Preview conversation note').onclick!();let preview=d.preview();d.choose(1,false);assert.equal(preview.apply!.disabled,true);d.choose(2,false);assert.equal(d.button('Preview conversation note').disabled,true);
+  const count=f.plugin.modals.size;await d.button('Preview conversation note').onclick!();assert.equal(f.plugin.modals.size,count);d.choose(2,true);
+  await d.button('Preview conversation note').onclick!();preview=d.preview();f.input('Claim text 1','New correction after opening save');assert.equal(preview.apply!.disabled,true);assert.equal(d.button('Preview conversation note').disabled,true);assert.ok(!rendered(d.draft.contentEl as unknown as Element).includes('Why?'));
+  await f.button('Save conversation').onclick!();d=conversationDraftControls(f);await d.button('Preview conversation note').onclick!();preview=d.preview();f.state.fresh=false;await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);assert.match(preview.status!.textContent!,/changed/);f.state.fresh=true;
+  await d.button('Preview conversation note').onclick!();preview=d.preview();d.draft.close();await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+  await f.button('Save conversation').onclick!();d=conversationDraftControls(f);await d.button('Preview conversation note').onclick!();preview=d.preview();f.modal.close();await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+ }finally{f.clean();}
+});
+
+test('conversation save supports finalized and unanswered turns and refuses late changed selections',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Continue with follow-up').onclick!();assert.equal(f.modal.answer,null);await f.button('Save conversation').onclick!();let d=conversationDraftControls(f);
+  let resolve!:(fresh:boolean)=>void;f.plugin.evidenceCurrent=()=>new Promise<boolean>(r=>{resolve=r;});const old=d.button('Preview conversation note').onclick!();d.choose(1,false);resolve(true);await old;assert.equal([...f.plugin.modals].filter(m=>'note' in (m as object)).length,0);
+  d.draft.close();f.plugin.evidenceCurrent=async()=>true;await f.button('Start new conversation').onclick!();
+  Reflect.set(globalThis,'__workbenchModel',()=>Promise.resolve(JSON.stringify({supported:false,answer:[],gaps:['No measured result.']})));await f.begin();await f.button('Save conversation').onclick!();d=conversationDraftControls(f);await d.button('Preview conversation note').onclick!();const preview=d.preview();assert.match(preview.note.content,/did not establish an answer/);assert.match(preview.note.content,/No measured result/);
+  f.plugin.createNotes=async()=>{throw new Error('Already exists: P/Conversations/Test.md. Choose another name.');};await preview.apply!.onclick!({} as PointerEvent);assert.match(preview.status!.textContent!,/Already exists/);assert.equal(f.state.created.length,0);
+ }finally{f.clean();}
+});
+
+test('conversation save rechecks selection after its final asynchronous source validation',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Save conversation').onclick!();const d=conversationDraftControls(f);
+  await d.button('Preview conversation note').onclick!();const preview=d.preview();
+  let checks=0,resolve:((fresh:boolean)=>void)|undefined;
+  f.plugin.evidenceCurrent=()=>++checks===3?new Promise<boolean>(r=>{resolve=r;}):Promise.resolve(true);
+  const saving=preview.apply!.onclick!({} as PointerEvent);
+  for(let i=0;!resolve&&i<100;i++)await new Promise(r=>setImmediate(r));
+  assert.ok(resolve,'Final parent source check must be reached');
+  d.choose(1,false);resolve(true);await saving;
+  assert.equal(f.state.created.length,0);assert.match(preview.status!.textContent!,/changed/);
  }finally{f.clean();}
 });
