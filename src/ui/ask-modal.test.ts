@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 import type ThreadPlugin from "../main.ts";
 import { defaultSettings } from "../settings/settings.ts";
-import { indexNote } from "../vault/index.ts";
+import { indexNote, LocalIndex } from "../vault/index.ts";
+import { readMetadata } from "../vault/evidence.ts";
 const compiled=await build({entryPoints:[new URL('./ask-modal.ts',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'workbench-host',setup(builder){
  builder.onResolve({filter:/^obsidian$/},()=>({path:'host',namespace:'stub'}));builder.onResolve({filter:/intelligence\/ollama\.ts$/},()=>({path:'model',namespace:'stub'}));
  builder.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:args.path==='model'?`
  export function validateVectors(){throw new Error("Unexpected embedding call");}
  export class OllamaClient {generate(_model,prompt,signal){return globalThis.__workbenchModel(prompt,signal);}}
  `:`
+ export function parseYaml(yaml){return Object.fromEntries(yaml.split(/\\r?\\n/).map(line=>{const at=line.indexOf(':');return[line.slice(0,at),JSON.parse(line.slice(at+1))];}));}
  const state=()=>globalThis.__workbenchForm;
  class Element {constructor(tag='div',options={}){this.tagName=tag;this.textContent=options.text??'';this.children=[];this.disabled=false;this.value='';state().elements.push(this);if(options.attr?.['aria-label'])state().fields.set(options.attr['aria-label'],this);}
  createEl(tag,options={}){const child=new Element(tag,options);this.children.push(child);return child;}createDiv(options={}){return this.createEl('div',options);}addClass(){}focus(){state().focused=this;}empty(){this.children=[];this.textContent='';}setText(value){this.textContent=value;}setAttribute(key,value){if(key==='aria-label')state().fields.set(value,this);}}
@@ -96,8 +98,10 @@ async function conversationFixture(){
  const form={elements:[] as Element[],fields:new Map<string,Element>(),focused:null as Element|null};Reflect.set(globalThis,'__workbenchForm',form);
  const settings={...defaultSettings(),model:'local',allowedPaths:['P'],selectedProject:'P'};
  const entries=await Promise.all(['Budget is 20 euros.','Voice is postponed.'].map((text,i)=>indexNote({path:`P/${i}.md`,text,metadata:{type:'source'},modifiedAt:1},()=>null)));
- const state={fresh:true,identity:'project',calls:[] as {earlierConversation:unknown[];evidence:{id:string;excerpt:string}[]}[],created:[] as import('../vault/workspace.ts').NewNote[][],searches:0};
- const plugin={app:{},active:true,settings,index:{ready:true,revision:1},modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>state.fresh,projectIdentity:()=>state.identity,withDependencies:(v:unknown)=>v,
+ const index=new LocalIndex();index.entries=entries;index.ready=true;index.revision=1;
+ const files=new Map<string,string>();
+ const state={files,fresh:true,identity:'project',calls:[] as {earlierConversation:unknown[];evidence:{id:string;excerpt:string}[]}[],created:[] as import('../vault/workspace.ts').NewNote[][],searches:0};
+ const plugin={app:{vault:{adapter:{read:async(path:string)=>{const text=files.get(path);if(text===undefined)throw Error('Missing collection');return text;}}}},active:true,settings,index,modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>state.fresh,projectIdentity:()=>state.identity,withDependencies:(v:unknown)=>v,
   searchEvidence:async()=>{state.searches++;return{hits:entries.map(entry=>({entry,heading:'',excerpt:entry.chunks[0]!.excerpt,score:1}))};},
   createNotes:async(notes:import('../vault/workspace.ts').NewNote[],validate:()=>Promise<void>,current:()=>boolean)=>{await validate();assert.ok(current());state.created.push(structuredClone(notes));},openIndexedSource:async()=>{}};
  const model=(prompt:string)=>{const data=JSON.parse(prompt);state.calls.push(data);return Promise.resolve(JSON.stringify({supported:true,answer:[{text:data.evidence[0].excerpt,kind:'fact',sourceIds:[data.evidence[0].id]}],gaps:[]}));};Reflect.set(globalThis,'__workbenchModel',model);
@@ -226,5 +230,96 @@ test('conversation save rechecks selection after its final asynchronous source v
   assert.ok(resolve,'Final parent source check must be reached');
   d.choose(1,false);resolve(true);await saving;
   assert.equal(f.state.created.length,0);assert.match(preview.status!.textContent!,/changed/);
+ }finally{f.clean();}
+});
+
+function dialogButton(modal:import('./thread-modal.ts').ThreadModal,label:string){
+ const all=(e:Element):Element[]=>[e,...e.children.flatMap(all)];const found=all(modal.contentEl as unknown as Element).find(e=>e.textContent===label);assert.ok(found,label);return found;
+}
+async function savedCollectionFixture(f:Awaited<ReturnType<typeof conversationFixture>>){
+ await f.begin();f.input('Evidence choice S1','pin');f.input('Evidence choice S2','exclude');
+ const calls=f.state.calls.length;await f.button('Save research collection').onclick!();
+ const draft=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionSaveModal;
+ f.input('New collection note name','My research');await dialogButton(draft,'Preview collection note').onclick!();
+ const preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+ assert.ok(preview.note);assert.equal(f.state.created.length,0);assert.equal(f.state.calls.length,calls);
+ await preview.apply!.onclick!({} as PointerEvent);assert.deepEqual(f.state.created,[[preview.note]]);
+ const note=preview.note;
+ const parse=(yaml:string)=>Object.fromEntries(yaml.split(/\r?\n/).map(line=>{const at=line.indexOf(':');return[line.slice(0,at),JSON.parse(line.slice(at+1))];}));
+ f.state.files.set(note.path,note.content);f.plugin.index.entries.push(await indexNote({path:note.path,text:note.content,metadata:readMetadata(note.content,parse),modifiedAt:1},()=>null));
+ preview.close();draft.close();return note;
+}
+async function openCollectionFixture(f:Awaited<ReturnType<typeof conversationFixture>>,path:string){
+ f.input('Question','What budget is recorded?');await f.button('Open research collection').onclick!();
+ const dialog=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionOpenModal;await dialog.refresh();f.input('Research collection',path);await dialog.loadSelected();return dialog;
+}
+
+test('collection handlers save exact reference-only notes, reopen intent and generate only on request',async()=>{
+ const f=await conversationFixture();try{
+  const note=await savedCollectionFixture(f);assert.ok(!note.content.includes('Budget is 20 euros.')&&!note.content.includes('Voice is postponed.'));assert.match(note.content,/Reference 1 \(pin\)/);
+  const calls=f.state.calls.length,dialog=await openCollectionFixture(f,note.path);assert.match(rendered(dialog.contentEl as unknown as Element),/Budget is 20 euros/);assert.equal(f.state.calls.length,calls);assert.equal(f.form.fields.get('Collection choice 1')!.value,'pin');assert.equal(f.form.fields.get('Collection choice 2')!.value,'exclude');
+  await dialogButton(dialog,'Use collection in Ask').onclick!();assert.equal(f.modal.answer,null);assert.equal(f.state.calls.length,calls);assert.equal(f.form.fields.get('Evidence choice S1')!.value,'pin');
+  await f.generate();assert.equal(f.state.calls.length,calls+1);assert.equal(f.state.calls.at(-1)!.evidence.length,1);assert.ok(!JSON.stringify(f.state.calls.at(-1)).includes('Voice is postponed'));
+  f.modal.invalidatePaths(new Set([note.path]));assert.equal(f.modal.answer,null,'Changing the selection record must revoke generated output');
+ }finally{f.clean();}
+});
+
+test('collection saves revoke old names, changed intent, cancel, close and late validations',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Save research collection').onclick!();let draft=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionSaveModal;
+  await dialogButton(draft,'Preview collection note').onclick!();let preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  f.input('New collection note name','New name');assert.equal(preview.apply!.disabled,true);await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+  await dialogButton(draft,'Preview collection note').onclick!();preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  f.input('Evidence choice S1','exclude');assert.equal(preview.apply!.disabled,true);assert.equal(dialogButton(draft,'Preview collection note').disabled,true);
+  await f.button('Save research collection').onclick!();draft=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionSaveModal;
+  await dialogButton(draft,'Preview collection note').onclick!();preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  let resolve!: (v:boolean)=>void;f.plugin.evidenceCurrent=()=>new Promise<boolean>(r=>{resolve=r;});const saving=preview.apply!.onclick!({} as PointerEvent);f.input('New collection note name','Changed during save');resolve(true);await saving;assert.equal(f.state.created.length,0);
+  f.plugin.evidenceCurrent=async()=>true;await dialogButton(draft,'Preview collection note').onclick!();preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;await dialogButton(draft,'Cancel collection save').onclick!();await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+  await f.button('Save research collection').onclick!();draft=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionSaveModal;await dialogButton(draft,'Preview collection note').onclick!();preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;f.modal.close();await preview.apply!.onclick!({} as PointerEvent);assert.equal(f.state.created.length,0);
+ }finally{f.clean();}
+});
+
+test('changed collection passages need confirmation and excluded references stay redacted',async()=>{
+ const f=await conversationFixture();try{
+  const note=await savedCollectionFixture(f),entry=f.plugin.index.entries[0]!;
+  f.plugin.index.entries[0]=await indexNote({path:entry.path,text:'CURRENT_ONLY budget is 40 euros.',metadata:entry.metadata,modifiedAt:2},()=>null);
+  let dialog=await openCollectionFixture(f,note.path);assert.match(rendered(dialog.contentEl as unknown as Element),/CURRENT_ONLY/);assert.equal(dialogButton(dialog,'Use collection in Ask').disabled,true);
+  const confirm=f.form.fields.get('Confirm changed reference 1')!;confirm.checked=true;confirm.onchange!();assert.equal(dialogButton(dialog,'Use collection in Ask').disabled,false);
+  await dialogButton(dialog,'Use collection in Ask').onclick!();await f.generate();assert.match(JSON.stringify(f.state.calls.at(-1)),/CURRENT_ONLY/);
+  f.plugin.settings={...f.plugin.settings,excludedPaths:[entry.path]};f.modal.invalidate();dialog=await openCollectionFixture(f,note.path);
+  const shown=rendered(dialog.contentEl as unknown as Element);assert.match(shown,/Reference 1: unavailable/);assert.ok(!shown.includes(entry.path)&&!shown.includes('CURRENT_ONLY')&&!shown.includes('Budget is 20'));
+  assert.equal(dialogButton(dialog,'Use collection in Ask').disabled,true);
+ }finally{f.clean();}
+});
+
+test('late collection reads and source checks cannot populate or use a closed or changed parent',async()=>{
+ const f=await conversationFixture();try{
+  const note=await savedCollectionFixture(f);let dialog=await openCollectionFixture(f,note.path);
+  let resolve!: (value:string)=>void;f.plugin.app.vault.adapter.read=()=>new Promise<string>(r=>{resolve=r;});const pending=dialog.loadSelected();dialog.close();resolve(note.content);await pending;assert.equal((dialog.contentEl as unknown as Element).children.length,0);assert.equal(dialog.contentEl.textContent,'');
+  f.plugin.app.vault.adapter.read=async()=>note.content;dialog=await openCollectionFixture(f,note.path);
+  let fresh!: (value:boolean)=>void;f.plugin.evidenceCurrent=()=>new Promise<boolean>(r=>{fresh=r;});const use=dialogButton(dialog,'Use collection in Ask').onclick!();f.input('Question','A newer question');fresh(true);await use;
+  assert.equal(f.modal.answer,null);assert.ok(!rendered(f.modal.resultEl as unknown as Element).includes('Budget is 20'));assert.equal(dialogButton(dialog,'Use collection in Ask').disabled,true);
+ }finally{f.clean();}
+});
+
+test('collection save revalidates after its own destination folder temporarily invalidates the index',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Save research collection').onclick!();const draft=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionSaveModal;
+  await dialogButton(draft,'Preview collection note').onclick!();const preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  f.plugin.projectIdentity=()=>{if(!f.plugin.index.ready)throw Error('Index loading');return f.state.identity;};
+  f.plugin.evidenceCurrent=async()=>{f.plugin.index.ready=true;return f.state.fresh;};
+  f.plugin.createNotes=async(notes,validate,current)=>{f.plugin.index.ready=false;f.modal.invalidate();await validate();assert.ok(current());f.state.created.push(structuredClone(notes));};
+  const approved={...preview.note};await preview.apply!.onclick!({} as PointerEvent);assert.deepEqual(f.state.created,[[approved]]);
+ }finally{f.clean();}
+});
+
+test('opening collections waits for current index identity and discards late opens after question changes',async()=>{
+ const f=await conversationFixture();try{
+  f.input('Question','What budget is recorded?');f.plugin.index.ready=false;let rebuilt=0;
+  f.plugin.rebuildIndex=async()=>{rebuilt++;f.plugin.index.ready=true;};
+  f.plugin.projectIdentity=()=>{if(!f.plugin.index.ready)throw Error('Index loading');return f.state.identity;};
+  await f.button('Open research collection').onclick!();assert.ok(rebuilt);let dialog=[...f.plugin.modals].at(-1) as import('./collection-modal.ts').CollectionOpenModal;assert.ok(dialog);dialog.close();
+  f.plugin.index.ready=false;let resolve!:()=>void;f.plugin.rebuildIndex=()=>new Promise<void>(r=>{resolve=r;});
+  const old=f.button('Open research collection').onclick!();f.input('Question','A newer question');resolve();await old;assert.equal(f.plugin.modals.size,0);
  }finally{f.clean();}
 });

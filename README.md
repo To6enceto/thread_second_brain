@@ -140,6 +140,30 @@ and copied excerpts out of retrieval and selection-as-evidence. Unknown versions
 or manual changes to managed records fail closed; preserve the note and create a
 new reviewed conversation. Saved project information never grants read access.
 
+To keep a reusable evidence selection, choose **Save research collection** in the
+Ask workbench. Name it, choose **Preview collection note**, inspect the exact
+destination/content, then **Save previewed note**. Collections preserve references
+and Include/Pin/Exclude intent without copying source excerpts. Project records
+go in `Project/Collections/`; wider-scope records use `Knowledge/Collections/`.
+
+Later, enter a question in Ask, select the matching answer scope and choose
+**Open research collection**. Select a record, then **Review selected collection**.
+Thread rereads source hashes and shows current permitted indexed passages.
+Renamed sources can resolve by stable identity or observed rename; changed
+passages require the labelled confirmation checkbox. Missing, excluded,
+ambiguous or stale references remain unavailable without showing their old
+paths or text. PDF originals still require consent and current extraction.
+
+Inspect choices and coverage, choose **Use collection in Ask**, then explicitly
+**Generate from chosen evidence**. Nothing generates on open. To retain edited
+choices, save a newly named collection copy; originals are never overwritten.
+Source, collection, permission or question changes revoke pending reuse/previews.
+Records contain at most 50 references, 128 KiB of metadata and 512 KiB total;
+the picker shows at most 100 permitted indexed collections. Reuse keeps the
+16000-character context limit. Index omissions or changed passage locations may
+require fresh retrieval; a collection is neither complete coverage nor a read
+grant. Collection notes themselves are excluded from retrieval/editor evidence.
+
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 

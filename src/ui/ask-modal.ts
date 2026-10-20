@@ -2,6 +2,7 @@ import { Setting } from "obsidian";
 import { ThreadModal } from "./thread-modal.ts";
 import { NewNoteModal } from "./new-note-modal.ts";
 import { ConversationSaveModal } from "./conversation-save-modal.ts";
+import { CollectionSaveModal, CollectionOpenModal } from "./collection-modal.ts";
 import { buildEvidence,contextCoverageText,type EvidenceBundle } from "../vault/evidence.ts";
 import { selectContext,type EvidenceChoice } from "../vault/workbench.ts";
 import { hitsToNotes } from "../vault/index.ts";
@@ -18,7 +19,7 @@ import { searchFilters,searchMethod,searchBudgetControls } from "./search-filter
 import { hybridCoverageText } from "../retrieval/semantic.ts";
 import { searchCoverageText,type SearchFilters } from "../retrieval/search.ts";
 
-interface PreparedContext {question:string;vault:boolean;projectIdentity:string;settings:ThreadSettings;candidates:EvidenceBundle;choices:Record<string,EvidenceChoice>;}
+interface PreparedContext {question:string;vault:boolean;projectIdentity:string;settings:ThreadSettings;candidates:EvidenceBundle;choices:Record<string,EvidenceChoice>;collection?:{path:string;hash:string};}
 export class AskModal extends ThreadModal {
   answer:Answer|null=null;
   bundle:EvidenceBundle|null=null;
@@ -115,6 +116,27 @@ export class AskModal extends ThreadModal {
     this.askButton=actions.createEl("button",{text:"Retrieve evidence",cls:"mod-cta"});
     this.reuseButton=actions.createEl("button",{text:"Reuse previous evidence"});this.reuseButton.disabled=true;
     this.reuseButton.onclick=()=>this.reuse(this.question.trim(),vault);
+    actions.createEl("button",{text:"Open research collection"}).onclick=async()=>{
+      if(this.closed)return;
+      const question=this.question.trim();
+      if(!question||question.length>1000){this.status?.setText("Enter a question of up to 1000 characters before opening a collection.");return;}
+      this.changed("Review a saved collection for this question.",true);
+      const settings=structuredClone(this.plugin.settings),revision=this.inputs,selectedVault=vault;
+      const current=()=>!this.closed&&this.inputs===revision&&this.plugin.active&&JSON.stringify(settings)===JSON.stringify(this.plugin.settings);
+      try{
+        if(!this.plugin.index.ready)await this.plugin.rebuildIndex();
+        if(!current())return;
+        const identity=selectedVault?"":this.plugin.projectIdentity(settings.selectedProject);
+        const modal=new CollectionOpenModal(this.plugin,{settings,vault:selectedVault,identity},current,(bundle,choices,collection)=>{
+          if(!current())return;
+          this.inputs++;this.resetCurrent("Collection loaded. Review the exact context, then Generate.");
+          const prepared={question,vault:selectedVault,projectIdentity:identity,settings,candidates:bundle,choices,collection};
+          this.prepared=prepared;this.watchBundle(bundle);this.renderWorkbench(prepared);
+          this.status?.setText("Collection passages revalidated. Inspect the current context and Generate explicitly. Save research collection creates a new copy of edited choices.");
+        });
+        this.previews.add(modal);this.plugin.modals.add(modal);modal.open();
+      }catch(error){if(current())this.status?.setText(error instanceof Error?error.message:"Could not open collections.");}
+    };
     actions.createEl("button",{text:"Cancel"}).onclick=()=>edited("Canceled. Start a new conversation.",true);
     actions.createEl("button",{text:"Start new conversation"}).onclick=()=>{if(this.closed)return;this.question="";if(this.questionInput)this.questionInput.value="";edited("New conversation. Enter a question and retrieve evidence.",true);};
     this.historyEl=el.createDiv({cls:"thread-conversation-history"});this.renderHistory();
@@ -162,11 +184,22 @@ export class AskModal extends ThreadModal {
     if(prepared.candidates.searchCoverage)root.createEl("p",{text:searchCoverageText(prepared.candidates.searchCoverage),cls:"thread-meta"});
     if(prepared.candidates.hybridCoverage)root.createEl("p",{text:hybridCoverageText(prepared.candidates.hybridCoverage),cls:"thread-meta"});
     root.createEl("p",{text:"Choices apply to this request only. Pins go first within the same bounded context; omitted search/index content stays omitted."});
+    root.createEl("button",{text:"Save research collection"}).onclick=()=>{
+      if(!this.live(prepared))return;
+      const revision=this.inputs;
+      const modal=new CollectionSaveModal(this.plugin,prepared.candidates,prepared.choices,{settings:prepared.settings,vault:prepared.vault,identity:prepared.projectIdentity},()=>!this.closed&&this.inputs===revision&&this.plugin.active);
+      for(const old of this.previews)if(old.closed)this.previews.delete(old);
+      this.previews.add(modal);this.plugin.modals.add(modal);modal.open();
+    };
     const columns=root.createDiv({cls:"thread-workbench-columns"}),evidence=columns.createDiv({cls:"thread-evidence-list"}),sidebar=columns.createDiv({cls:"thread-context-panel"});
     const context=sidebar.createDiv({cls:"thread-chosen-context"});
     const generate=sidebar.createEl("button",{text:"Generate from chosen evidence",cls:"mod-cta"});
     const answerEl=sidebar.createDiv({cls:"thread-answer-preview"});
-    const chosen=()=>this.plugin.withDependencies(selectContext(prepared.candidates,prepared.choices),prepared.settings);
+    const chosen=()=>{
+      const bundle=selectContext(prepared.candidates,prepared.choices);
+      if(prepared.collection)bundle.noteHashes[prepared.collection.path]=prepared.collection.hash;
+      return this.plugin.withDependencies(bundle,prepared.settings);
+    };
     const showContext=()=>{
       const bundle=chosen();context.empty();context.createEl("h4",{text:"Context for the model",cls:"thread-label"});
       const bar=context.createDiv({cls:"thread-context-bar",attr:{"aria-hidden":"true"}});

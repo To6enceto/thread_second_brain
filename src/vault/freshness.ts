@@ -5,6 +5,7 @@ import { mayReadPdf } from "../pdf/scope.ts";
 import type { PdfRecord } from "../pdf/record.ts";
 import { hasAnswerRecord, answerRecordProjection } from "./answer-record.ts";
 import { hasConversationRecord, readConversationRecord, conversationReferences } from "./conversation-record.ts";
+import { hasCollection, readCollection } from "./collection-record.ts";
 
 export interface PdfCitation{path:string;hash:string;page:number;}
 export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;pdf?:PdfCitation;}
@@ -84,6 +85,12 @@ function privateRecordText(text:string,version:unknown,kind:"question"|"review",
 export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
   const whole={text,ranges:[{from:0,to:text.length}]};
   if(metadata.thread_pdf_version!==undefined||metadata.thread_pdf!==undefined||/^[\t ]*(?:thread_pdf(?:_version)?|["']thread_pdf(?:_version)?["'])\s*:/im.test(text))return{text:"",ranges:[],output:{refs:[],invalid:true,title:"PDF extraction needs current-original verification before evidence reuse."}};
+  if (hasCollection(text, metadata)) {
+    try {
+      readCollection(text, metadata);
+      return { text: "", ranges: [], output: { refs: [], invalid: false, title: "Collection references require current selection review" } };
+    } catch { return { text: "", ranges: [], output: { refs: [], invalid: true, title: "Unsupported or changed collection record" } }; }
+  }
   if (hasConversationRecord(text, metadata)) {
     try {
       const record = readConversationRecord(text, metadata);
