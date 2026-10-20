@@ -144,7 +144,7 @@ export class ThreadWorkspaceView extends BriefingView {
       ]);
       card("Coverage and recovery", "Check current read coverage and inspect checkpoint or recovery operations.", [
         ["Vault health", () => this.plugin.openHealth()], ["Index coverage", () => this.plugin.openIndexCoverage()],
-        ["Export checkpoint", () => this.plugin.openProjectExport()], ["Import package / recovery", () => this.plugin.openProjectImport()]
+        ["Export checkpoint", () => this.plugin.openProjectExport()], ["Compare checkpoint", () => this.plugin.openProjectComparison()], ["Import package / recovery", () => this.plugin.openProjectImport()]
       ]);
     }
     return true;

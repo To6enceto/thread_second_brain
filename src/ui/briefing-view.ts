@@ -107,7 +107,7 @@ export class BriefingView extends ItemView {
       ["Knowledge", [["Knowledge", () => this.plugin.openKnowledge()], ["Changes", () => this.plugin.openChanges()]]],
       ["Routine", [["Project actions", () => this.plugin.openActions()], ["Timeline", () => this.plugin.openTimeline()], ["Weekly review", () => this.plugin.openWeekly()], ["Workspaces", () => this.plugin.openWorkspace()]]],
       ["Vault", [["Vault health", () => this.plugin.openHealth()], ["Index coverage", () => this.plugin.openIndexCoverage()]]],
-      ["Packages", [["Export checkpoint", () => this.plugin.openProjectExport()], ["Import package / recovery", () => this.plugin.openProjectImport()]]]
+      ["Packages", [["Export checkpoint", () => this.plugin.openProjectExport()], ["Compare checkpoint", () => this.plugin.openProjectComparison()], ["Import package / recovery", () => this.plugin.openProjectImport()]]]
     ] as const) {
       const toolsEl = secondary.createDiv({ cls: "thread-tool-group" });
       toolsEl.createEl("h3", { text: group, cls: "thread-label" });

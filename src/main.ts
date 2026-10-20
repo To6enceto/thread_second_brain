@@ -1,5 +1,6 @@
 import {PdfModal} from "./ui/pdf-modal.ts";
 import {ExportModal} from "./ui/export-modal.ts";
+import {ProjectComparisonModal} from "./ui/compare-modal.ts";
 import {ProjectImportModal} from "./ui/import-modal.ts";
 import {emptyImports,loadProjectImports,importRoot,type ImportState,type ImportPort} from "./portability/import.ts";
 import {packagePath,byteHash} from "./portability/format.ts";
@@ -128,6 +129,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({id:"project-actions",name:"Project actions",callback:()=>this.openActions()});
     this.addCommand({id:"extract-pdf",name:"Extract local PDF",callback:()=>this.openPdf()});
     this.addCommand({id:"export-project",name:"Export project checkpoint",callback:()=>this.openProjectExport()});
+    this.addCommand({id:"compare-project",name:"Compare project checkpoint",callback:()=>this.openProjectComparison()});
     this.addCommand({id:"import-project",name:"Import project package and recovery",callback:()=>this.openProjectImport()});
     this.addCommand({id:"index-coverage",name:"Text index coverage and budgets",callback:()=>this.openIndexCoverage()});
     this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
@@ -192,6 +194,7 @@ export default class ThreadPlugin extends Plugin {
   }
   openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
   openProjectExport():void{const modal=new ExportModal(this);this.modals.add(modal);modal.open();}
+  openProjectComparison():void{const modal=new ProjectComparisonModal(this);this.modals.add(modal);modal.open();}
   openProjectImport():void{const modal=new ProjectImportModal(this);this.modals.add(modal);modal.open();}
   projectImportsPath():string{return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/project-imports.json`;}
   async saveProjectImports(state:ImportState):Promise<void>{
@@ -538,7 +541,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
-    for(const modal of this.modals)if(modal instanceof ProjectImportModal)modal.packageChanged(path,folder);
+    for(const modal of this.modals)if(modal instanceof ProjectImportModal||modal instanceof ProjectComparisonModal)modal.packageChanged(path,folder);
     if(!folder&&/\.pdf$/i.test(path)&&(mayReadPdf(path,this.settings)||this.index.binaries.has(path)||this.index.entries.some(e=>e.pdf?.path===path))){
       const affected=this.indexUpdates.invalidate([path],this.settings);this.notifySources(affected);void this.persistIndex().catch(()=>new Notice("Thread could not scrub PDF-derived cache. Check vault write access and rebuild."));this.queueIndex();return;
     }

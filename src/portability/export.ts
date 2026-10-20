@@ -1,3 +1,4 @@
+import {hasCollection,readCollection} from '../vault/collection-record.ts';
 import {readSourceReferences,type SourceReference} from '../vault/freshness.ts';
 import {questionReviewReferences} from '../vault/review-events.ts';
 import {reviewProvenance} from '../vault/review-provenance.ts';
@@ -20,8 +21,10 @@ export function exportInventory(index:LocalIndex,settings:ThreadSettings):Export
  for(const path of paths)if(mayReadPdf(path,settings)&&index.binaries.has(path)){try{packagePath(path);candidates.push({path,hash:index.binaries.get(path)!,kind:'pdf'});}catch{unavailable++;}}
  candidates.sort((a,b)=>a.path.localeCompare(b.path));return{candidates:candidates.slice(0,100),unavailable,candidateLimit:Math.max(0,candidates.length-100)};
 }
-function privateReferences(raw:string,metadata:Record<string,unknown>,entry:IndexEntry,parse:ExportPort['parse']):{refs:SourceReference[];hashes:Record<string,string>}{
+export function retainedReferences(raw:string,metadata:Record<string,unknown>,entry:IndexEntry,parse:ExportPort['parse']):{refs:SourceReference[];hashes:Record<string,string>}{
  const refs=[...entry.output?.refs??[]];let hashes:Record<string,string>={};
+ // Collections deliberately have no AI projection; raw export still contains every locator.
+ if(hasCollection(raw,metadata))refs.push(...readCollection(raw,metadata).items.map(item=>item.source));
  // Export retains all raw history, unlike the latest-only AI projection.
  let inside=false,blocks=0;
  for(const line of raw.split(/\r?\n/)){
@@ -58,8 +61,8 @@ export async function buildProjectExport(index:LocalIndex,settings:ThreadSetting
   }else{
    if(!readableText(candidate.path,settings))throw Error('Export source is outside read scope.');const entry=index.entries.find(e=>e.path===candidate.path)!;
    const raw=await port.readText(candidate.path);assertCurrent();if(await contentHash(raw)!==candidate.hash)throw Error('Export source changed. Rebuild and preview again.');
-   const metadata=readMetadata(raw,port.parse);let privateData:ReturnType<typeof privateReferences>;
-   try{privateData=privateReferences(raw,metadata,entry,port.parse);}catch{unavailable++;continue;}
+   const metadata=readMetadata(raw,port.parse);let privateData:ReturnType<typeof retainedReferences>;
+   try{privateData=retainedReferences(raw,metadata,entry,port.parse);}catch{unavailable++;continue;}
    let eligible=true;
    for(const ref of privateData.refs){const resolved=graph.resolve(ref);if(!resolved.path||!['current','renamed'].includes(resolved.state)||!graph.scopeAllows(resolved.path,ref.noteHash)){eligible=false;break;}references[resolved.path]=ref.noteHash;Object.assign(references,graph.assess(resolved.path).dependencies);}
    for(const [path,hash]of Object.entries(privateData.hashes)){if(!graph.scopeAllows(path,hash)){eligible=false;break;}references[path]=hash;Object.assign(references,graph.assess(path).dependencies);}

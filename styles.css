@@ -300,3 +300,6 @@
 .thread-conversation-turn { border: 1.5px dashed var(--thread-ai); border-radius: var(--thread-radius-sm); padding: 10px; margin-block: 8px; }
 .thread-conversation-turn > summary { cursor: pointer; min-height: 32px; overflow-wrap: anywhere; }
 .thread-conversation-turn .thread-source { white-space: normal; overflow-wrap: anywhere; min-height: 32px; }
+
+.thread-comparison .thread-muted { overflow-wrap: anywhere; }
+.thread-comparison .thread-card { margin-block: 8px; }

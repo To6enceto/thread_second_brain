@@ -762,3 +762,25 @@ artifacts in version-specific staging. `node scripts/verify-package.mjs dist/thr
 PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
 from the installed plugin. This private build has no API/hosting subscription;
 local storage, compute and electricity still apply.
+
+## Compare a retained checkpoint
+
+Use **Thread: Compare project checkpoint**, **Compare checkpoint** in the sidebar
+Packages tools, or the full workspace's package controls. Select a saved local
+`.thread-project.json` for the currently selected permitted project, then click
+**Compare selected checkpoint**. No model runs and no notes or permissions change.
+
+Expand a row to inspect actual retained/current text, full-byte SHA-256 and sizes.
+Missing means absent at the original permitted path now, not proven deletion.
+Current-only may have been unselected in the earlier export. The dialog reports
+checkpoint omissions and current limits; it never invents history from file dates
+or infers renames. PDF rows compare hashes/sizes only. Historical PDF-derived text
+still requires exact current original consent and matching supporting snapshots.
+Excluded or stale historical evidence is withheld even if the package contains
+matching old copies. Package integrity alone does not establish permission.
+
+Existing package budgets apply to each side, with at most100 current candidates
+and200 comparison rows. Text display is limited to50000 characters per side and
+200000 total, with explicit clipping notices; full-byte hashes remain visible.
+Source/package/input/settings changes or Cancel clear results. Recompare current
+content; importing copies is a separate explicit workflow, not a restore button.
