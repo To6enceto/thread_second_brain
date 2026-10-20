@@ -11,7 +11,7 @@ const compiled = await build({
   entryPoints: [new URL("./briefing-view.ts", import.meta.url).pathname], bundle: true, write: false,
   format: "esm", platform: "node", plugins: [{ name: "host-api-stub", setup(builder) {
     builder.onResolve({ filter: /^obsidian$/ }, () => ({ path: "obsidian", namespace: "host-stub" }));
-    builder.onLoad({ filter: /.*/, namespace: "host-stub" }, () => ({ contents: "export class ItemView {} export class TFile {} export class WorkspaceLeaf {}" }));
+    builder.onLoad({ filter: /.*/, namespace: "host-stub" }, () => ({ contents: "export class ItemView {} export class TFile {} export class WorkspaceLeaf {} export function setIcon() {}" }));
   } }]
 });
 const { BriefingView } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0]!.text).toString("base64")}`) as typeof import("./briefing-view.ts");

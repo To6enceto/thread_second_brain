@@ -1,4 +1,4 @@
-import { ItemView, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, setIcon, TFile, WorkspaceLeaf } from "obsidian";
 import type ThreadPlugin from "../main.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { briefingPrompt, validateBriefing, SECTION_KEYS, type Briefing, type Claim, type SectionKey } from "../intelligence/briefing.ts";
@@ -58,41 +58,79 @@ export class BriefingView extends ItemView {
   render(): void {
     const root = this.contentEl;
     root.empty(); root.addClass("thread-view");
-    root.createEl("h2", { text: "Thread" });
-    const projectLabel = root.createEl("label", { text: "Project", cls: "thread-project-selector" });
+    const header = root.createDiv({ cls: "thread-header" });
+    header.createEl("h2", { text: "Thread", cls: "thread-wordmark" });
+    const headerActions = header.createDiv({ cls: "thread-actions" });
+    const refresh = headerActions.createEl("button", { cls: "thread-icon-button", attr: { "aria-label": "Refresh home" } });
+    setIcon(refresh, "refresh-cw"); refresh.disabled = this.homeLoading;
+    refresh.onclick = () => { void this.loadHome(); };
+    const settings = headerActions.createEl("button", { cls: "thread-icon-button", attr: { "aria-label": "Settings" } });
+    setIcon(settings, "settings"); settings.onclick = () => this.plugin.openSetup();
+    const controls = this.result && !this.controller ? root.createEl("details", { cls: "thread-project-controls" }) : root;
+    if (controls !== root) controls.createEl("summary", { text: "Project controls" });
+    const projectLabel = controls.createEl("label", { cls: "thread-project-selector" });
+    projectLabel.createEl("span", { text: "Project", cls: "thread-label" });
+    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject.split("/").pop() || "Choose a permitted project", cls: "thread-project-name" });
+    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject, cls: "thread-project-path" });
+    setIcon(projectLabel.createSpan({ cls: "thread-project-chevron", attr: { "aria-hidden": "true" } }), "chevrons-up-down");
     const selector = projectLabel.createEl("select", { attr: { "aria-label": "Project" } });
     selector.add(new Option("Choose a permitted project", ""));
     for (const path of permittedProjects(this.plugin.index, this.plugin.settings)) selector.add(new Option(path, path));
     selector.value = this.plugin.settings.selectedProject; selector.disabled = this.homeLoading;
     selector.onchange = () => { void this.switchProject(selector.value); };
-    const actions = root.createDiv({ cls: "thread-actions" });
-    const resume = actions.createEl("button", { text: "Resume project", cls: "mod-cta" });
+    const actions = controls.createDiv({ cls: "thread-primary-actions" });
+    const resumeRow = actions.createDiv({ cls: "thread-resume-row" });
+    const resumeWrap = resumeRow.createDiv({ cls: "thread-resume-wrap" });
+    const resume = resumeWrap.createEl("button", { text: "Resume project", cls: "mod-cta thread-resume" });
+    resumeWrap.createEl("span", { text: "Recorded context first · AI optional", cls: "thread-resume-subtext" });
     resume.disabled = this.controller !== null;
     resume.addEventListener("click", () => { void this.resume(); });
-    if (this.controller) actions.createEl("button", { text: "Cancel" }).addEventListener("click", () => { void this.cancelGeneration(); });
-    actions.createEl("button",{text:"All projects"}).onclick=()=>this.plugin.openProjectOverview();
-    actions.createEl("button",{text:"Ask"}).onclick=()=>this.plugin.openAsk();
-    actions.createEl("button",{text:"Review queue"}).onclick=()=>this.plugin.openReviewQueue();
-    actions.createEl("button",{text:"Wrap up"}).onclick=()=>this.plugin.openSession();
-    const refresh = actions.createEl("button", { text: "Refresh home" }); refresh.disabled = this.homeLoading;
-    refresh.onclick = () => { void this.loadHome(); };
-    const more = root.createEl("details", { cls: "thread-more-actions" }); more.createEl("summary", { text: "More actions" });
-    const secondary = more.createDiv({ cls: "thread-actions" });
-    for (const [label, action] of [
-      ["Find evidence", () => this.plugin.openRecall()], ["Capture", () => this.plugin.openCapture()],
-      ["Questions", () => this.plugin.openQuestions()], ["Decisions", () => this.plugin.openDecisions()], ["Review decisions", () => this.plugin.openDecisionReview()],
-      ["Timeline", () => this.plugin.openTimeline()], ["Vault health", () => this.plugin.openHealth()], ["Index coverage", () => this.plugin.openIndexCoverage()], ["Local PDF extraction", () => this.plugin.openPdf()], ["Export checkpoint", () => this.plugin.openProjectExport()], ["Import package / recovery", () => this.plugin.openProjectImport()],
-      ["Knowledge", () => this.plugin.openKnowledge()], ["Source freshness", () => this.plugin.openFreshness()],
-      ["Weekly review", () => this.plugin.openWeekly()], ["Changes", () => this.plugin.openChanges()],
-      ["Workspaces", () => this.plugin.openWorkspace()], ["Settings", () => this.plugin.openSetup()]
-    ] as const) secondary.createEl("button", { text: label }).onclick = action;
+    if (this.controller) resumeRow.createEl("button", { text: "Cancel" }).addEventListener("click", () => { void this.cancelGeneration(); });
+    const quick = actions.createDiv({ cls: "thread-quick-actions" });
+    for (const [label, icon, action] of [
+      ["Ask", "search", () => this.plugin.openAsk()],
+      ["Capture", "plus", () => this.plugin.openCapture()],
+      ["Wrap up", "list-checks", () => this.plugin.openSession()]
+    ] as const) {
+      const button = quick.createEl("button");
+      setIcon(button.createSpan({ cls: "thread-action-icon", attr: { "aria-hidden": "true" } }), icon);
+      button.createSpan({ text: label }); button.onclick = action;
+    }
+    const navigation = actions.createDiv({ cls: "thread-actions thread-home-navigation" });
+    navigation.createEl("button",{text:"All projects"}).onclick=()=>this.plugin.openProjectOverview();
+    if (this.plugin.settings.model) {
+      const model = controls.createDiv({ cls: "thread-model-line" });
+      model.createSpan({ cls: "thread-model-dot", attr: { "aria-hidden": "true" } });
+      model.createSpan({ text: this.plugin.settings.model });
+    }
     root.createEl("p", { text: this.message, cls: "thread-status", attr: { role: "status", "aria-live": "polite" } });
-    this.renderHome(root);
+    this.renderHome(controls);
+    const more = controls.createEl("section", { cls: "thread-all-tools" }); more.createEl("h3", { text: "All tools", cls: "thread-label" });
+    const secondary = more.createDiv({ cls: "thread-tool-groups" });
+    for (const [group, tools] of [
+      ["Evidence", [["Find evidence", () => this.plugin.openRecall()], ["Questions", () => this.plugin.openQuestions()], ["Source freshness", () => this.plugin.openFreshness()], ["Local PDF extraction", () => this.plugin.openPdf()]]],
+      ["Decisions", [["Decisions", () => this.plugin.openDecisions()], ["Review decisions", () => this.plugin.openDecisionReview()]]],
+      ["Knowledge", [["Knowledge", () => this.plugin.openKnowledge()], ["Changes", () => this.plugin.openChanges()]]],
+      ["Routine", [["Timeline", () => this.plugin.openTimeline()], ["Weekly review", () => this.plugin.openWeekly()], ["Workspaces", () => this.plugin.openWorkspace()]]],
+      ["Vault", [["Vault health", () => this.plugin.openHealth()], ["Index coverage", () => this.plugin.openIndexCoverage()]]],
+      ["Packages", [["Export checkpoint", () => this.plugin.openProjectExport()], ["Import package / recovery", () => this.plugin.openProjectImport()]]]
+    ] as const) {
+      const toolsEl = secondary.createDiv({ cls: "thread-tool-group" });
+      toolsEl.createEl("h3", { text: group, cls: "thread-label" });
+      for (const [label, action] of tools) toolsEl.createEl("button", { text: label }).onclick = action;
+    }
+    controls.createEl("p", { text: "Dates describe records, not verified events.", cls: "thread-home-footnote" });
     if (!this.result || !this.bundle) return;
-    root.createEl("h3", { text: "Recorded context" });
+    const progress = root.createDiv({ cls: "thread-progress" });
+    progress.createDiv({ text: `Recorded context · ${this.bundle.sources.length} passages`, cls: "thread-progress-recorded" });
+    progress.createDiv({ text: this.generatedAt ? `AI · ${this.generatedAt} · ${this.plugin.settings.model}` : "AI optional", cls: "thread-progress-ai" });
+    const legend = root.createDiv({ cls: "thread-legend" });
+    legend.createSpan({ text: "From your notes", cls: "thread-legend-recorded" });
+    legend.createSpan({ text: "AI interpretation", cls: "thread-legend-ai" });
+    root.createEl("h3", { text: "Recorded context", cls: "thread-recorded-heading" });
     root.createEl("p", { text: "Quoted from recognized note fields. Recorded statements and user reports still need your judgment.", cls: "thread-meta" });
     for (const key of SECTION_KEYS.filter(key => key !== "nextActions")) {
-      const section = root.createEl("section"); section.createEl("h3", { text: LABELS[key] });
+      const section = root.createEl("section", { cls: `thread-recorded-section thread-section-${key}` }); section.createEl("h3", { text: LABELS[key], cls: "thread-label" });
       const claims = this.result.sections[key];
       if (!claims.length) section.createEl("p", { text: key === "newEvidence"
         ? this.bundle.baseline ? "No newer evidence identified from the available dates." : "No comparison baseline yet."
@@ -101,20 +139,24 @@ export class BriefingView extends ItemView {
     }
     if (this.generatedAt) {
       const ai = root.createEl("section", { cls: "thread-ai" });
-      ai.createEl("h3", { text: "AI interpretations and suggestions" });
+      const heading = ai.createDiv({ cls: "thread-section-heading" });
+      heading.createEl("h3", { text: "AI interpretations and suggestions", cls: "thread-label" });
+      heading.createSpan({ text: "Doesn't change your notes", cls: "thread-meta" });
       ai.createEl("p", { text: `Generated ${this.generatedAt} using ${this.plugin.settings.model}. These do not change the recorded context.`, cls: "thread-meta" });
       for (const claim of this.interpretations) this.renderClaim(ai, claim);
-      ai.createEl("h4", { text: "Suggested next action" });
-      if (!this.result.sections.nextActions.length) ai.createEl("p", { text: "No sourced suggestion returned." });
-      for (const claim of this.result.sections.nextActions) this.renderClaim(ai, claim);
+      const next = ai.createDiv({ cls: "thread-next-action" });
+      next.createEl("h4", { text: "Suggested next action" });
+      if (!this.result.sections.nextActions.length) next.createEl("p", { text: "No sourced suggestion returned." });
+      for (const claim of this.result.sections.nextActions) this.renderClaim(next, claim);
       const modelGaps = ai.createEl("details"); modelGaps.createEl("summary", { text: "Model-reported gaps and limits" });
       for (const gap of this.modelGaps) modelGaps.createEl("p", { text: gap });
     }
-    root.createEl("h3", { text: "Evidence gaps and limits" });
-    const gaps = root.createEl("ul");
+    const limits = root.createEl("section", { cls: "thread-limits" });
+    limits.createEl("h3", { text: "Evidence gaps and limits", cls: "thread-label" });
+    const gaps = limits.createEl("ul");
     for (const gap of this.result.gaps) gaps.createEl("li", { text: gap });
     gaps.createEl("li", { text: contextCoverageText(this.bundle) });
-    const details = root.createEl("details", { cls: "thread-evidence" });
+    const details = limits.createEl("details", { cls: "thread-evidence" });
     details.createEl("summary", { text: `Evidence used (${this.bundle.sources.length} passages)` });
     for (const source of this.bundle.sources) {
       const item = details.createDiv(); this.sourceButton(item, source);
@@ -148,17 +190,33 @@ export class BriefingView extends ItemView {
   }
 
   private renderHome(root: HTMLElement): void {
-    const snapshot = this.home; if (!snapshot) return;
+    const snapshot = this.home;
+    if (!snapshot) {
+      root.createEl("button", { text: "Review queue" }).onclick = () => this.plugin.openReviewQueue();
+      return;
+    }
     const revision = this.revision;
     const home = root.createEl("details", { cls: "thread-home" }); home.open = !this.result;
     home.createEl("summary", { text: "Project home" });
-    home.createEl("p", { text: "Current indexed records. Refresh after changes; dates describe records, not verified events.", cls: "thread-meta" });
+    const reviews = home.createEl("section", { cls: "thread-pending-reviews" });
+    reviews.createEl("h3", { text: "Needs your review", cls: "thread-label" });
+    reviews.createEl("p", { text: `Pending reviews (${snapshot.pendingReviews})` });
+    reviews.createEl("p", { text: snapshot.pendingReviews ? "A proposal for this project awaits explicit review." : "No proposal visible for this project. Changes also contains recovery and retained history.", cls: "thread-muted" });
+    const reviewActions = reviews.createDiv({ cls: "thread-actions" });
+    reviewActions.createEl("button", { text: "Review changes" }).onclick = () => this.plugin.openChanges();
+    reviewActions.createEl("button", { text: "Review queue" }).onclick = () => this.plugin.openReviewQueue();
     const items = (label: string, list: HomeItem[], total: number) => {
-      home.createEl("h3", { text: `${label} (${list.length} of ${total})` });
-      if (!list.length) home.createEl("p", { text: "No eligible records included.", cls: "thread-muted" });
+      const questions = label === "Recorded questions";
+      const section = home.createEl("section", { cls: `thread-home-section${label === "Recent sessions" ? " thread-sessions" : ""}${questions ? " thread-home-questions" : ""}` });
+      const heading = section.createDiv({ cls: "thread-section-heading" });
+      heading.createEl("h3", { text: label });
+      heading.createSpan({ text: `${list.length} of ${total}`, cls: "thread-meta" });
+      if (!list.length) section.createEl("p", { text: "No eligible records included.", cls: "thread-muted" });
       for (const item of list) {
-        const open = home.createEl("button", { text: item.path, cls: "thread-source" });
-        home.createEl("p", { text: item.text, cls: "thread-excerpt" });
+        const row = section.createDiv({ cls: "thread-home-record" });
+        if (questions) row.createSpan({ text: "?", cls: "thread-question-glyph", attr: { "aria-hidden": "true" } });
+        const open = row.createEl("button", { text: questions ? item.text : item.path.split("/").pop()!.replace(/\.md$/i, ""), cls: "thread-source", attr: { title: item.path } });
+        if (!questions) row.createEl("p", { text: item.text, cls: `thread-excerpt${label === "Recent sessions" ? " thread-record-date" : ""}` });
         open.onclick = () => { void this.plugin.openIndexedSource(item.path, item.hash, item.heading,
           () => !this.closed && this.revision === revision && this.home === snapshot && this.plugin.settings.selectedProject === snapshot.project)
           .catch(error => { if (!this.closed && this.revision === revision) { this.message = error instanceof Error ? error.message : "Source unavailable. Refresh home."; this.render(); } }); };
@@ -167,9 +225,6 @@ export class BriefingView extends ItemView {
     items("Recent sessions", snapshot.sessions, snapshot.counts.sessions);
     items("Decisions", snapshot.decisions, snapshot.counts.decisions);
     items("Recorded questions", snapshot.questions, snapshot.counts.questions);
-    home.createEl("h3", { text: `Pending reviews (${snapshot.pendingReviews})` });
-    home.createEl("p", { text: snapshot.pendingReviews ? "A proposal for this project awaits explicit review." : "No proposal visible for this project. Changes also contains recovery and retained history.", cls: "thread-muted" });
-    home.createEl("button", { text: "Review changes" }).onclick = () => this.plugin.openChanges();
   }
 
   private renderClaim(parent: HTMLElement, claim: Claim): void {
@@ -196,7 +251,9 @@ export class BriefingView extends ItemView {
   }
 
   private sourceButton(parent: HTMLElement, source: Evidence): void {
-    const button = parent.createEl("button", { text: `${source.path}${source.property ? ` > property: ${source.property}` : source.heading ? ` > ${source.heading}` : ""}`, cls: "thread-source" });
+    const button = parent.createEl("button", { cls: "thread-source", attr: { title: source.path } });
+    button.createSpan({ text: source.id, cls: "thread-source-id" });
+    button.createSpan({ text: `${source.path.split("/").pop()}${source.property ? ` › property: ${source.property}` : source.heading ? ` › ${source.heading}` : ""}` });
     button.dataset.sourcePath = source.path;
     button.addEventListener("click", () => { void this.openSource(source); });
   }

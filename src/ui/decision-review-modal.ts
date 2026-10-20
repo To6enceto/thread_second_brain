@@ -29,7 +29,7 @@ export class DecisionReviewModal extends ThreadModal {
     this.clearChoices=()=>{selected.clear();show();decisions.replaceChildren(new Option("Refresh decisions",""));sources.replaceChildren(new Option("Refresh evidence",""));};
     this.generateButton=el.createEl("button",{text:"Assess selected evidence",cls:"mod-cta"});
     el.createEl("button",{text:"Cancel assessment"}).onclick=()=>{reset();this.status?.setText("Assessment canceled.");};
-    this.status=el.createEl("p",{attr:{role:"status","aria-live":"polite"}});this.resultEl=el.createDiv();
+    this.status=el.createEl("p",{attr:{role:"status","aria-live":"polite"}});this.resultEl=el.createDiv({cls:"thread-ai"});
     let action:"retain"|"annotate"|"supersede"="retain";let reasoning="";let replacementName="";
     new Setting(el).setName("Your decision action").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Decision review action");d.addOption("retain","Retain current choice").addOption("annotate","Annotate current choice").addOption("supersede","Supersede — explicitly accept my replacement").onChange(v=>{if(v==="retain"||v==="annotate"||v==="supersede")action=v;});});
     new Setting(el).setName("Your review reasoning").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Review reasoning");t.inputEl.maxLength=5000;t.onChange(v=>reasoning=v);});
@@ -74,7 +74,7 @@ export class DecisionReviewModal extends ThreadModal {
         this.assessment={answer,bundle,settings,path,before,epoch};this.resultEl!.empty();
         for(const c of answer.answer)this.resultEl!.createEl("p",{text:`Interpretation / potentially conflicting evidence: ${c.text} (${c.sourceIds.join(", ")})`});
         for(const gap of answer.gaps)this.resultEl!.createEl("p",{text:`Gap: ${gap}`});
-        for(const s of bundle.sources)this.resultEl!.createEl("button",{text:`${s.id}: ${s.path} › ${s.heading}`}).onclick=()=>{void this.plugin.openIndexedSource(s.path,bundle.noteHashes[s.path]!,s.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};
+        for(const s of bundle.sources)this.resultEl!.createEl("button",{text:`${s.id}: ${s.path} › ${s.heading}`,cls:"thread-source"}).onclick=()=>{void this.plugin.openIndexedSource(s.path,bundle.noteHashes[s.path]!,s.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};
         this.proposalButton!.disabled=false;this.status?.setText("Review the observations, enter your reasoning and choose an action. No notes have changed.");
       }catch(e){if(!this.closed&&epoch===this.epoch&&!controller.signal.aborted)this.status?.setText(e instanceof Error?e.message:"Assessment failed.");}
       finally{if(this.controller===controller)this.controller=null;this.generateButton!.disabled=false;}

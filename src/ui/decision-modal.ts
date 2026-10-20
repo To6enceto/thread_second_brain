@@ -58,8 +58,10 @@ export class DecisionModal extends ThreadModal {
         sourceSelect.replaceChildren(new Option("Choose eligible evidence", ""));for(const entry of entries)sourceSelect.add(new Option(entry.path,entry.path));
         selected.clear();renderSelected();chosenPath="";this.resultEl!.empty();
         const decisions=settings.selectedProject?this.plugin.index.projectEntries(settings,settings.selectedProject).filter(e=>e.metadata.type==="decision"):[];
-        for(const entry of decisions){const row=this.resultEl!.createDiv();row.createEl("span",{text:`${String(entry.metadata.status??"status not recorded")}: `});
-          row.createEl("button",{text:entry.path}).onclick=()=>{void this.plugin.openIndexedSource(entry.path,entry.hash,"",()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(e instanceof Error?e.message:"Source unavailable."));};
+        for(const entry of decisions){const row=this.resultEl!.createDiv({cls:"thread-card thread-decision-record"});
+          const status=["accepted","proposed","superseded"].includes(String(entry.metadata.status))?String(entry.metadata.status):"unknown";
+          row.addClass(`thread-decision-${status}`);row.createEl("span",{text:`${String(entry.metadata.status??"status not recorded")}: `,cls:`thread-badge thread-badge-${status}`});
+          row.createEl("button",{text:entry.path,cls:"thread-source"}).onclick=()=>{void this.plugin.openIndexedSource(entry.path,entry.hash,"",()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(e instanceof Error?e.message:"Source unavailable."));};
         }
         preview.disabled=!settings.selectedProject;
         this.status?.setText(settings.selectedProject?`${decisions.length} recorded decisions. Evidence is optional; missing fields stay explicit.`:"Select a project in Thread Settings first.");

@@ -8,7 +8,7 @@ export class WorkspaceModal extends Modal {
   creating = false;
   constructor(plugin: ThreadPlugin) { super(plugin.app); this.plugin = plugin; }
   onOpen(): void {
-    const el = this.contentEl; el.createEl("h2", { text: "Create a project workspace" });
+    const el = this.contentEl; el.addClass("thread-modal"); el.createEl("h2", { text: "Create a project workspace" });
     el.createEl("p", { text: "Map your folders in Thread Settings first. Existing templates are kept. Preview every new note before creating it." });
     let name = ""; let previewName = "";
     let nameInput: HTMLInputElement;

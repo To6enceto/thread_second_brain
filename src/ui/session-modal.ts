@@ -33,7 +33,7 @@ export class SessionModal extends ThreadModal {
         if(!current()||!await this.plugin.evidenceCurrent(bundle,settings))throw new Error("Project evidence changed. Generate again.");
         if(!current())return;
         const content=sessionMarkdown(approved.report,result,bundle,settings.model,project);this.resultEl!.createEl("pre",{text:content,cls:"thread-preview"});
-        for(const s of bundle.sources)this.resultEl!.createEl("button",{text:`${s.id}: ${s.path} › ${s.heading}`}).onclick=()=>{void this.plugin.openIndexedSource(s.path,bundle.noteHashes[s.path]!,s.heading,current).catch(e=>this.status?.setText(String(e)));};
+        for(const s of bundle.sources)this.resultEl!.createEl("button",{text:`${s.id}: ${s.path} › ${s.heading}`,cls:"thread-source"}).onclick=()=>{void this.plugin.openIndexedSource(s.path,bundle.noteHashes[s.path]!,s.heading,current).catch(e=>this.status?.setText(String(e)));};
         this.previewButton!.disabled=false;this.previewButton!.onclick=()=>{
           if(!current())return;const preview=new NewNoteModal(this.plugin,{path:target,content},()=>this.plugin.evidenceCurrent(bundle,settings));this.plugin.modals.add(preview);preview.open();
         };

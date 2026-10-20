@@ -20,7 +20,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   let scopeEl:HTMLElement|null=null;
   const cancelChecks=()=>{connection.controller?.abort();connection.controller=null;feedback.setText("Draft changed. Save explicitly to use these settings.");};
   const updateScope=()=>{if(!scopeEl)return;try{scopeEl.setText(scopePreviewText(pendingScope(project,allowed,exclusions,plugin.settings)));}catch(e){scopeEl.setText(e instanceof Error?e.message:"Invalid scope draft.");}};
-  containerEl.createEl("h3",{text:"1. Connect to local Ollama"});
+  containerEl.createEl("h3",{text:"1. Connect to local Ollama",cls:"thread-label"});
   containerEl.createEl("p",{text:"Install Ollama yourself if needed. Start it with OLLAMA_NO_CLOUD=1 and download a free model separately, for example qwen3:4b-instruct. Thread checks cloud status before use."});
   new Setting(containerEl).setName("Local Ollama endpoint").setDesc("HTTP loopback only. Default: http://127.0.0.1:11434.")
     .addText(text=>{text.inputEl.setAttribute("aria-label","Local Ollama endpoint");text.setValue(endpoint).onChange(value=>{
@@ -40,7 +40,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     }catch(e){if(current())feedback.setText(e instanceof Error?e.message:"Model discovery failed. Check local Ollama.");}
     finally{discover.disabled=false;}
   };
-  containerEl.createEl("h3",{text:"2. Choose downloaded models"});
+  containerEl.createEl("h3",{text:"2. Choose downloaded models",cls:"thread-label"});
   new Setting(containerEl).setName("Downloaded model").setDesc("Exact text model name. Discovery checks capability, not answer quality. Tested: qwen3:4b-instruct.")
     .addText(text=>{textInput=text;text.inputEl.setAttribute("aria-label","Downloaded model");text.setValue(model).onChange(value=>{model=value;cancelChecks();});});
   new Setting(containerEl).setName("Available text models").addDropdown(choices=>{
@@ -54,7 +54,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
   new Setting(semantic).setName("Available embedding models").addDropdown(choices=>{
     embeddingChoices=choices;choices.selectEl.setAttribute("aria-label","Available embedding models");choices.addOption("","Discover models first").setDisabled(true).onChange(value=>{if(value){embeddingModel=value;embeddingInput.setValue(value);cancelChecks();}});
   });
-  containerEl.createEl("h3",{text:"3. Preview read access and save"});
+  containerEl.createEl("h3",{text:"3. Preview read access and save",cls:"thread-label"});
   new Setting(containerEl).setName("Project folder").setDesc("Saving explicitly adds this folder to allowed read paths. Choosing it alone grants nothing.")
     .addDropdown(dropdown=>{
       dropdown.addOption("","Choose a folder");dropdown.selectEl.setAttribute("aria-label","Project folder");
@@ -91,7 +91,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
       if(!controller.signal.aborted&&connection.controller===controller&&containerEl.isConnected)feedback.setText(reports.join(" "));
     }catch(e){if(!controller.signal.aborted&&connection.controller===controller&&containerEl.isConnected)feedback.setText(e instanceof Error?e.message:"Connection failed. Check endpoint, cloud-disabled Ollama and a downloaded text model.");}
   })).addButton(button=>button.setButtonText("Cancel local checks").onClick(()=>{connection.controller?.abort();connection.controller=null;feedback.setText("Local checks canceled. Settings and notes were not changed.");}));
-  containerEl.createEl("h3",{text:"4. Try Thread"});
+  containerEl.createEl("h3",{text:"4. Try Thread",cls:"thread-label"});
   containerEl.createEl("p",{text:"Open project home after Save. Optionally preview one clearly synthetic sample in your saved Projects mapping. Saving a sample does not grant read access: select its folder here and review grants separately."});
   containerEl.createEl("button",{text:"Open project home"}).onclick=()=>{void plugin.openThread();};
   containerEl.createEl("button",{text:"Preview optional sample"}).onclick=()=>{

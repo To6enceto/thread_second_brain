@@ -1,4 +1,4 @@
-import { Notice,parseYaml,Setting } from "obsidian";
+import { Notice,parseYaml,setIcon,Setting } from "obsidian";
 import { ThreadModal } from "./thread-modal.ts";
 import type { ChangeBatch } from "../vault/changes.ts";
 import { editableBody,lineDiff } from "../vault/change-draft.ts";
@@ -18,9 +18,11 @@ export class ChangeReviewModal extends ThreadModal {
   override invalidate(message?:string):void {this.drafts.clear();this.draftRevision++;super.invalidate(message);}
 
   onOpen():void{
-    this.contentEl.createEl("h2",{text:"Review knowledge changes"});
-    this.contentEl.createEl("p",{text:"Review every affected note. Originals are backed up before writes. Recovery and undo preserve later edits. History keeps the last 20 applied batches; filesystem changes are not atomic."});
-    this.status=this.contentEl.createEl("p",{attr:{role:"status","aria-live":"polite"}});this.resultEl=this.contentEl.createDiv();
+    this.contentEl.addClass("thread-change-review");this.modalEl.addClass("thread-dialog");
+    const header=this.contentEl.createDiv({cls:"thread-modal-header"});
+    header.createEl("h2",{text:"Review knowledge changes"});
+    header.createEl("p",{text:"Review every affected note. Originals are backed up before writes. Recovery and undo preserve later edits. History keeps the last 20 applied batches; filesystem changes are not atomic.",cls:"thread-meta"});
+    this.status=this.contentEl.createEl("p",{attr:{role:"status","aria-live":"polite"}});this.resultEl=this.contentEl.createDiv({cls:"thread-change-results"});
     this.contentEl.createEl("button",{text:"Refresh change review"}).onclick=()=>this.render();this.render();
   }
   private contextAllowed(batch:ChangeBatch):boolean{
@@ -40,29 +42,43 @@ export class ChangeReviewModal extends ThreadModal {
     catch{return false;}
   }
   private allowed(batch:ChangeBatch):boolean{return this.contextAllowed(batch)&&batch.operations.every(op=>this.plugin.changePathAllowed(op.path));}
-  private diff(before:string,after:string,row:HTMLElement):void{
+  private diff(before:string,after:string,row:HTMLElement,bar:HTMLElement):void{
     const diff=lineDiff(before,after),changed=diff.lines.filter(line=>line.kind!=="same");
+    const counts=bar.createDiv({cls:"thread-diff-counts"});
+    counts.createSpan({text:`+${changed.filter(line=>line.kind==="added").length}`,cls:"thread-added-count"});
+    counts.createSpan({text:`-${changed.filter(line=>line.kind==="removed").length}`,cls:"thread-muted"});
     row.createEl("p",{text:`${changed.filter(line=>line.kind==="added").length} added lines; ${changed.filter(line=>line.kind==="removed").length} removed lines. ${diff.minimal?"":"Large edit: a bounded bulk comparison is shown. "}Line endings count as changes. Full exact contents are available below.`});
     const visible=new Set<number>();
     diff.lines.forEach((line,i)=>{if(line.kind!=="same")for(let j=Math.max(0,i-2);j<=Math.min(diff.lines.length-1,i+2);j++)visible.add(j);});
     const indices=[...visible].sort((a,b)=>a-b),pre=row.createEl("pre",{cls:"thread-diff",attr:{"aria-label":"Changed lines, plus means added and minus means removed"}});
+    let beforeLine=0,afterLine=0;
+    const numbers=diff.lines.map(line=>({before:line.kind==="added"?"":String(++beforeLine),after:line.kind==="removed"?"":String(++afterLine)}));
     let previous=-1;
     for(const i of indices.slice(0,500)){
       if(previous!==i-1)pre.createEl("span",{text:"... unchanged lines ...",cls:"thread-diff-same"});
-      const line=diff.lines[i]!;pre.createEl("span",{text:`${line.kind==="added"?"+":line.kind==="removed"?"-":" "} ${line.text.replace(/\r?\n$/,"")}`,cls:`thread-diff-${line.kind}`});previous=i;
+      const line=diff.lines[i]!,display=pre.createEl("span",{cls:`thread-diff-line thread-diff-${line.kind}`});
+      display.createSpan({text:numbers[i]!.before,cls:"thread-diff-number",attr:{"aria-hidden":"true",title:"Before line"}});
+      display.createSpan({text:numbers[i]!.after,cls:"thread-diff-number",attr:{"aria-hidden":"true",title:"After line"}});
+      display.createSpan({text:line.kind==="added"?"+":line.kind==="removed"?"-":" ",cls:"thread-diff-marker"});
+      display.createSpan({text:line.text.replace(/\r?\n$/,""),cls:"thread-diff-text"});previous=i;
     }
     if(!changed.length)pre.setText("No content changes.");
     if(indices.length>500)row.createEl("p",{text:"Diff display shortened to 500 lines. Review the full exact contents before approval."});
   }
   private preview(batch:ChangeBatch,undo=false,editable=false):void{
     if(!this.contextAllowed(batch)){this.resultEl!.createEl("p",{text:"Supporting source snapshots changed, are unavailable or outside current read scope. Cached contents are hidden. Resolve source access before reviewing, or inspect the durable changes.json journal for manual recovery."});return;}
-    for(const op of batch.operations){
-      const row=this.resultEl!.createEl("section");row.createEl("h3",{text:op.path});
+    for(const [index,op] of batch.operations.entries()){
+      const row=this.resultEl!.createEl("section",{cls:"thread-change-operation"});
+      row.createEl("p",{text:`${undo?"Undo preview":"Proposed change"} · ${index+1} of ${batch.operations.length}`,cls:"thread-label thread-operation-label"});
+      row.createEl("h3",{text:`${undo?"Restore":op.before===null?"Create":"Update"} ${op.path.split("/").pop()!.replace(/\.md$/i,"")}`,cls:"thread-operation-title"});
+      const heading=row.createDiv({cls:"thread-operation-heading"});
+      setIcon(heading.createSpan({attr:{"aria-hidden":"true"}}),"file-text");
+      heading.createEl("h3",{text:op.path});
       if(!this.plugin.changePathAllowed(op.path)){row.createEl("p",{text:"Target outside current read/write scope. Its cached contents are hidden."});continue;}
       row.createEl("button",{text:"Open current note"}).onclick=()=>{void this.plugin.openChangeTarget(op.path).catch(e=>this.status?.setText(e instanceof Error?e.message:"Target unavailable."));};
       const before=undo?op.after:op.before??"",after=undo?op.before??"":op.after;
-      this.diff(before,after,row);
-      const exact=row.createEl("details");exact.createEl("summary",{text:"Full exact contents"});
+      this.diff(before,after,row,heading);
+      const exact=row.createEl("details",{cls:"thread-exact-contents"});exact.createEl("summary",{text:"Full exact contents"});
       exact.createEl("h4",{text:undo?"Expected applied contents":"Before"});exact.createEl("pre",{text:undo?op.after:op.before??"New note - no original contents",cls:"thread-preview"});
       exact.createEl("h4",{text:undo?"Restore original":"After"});exact.createEl("pre",{text:undo?op.before??"Move this unchanged created note to Obsidian's local trash.":op.after,cls:"thread-preview"});
       if(editable){
@@ -92,18 +108,19 @@ export class ChangeReviewModal extends ThreadModal {
     this.applyButton=null;
     const state=this.plugin.changes.state;
     if(state.recovery){
-      const recovery=state.recovery;this.resultEl!.createEl("h3",{text:"Recovery required"});
+      const recovery=state.recovery;this.resultEl!.createEl("h3",{text:"Recovery required",cls:"thread-recovery-heading"});
       this.resultEl!.createEl("p",{text:`Affected paths: ${recovery.paths.join(", ")}. Recovery restores the last stable batch state; unrelated later edits are left intact.`});
       this.resultEl!.createEl("p",{text:"1. Preserve changes.json and a copy of affected notes. 2. Open each current note and compare with the exact recovery preview. 3. Recover only when current contents match a stored batch state. If later edits conflict, preserve them and reconcile manually; do not delete the journal or broaden read permissions as a shortcut."});
       this.preview(recovery.batch,recovery.action==="apply");
-      const restore=this.resultEl!.createEl("button",{text:"Recover previewed batch",cls:"mod-cta"});restore.disabled=!this.allowed(recovery.batch);
+      const recoveryActions=this.resultEl!.createDiv({cls:"thread-actions thread-change-actions"});
+      const restore=recoveryActions.createEl("button",{text:"Recover previewed batch",cls:"mod-cta"});restore.disabled=!this.allowed(recovery.batch);
       restore.onclick=()=>{void this.run(()=>this.plugin.changes.recover(recovery.batch.id),"Recovery completed. Inspect the restored notes.");};
       return;
     }
     if(state.pending){
       const proposal=state.pending;
       if(this.draftId!==proposal.id){this.draftId=proposal.id;this.drafts.clear();this.dirty=false;}
-      this.resultEl!.createEl("h3",{text:`Proposal ${proposal.status} · ${new Date(proposal.createdAt).toLocaleString()}`});
+      this.resultEl!.createEl("h3",{text:`Proposal ${proposal.status} · ${new Date(proposal.createdAt).toLocaleString()}`,cls:"thread-proposal-heading"});
       this.resultEl!.createEl("p",{text:`Review all ${proposal.operations.length} related operations together. Approval applies to this exact proposal: ${proposal.id}.`});
       if(proposal.status==="stale")this.resultEl!.createEl("p",{text:"This proposal is stale. Preserve any draft you need, reject it, refresh evidence and generate a new proposal. Thread will not overwrite current notes to repair a conflict."});
       this.preview(proposal,false,proposal.status==="pending"&&this.allowed(proposal));
@@ -120,13 +137,14 @@ export class ChangeReviewModal extends ThreadModal {
           this.resultEl!.createEl("button",{text:`Source: ${path}`}).onclick=()=>{const epoch=this.epoch;void this.plugin.openIndexedSource(path,hash,"",()=>!this.closed&&this.epoch===epoch).catch(e=>this.status?.setText(e instanceof Error?e.message:"Source unavailable."));};
         }
       }catch{/* Human-only proposals have no source context. */}
-      const apply=this.resultEl!.createEl("button",{text:"Apply previewed changes",cls:"mod-cta"});this.applyButton=apply;apply.disabled=this.dirty||proposal.status!=="pending"||!this.allowed(proposal);
+      const actions=this.resultEl!.createDiv({cls:"thread-actions thread-change-actions"});
+      actions.createEl("button",{text:"Reject proposal"}).onclick=()=>{void this.run(()=>this.plugin.changes.reject(proposal.id),"Proposal rejected; no notes were changed.");};
+      const apply=actions.createEl("button",{text:"Apply previewed changes",cls:"mod-cta"});this.applyButton=apply;apply.disabled=this.dirty||proposal.status!=="pending"||!this.allowed(proposal);
       apply.onclick=()=>{if(this.dirty){this.status?.setText("Renew exact preview before applying edited drafts.");return;}void this.run(()=>this.plugin.changes.apply(proposal.id),"Applied reviewed changes. Originals remain in the last 20 batches.");};
-      this.resultEl!.createEl("button",{text:"Reject proposal"}).onclick=()=>{void this.run(()=>this.plugin.changes.reject(proposal.id),"Proposal rejected; no notes were changed.");};
     }else this.resultEl!.createEl("p",{text:"No pending proposal. Choose Knowledge updates to prepare one."});
     this.resultEl!.createEl("h3",{text:"Applied history"});
     for(const batch of [...state.history].reverse()){
-      const row=this.resultEl!.createDiv();row.createEl("p",{text:`${new Date(batch.createdAt).toLocaleString()} · ${batch.operations.map(o=>o.path).join(", ")}${batch.undone?" · undone":""}`});
+      const row=this.resultEl!.createDiv({cls:"thread-history-entry"});row.createEl("p",{text:`${new Date(batch.createdAt).toLocaleString()} · ${batch.operations.map(o=>o.path).join(", ")}${batch.undone?" · undone":""}`});
       if(!batch.undone){const show=row.createEl("button",{text:"Preview undo"});show.disabled=Boolean(state.pending)||!this.allowed(batch);show.onclick=()=>{this.undoId=batch.id;this.render();};}
     }
     const undo=state.history.find(b=>b.id===this.undoId&&!b.undone);

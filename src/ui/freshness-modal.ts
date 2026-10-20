@@ -28,13 +28,13 @@ export class FreshnessModal extends ThreadModal{
       if(!entry){this.generateButton!.disabled=true;return;}
       setName(`${entry.title.slice(0,80)} refreshed`);const graph=this.plugin.index.graph(settings);const state=graph.assess(entry.path);
       const epoch=this.epoch;this.resultEl!.createEl("h3",{text:`${state.state}: ${entry.path}`});this.resultEl!.createEl("p",{text:state.reason});
-      this.resultEl!.createEl("button",{text:"Open original output"}).onclick=()=>{void this.plugin.openIndexedSource(entry.path,entry.hash,"",()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};
+      this.resultEl!.createEl("button",{text:"Open original output",cls:"thread-source"}).onclick=()=>{void this.plugin.openIndexedSource(entry.path,entry.hash,"",()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};
       const eligible=this.plugin.index.projectEntries(settings,null).filter(e=>e.path!==entry.path);
       for(const source of eligible)sources.add(new Option(source.path,source.path));
       for(const ref of state.references){
         const path=ref.path&&readableText(ref.path,settings)?ref.path:undefined;
-        const row=this.resultEl!.createDiv();row.createEl("p",{text:path?`${ref.state}: ${path}. ${ref.reason}`:`${ref.state}: Supporting source unavailable in the current scope. Choose a current replacement.`});
-        if(path&&ref.hash){const hash=ref.hash;row.createEl("button",{text:`Open current source: ${path}`}).onclick=()=>{void this.plugin.openIndexedSource(path,hash,ref.ref.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};if(eligible.some(e=>e.path===path)&&selected.size<5)selected.add(path);}
+        const row=this.resultEl!.createDiv({cls:"thread-card"});row.createEl("p",{text:path?`${ref.state}: ${path}. ${ref.reason}`:`${ref.state}: Supporting source unavailable in the current scope. Choose a current replacement.`});
+        if(path&&ref.hash){const hash=ref.hash;row.createEl("button",{text:`Open current source: ${path}`,cls:"thread-source"}).onclick=()=>{void this.plugin.openIndexedSource(path,hash,ref.ref.heading,()=>!this.closed&&epoch===this.epoch).catch(e=>this.status?.setText(String(e)));};if(eligible.some(e=>e.path===path)&&selected.size<5)selected.add(path);}
       }
       showSelected();this.generateButton!.disabled=false;this.status?.setText("Review source status. Select up to five current sources, including replacements for unavailable evidence. Generate a new reviewed synthesis in Reviews; the original output will be retained.");
     };

@@ -24,19 +24,25 @@ export class AskModal extends ThreadModal {
   private changed(message:string):void{this.inputs++;this.invalidate(message);}
   private live(prepared:PreparedContext):boolean{return !this.closed&&this.plugin.active&&this.prepared===prepared&&JSON.stringify(prepared.settings)===JSON.stringify(this.plugin.settings);}
   onOpen():void{
-    const el=this.contentEl;el.createEl("h2",{text:"Ask your vault"});
-    el.createEl("p",{text:"Retrieve passages, choose what to include or pin, then generate locally. Citations identify evidence; inspect whether each excerpt supports its claim."});
+    const el=this.contentEl;el.addClass("thread-ask");this.modalEl.addClass("thread-dialog");
+    const header=el.createDiv({cls:"thread-modal-header"}),title=header.createDiv({cls:"thread-modal-title"});title.createEl("h2",{text:"Ask your vault"});
+    title.createEl("span",{text:this.plugin.settings.selectedProject.split("/").pop()||"",cls:"thread-meta"});
+    header.createEl("p",{text:"Retrieve passages, choose what to include or pin, then generate locally. Citations identify evidence; inspect whether each excerpt supports its claim.",cls:"thread-meta"});
+    const form=el.createDiv({cls:"thread-ask-form"}),questionEl=form.createDiv({cls:"thread-question"}),options=form.createDiv({cls:"thread-search-options"});
     let question="",vault=false;let budget:ReturnType<typeof searchBudgetControls>|null=null;
     const edited=(message:string)=>{budget?.reset();this.changed(message);};
-    new Setting(el).setName("Question").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Question");t.inputEl.maxLength=1000;t.onChange(v=>{question=v;edited("Question changed. Retrieve passages again.");});});
-    new Setting(el).setName("Answer scope").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Answer scope");d.addOption("project","Selected project").addOption("vault","All allowed paths").onChange(v=>{vault=v==="vault";edited("Scope changed. Retrieve passages again.");});});
-    const filters=searchFilters(el,()=>edited("Filters changed. Retrieve passages again."));
-    const method=searchMethod(el,this.plugin.settings.semanticSearch,()=>edited("Search method changed. Retrieve passages again."));
-    budget=searchBudgetControls(el,()=>this.changed("Search budget changed. Retrieve passages again."),()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);},()=>!this.closed&&this.plugin.active);
+    new Setting(questionEl).setName("Question").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Question");t.inputEl.maxLength=1000;t.onChange(v=>{question=v;edited("Question changed. Retrieve passages again.");});});
+    new Setting(options).setName("Answer scope").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Answer scope");d.addOption("project","Selected project").addOption("vault","All allowed paths").onChange(v=>{vault=v==="vault";edited("Scope changed. Retrieve passages again.");});});
+    const filterEl=form.createDiv({cls:"thread-search-filters"});
+    const filters=searchFilters(filterEl,()=>edited("Filters changed. Retrieve passages again."));
+    const method=searchMethod(options,this.plugin.settings.semanticSearch,()=>edited("Search method changed. Retrieve passages again."));
+    const budgetEl=form.createEl("details",{cls:"thread-search-budget"});budgetEl.createEl("summary",{text:"Search budget and coverage"});
+    budget=searchBudgetControls(budgetEl,()=>this.changed("Search budget changed. Retrieve passages again."),()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);},()=>!this.closed&&this.plugin.active);
     this.status=el.createEl("p",{attr:{role:"status","aria-live":"polite"}});
-    this.askButton=el.createEl("button",{text:"Retrieve evidence",cls:"mod-cta"});
-    el.createEl("button",{text:"Cancel"}).onclick=()=>edited("Canceled. Retrieve evidence to start again.");
-    this.resultEl=el.createDiv();this.askButton.onclick=()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);};
+    const actions=options.createDiv({cls:"thread-actions thread-retrieve-actions"});
+    this.askButton=actions.createEl("button",{text:"Retrieve evidence",cls:"mod-cta"});
+    actions.createEl("button",{text:"Cancel"}).onclick=()=>edited("Canceled. Retrieve evidence to start again.");
+    this.resultEl=el.createDiv({cls:"thread-workbench"});this.askButton.onclick=()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);};
   }
   async run(question:string,vault:boolean,filters:SearchFilters={},hybrid=false,level:SearchLevel="standard"):Promise<void>{
     if(this.closed)return;this.inputs++;this.invalidate();const epoch=this.epoch,settings=structuredClone(this.plugin.settings);
@@ -59,17 +65,31 @@ export class AskModal extends ThreadModal {
     if(prepared.candidates.searchCoverage)root.createEl("p",{text:searchCoverageText(prepared.candidates.searchCoverage),cls:"thread-meta"});
     if(prepared.candidates.hybridCoverage)root.createEl("p",{text:hybridCoverageText(prepared.candidates.hybridCoverage),cls:"thread-meta"});
     root.createEl("p",{text:"Choices apply to this request only. Pins go first within the same bounded context; omitted search/index content stays omitted."});
-    const context=root.createDiv(),answerEl=root.createDiv();
-    const generate=root.createEl("button",{text:"Generate from chosen evidence",cls:"mod-cta"});
+    const columns=root.createDiv({cls:"thread-workbench-columns"}),evidence=columns.createDiv({cls:"thread-evidence-list"}),sidebar=columns.createDiv({cls:"thread-context-panel"});
+    const context=sidebar.createDiv({cls:"thread-chosen-context"});
+    const generate=sidebar.createEl("button",{text:"Generate from chosen evidence",cls:"mod-cta"});
+    const answerEl=sidebar.createDiv({cls:"thread-answer-preview"});
     const chosen=()=>this.plugin.withDependencies(selectContext(prepared.candidates,prepared.choices),prepared.settings);
-    const showContext=()=>{const bundle=chosen();context.empty();context.createEl("p",{text:contextCoverageText(bundle)});const details=context.createEl("details");details.createEl("summary",{text:"Exact source context sent to the model"});details.createEl("pre",{text:JSON.stringify(bundle.sources,null,2),cls:"thread-preview"});generate.disabled=!bundle.sources.length;};
+    const showContext=()=>{
+      const bundle=chosen();context.empty();context.createEl("h4",{text:"Context for the model",cls:"thread-label"});
+      const bar=context.createDiv({cls:"thread-context-bar",attr:{"aria-hidden":"true"}});
+      for(const source of prepared.candidates.sources){
+        const included=bundle.sources.some(selected=>selected.id===source.id);
+        const state=prepared.choices[source.id]==="exclude"?"excluded":included?prepared.choices[source.id]==="pin"?"pinned":"included":"omitted";
+        bar.createDiv({cls:`thread-context-${state}`,attr:{title:`${source.id}: ${state}`}});
+      }
+      context.createEl("p",{text:`${bundle.sources.length} of ${prepared.candidates.sources.length} passages included; ${bundle.sources.filter(source=>prepared.choices[source.id]==="pin").length} pinned first; ${prepared.candidates.sources.filter(source=>prepared.choices[source.id]==="exclude").length} explicitly excluded.`});
+      context.createEl("p",{text:contextCoverageText(bundle)});const details=context.createEl("details");details.createEl("summary",{text:"Exact source context sent to the model"});details.createEl("pre",{text:JSON.stringify(bundle.sources,null,2),cls:"thread-preview"});generate.disabled=!bundle.sources.length;
+    };
     for(const source of prepared.candidates.sources){
-      const row=root.createDiv({cls:"thread-queue-item"});row.createEl("p",{text:`${source.id}: ${source.path}${source.heading?` > ${source.heading}`:""}`});row.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
-      row.createEl("button",{text:`Open evidence ${source.id}`,cls:"thread-source"}).onclick=()=>{if(!this.live(prepared))return;void this.plugin.openIndexedSource(source.path,prepared.candidates.noteHashes[source.path]!,source.heading,()=>this.live(prepared)).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
-      new Setting(row).setName(`Use ${source.id}`).addDropdown(d=>{d.selectEl.setAttribute("aria-label",`Evidence choice ${source.id}`);d.addOption("include","Include").addOption("exclude","Exclude").addOption("pin","Pin first").onChange(value=>{
+      const row=evidence.createDiv({cls:"thread-evidence-card"}),top=row.createDiv({cls:"thread-evidence-top"});
+      top.createEl("button",{text:`Open evidence ${source.id}`,cls:"thread-source",attr:{title:source.path}}).onclick=()=>{if(!this.live(prepared))return;void this.plugin.openIndexedSource(source.path,prepared.candidates.noteHashes[source.path]!,source.heading,()=>this.live(prepared)).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
+      new Setting(top).setName(`Use ${source.id}`).addDropdown(d=>{d.selectEl.setAttribute("aria-label",`Evidence choice ${source.id}`);d.addOption("include","Include").addOption("exclude","Exclude").addOption("pin","Pin first").onChange(value=>{
         if(!this.live(prepared)||!["include","exclude","pin"].includes(value))return;
         prepared.choices[source.id]=value as EvidenceChoice;this.inputs++;this.epoch++;this.controller?.abort();this.controller=null;this.answer=null;this.bundle=null;answerEl.empty();showContext();this.status?.setText("Evidence choices changed. Generate again from the renewed context.");
       });});
+      row.createEl("p",{text:`${source.path.split("/").pop()}${source.heading?` › ${source.heading}`:""}`,cls:"thread-evidence-path",attr:{title:source.path}});
+      row.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
     }
     showContext();generate.onclick=()=>{if(this.live(prepared)&&!this.controller)return this.generate(prepared,chosen(),answerEl,generate);};
   }
@@ -91,7 +111,7 @@ export class AskModal extends ThreadModal {
   private renderAnswer(prepared:PreparedContext,answer:Answer,bundle:EvidenceBundle,root:HTMLElement,epoch:number,inputs:number):void{
     root.createEl("h3",{text:"Claims and supporting passages"});
     for(const claim of answer.answer){
-      const row=root.createDiv({cls:"thread-claim-evidence"});row.createDiv().createEl("p",{text:`${claim.kind}: ${claim.text}`});const evidence=row.createDiv();
+      const row=root.createDiv({cls:"thread-claim-evidence"});const text=row.createDiv().createEl("p",{text:`${claim.kind}: ${claim.text}`});text.createEl("span",{text:` ${claim.sourceIds.join(", ")}`,cls:"thread-citation-ids"});const evidence=row.createDiv();
       for(const id of claim.sourceIds){const source=bundle.sources.find(s=>s.id===id)!;evidence.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
         evidence.createEl("button",{text:`${id}: ${source.path}${source.heading?` > ${source.heading}`:""}`,cls:"thread-source"}).onclick=()=>{if(!this.live(prepared)||epoch!==this.epoch)return;void this.plugin.openIndexedSource(source.path,bundle.noteHashes[source.path]!,source.heading,()=>this.live(prepared)&&epoch===this.epoch).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
       }
