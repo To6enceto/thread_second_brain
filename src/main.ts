@@ -1,4 +1,8 @@
 import {PdfModal} from "./ui/pdf-modal.ts";
+import {ExportModal} from "./ui/export-modal.ts";
+import {PACKAGE_LIMITS} from "./portability/format.ts";
+import {exportDestination} from "./portability/write.ts";
+import type {ExportPort} from "./portability/export.ts";
 import {PdfChecks} from "./pdf/checks.ts";
 import {readPdfSource,pdfEvidenceText} from "./pdf/record.ts";
 import {readPdfOriginal} from "./pdf/original.ts";
@@ -99,6 +103,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
     this.addCommand({id:"extract-pdf",name:"Extract local PDF",callback:()=>this.openPdf()});
+    this.addCommand({id:"export-project",name:"Export project checkpoint",callback:()=>this.openProjectExport()});
     this.addCommand({id:"index-coverage",name:"Text index coverage and budgets",callback:()=>this.openIndexCoverage()});
     this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
     this.addCommand({id:"all-projects",name:"All permitted projects",callback:()=>this.openProjectOverview()});
@@ -147,6 +152,20 @@ export default class ThreadPlugin extends Plugin {
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
   openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
+  openProjectExport():void{const modal=new ExportModal(this);this.modals.add(modal);modal.open();}
+  projectExportPort(current:()=>boolean):ExportPort{
+    const settings=structuredClone(this.settings),snapshot=JSON.stringify(settings);
+    const ready=()=>this.active&&current()&&snapshot===JSON.stringify(this.settings);
+    const allowed=(path:string)=>ready()&&(readableText(path,settings)||mayReadPdf(path,settings));
+    return{current:ready,parse:parseYaml,size:path=>{if(!allowed(path))return null;const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?file.stat.size:null;},
+      readText:async path=>{if(!ready()||!readableText(path,settings))throw Error("Export source is outside read scope.");const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile)||file.stat.size>PACKAGE_LIMITS.textBytes)throw Error("Export source is missing or exceeds the 2 MiB text limit.");const text=await this.app.vault.read(file);if(!ready()||file.path!==path||!readableText(path,this.settings)||new TextEncoder().encode(text).length>PACKAGE_LIMITS.textBytes)throw Error("Export source changed or exceeded its byte budget.");return text;},
+      readPdf:(path,signal)=>this.readPdf(path,settings,signal),resolve:(path,link)=>{const exact=this.app.vault.getAbstractFileByPath(link),file=exact instanceof TFile?exact:this.app.metadataCache.getFirstLinkpathDest(link,path);return file&&allowed(file.path)?file.path:null;}};
+  }
+  checkProjectPackageDestination(path:string):void{
+    if(!this.active)throw Error("Thread stopped. Reopen and preview again.");exportDestination(path,this.settings.excludedPaths);
+    const keys=new Set(path.split('/').map((_,i,parts)=>parts.slice(0,i+1).join('/').toLowerCase()));
+    for(const file of this.app.vault.getAllLoadedFiles())if(keys.has(file.path.normalize('NFC').toLowerCase())&&!path.startsWith(file.path+'/')&&file.path!==path)throw Error("Destination collides with an existing path by case. Choose a new portable folder/name.");
+  }
   async readPdf(path:string,settings:ThreadSettings,signal:AbortSignal):Promise<{hash:string;bytes:ArrayBuffer}>{
     const snapshot=JSON.stringify(settings);return readPdfOriginal(path,settings,{get:path=>{const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?file:null;},read:file=>this.app.vault.readBinary(file)},()=>this.active&&snapshot===JSON.stringify(this.settings),signal);
   }

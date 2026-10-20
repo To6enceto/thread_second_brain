@@ -69,7 +69,7 @@ PDF support and project portability split into two features each.
 
 ## Milestone J - Preserve and move project context
 
-- [ ] 33. **Project exports and checkpoints** - Preview and explicitly create portable local project packages of selected permitted notes and eligible supporting files, with a versioned hash manifest, clear omissions and no plugin secrets/caches/journal originals or implicit whole-vault backup claim.
+- [x] 33. **Project exports and checkpoints** - Preview and explicitly create portable local project packages of selected permitted notes and eligible supporting files, with a versioned hash manifest, clear omissions and no plugin secrets/caches/journal originals or implicit whole-vault backup claim.
 - [ ] 34. **Reviewed project package import** - Validate package types, paths, sizes and hashes, preview destinations/links/identities and collisions, then import new copies without overwriting notes or granting reads; prove recovery, portability and the final packaged offline workflow.
 
 ## Build discipline

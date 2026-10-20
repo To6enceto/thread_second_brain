@@ -558,3 +558,40 @@ dependent outputs and vectors. Exact consent does not follow renamed PDFs.
 Use Extract local PDF explicitly with a new source name to restore evidence;
 old extractions, notes and original PDFs are preserved. Keyword search, recorded
 Resume context and explicit review remain usable without a model.
+
+Use **Thread: Export project checkpoint** (also under More actions) to choose a
+permitted project and current text files. Already-consented supporting PDF
+originals are optional and start unchecked. Preview the inventory, omissions,
+readable note contents, hashes and exact new destination, then explicitly save.
+The default destination is a new `.thread-project.json` file in `Thread Exports`;
+no read permission is added. Existing or concurrently created files are refused.
+Sources, settings and durable change/import history are preserved. Cancel or
+source/scope/input changes revoke the preview. An uncertain write can leave a
+folder or package file: inspect it and choose a new name before retrying.
+
+Project packages are uncompressed UTF-8 JSON version1 with a manifest and base64
+payloads, not ZIP archives. The manifest identifies the checkpoint and project,
+original paths, file types, byte lengths, SHA-256, identities and permitted
+links/provenance. Only visible portable NFC paths with `.md`, `.txt` or `.pdf`
+files are supported. Case-equivalent/file-folder conflicts and common reserved
+platform names are refused. Limits:100 candidates/entries,2 MiB per text file,
+16 MiB per PDF,32 MiB expanded file bytes and48 MiB serialized package bytes.
+Explicit original-PDF verification keeps its existing finite per-pass limits.
+No model or network is needed, and there is no service charge.
+
+Whole notes with stale, unsupported or unavailable copied decision/question/
+review/output provenance are omitted by default, with generic counts. Every
+retained synthesis block is checked (at most100 blocks/2000 references), including
+older blocks omitted by AI recall. Legacy appended decision model observations
+without complete source snapshots are conservatively omitted; local notes remain
+unchanged. Manifest
+link/provenance metadata does not enumerate excluded targets. Selected original
+note bytes can contain their own links. Hidden configuration, plugin secrets,
+caches, recovery journals and originals, models and runtime files are never
+selected automatically. This is a selected project checkpoint, not an exhaustive
+vault backup or permanent journal.
+
+Files and IDs remain byte-exact. The manifest retains original-path mappings;
+relocating copies can leave fully qualified vault links and PDF original paths
+needing manual review or explicit re-extraction. Checkpoints never silently
+rewrite identities, source hashes or provenance to declare moved evidence fresh.
