@@ -1,6 +1,6 @@
 {
   "name": "thread-obsidian",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "A local AI project memory and research companion for Obsidian.",
@@ -15,11 +15,12 @@
     "test": "node scripts/test.mjs",
     "build": "node esbuild.config.mjs --production",
     "verify": "npm run typecheck && npm test && npm run build",
-    "package": "npm run verify && node scripts/package.mjs",
+    "package": "npm run verify && node --experimental-strip-types scripts/package.mjs",
     "evaluate": "node --experimental-strip-types scripts/evaluate.mjs",
     "evaluate:index": "node --experimental-strip-types scripts/evaluate-index.mjs",
     "evaluate:retrieval": "node --experimental-strip-types scripts/evaluate-retrieval.mjs",
-    "fixtures:pdf": "node --experimental-strip-types scripts/pdf-fixtures.mjs"
+    "fixtures:pdf": "node --experimental-strip-types scripts/pdf-fixtures.mjs",
+    "updater": "node --experimental-strip-types scripts/update-thread.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

@@ -11,7 +11,7 @@ recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No
 account, API key, backend or paid model service is required.
 
-This is a **private local 0.3.0 build**, not a published Community plugin. It is
+This is a **private local 0.4.0 build**, not a published Community plugin. It is
 tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
 `qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
 use. Windows, macOS, other models and later versions need their own validation.
@@ -27,7 +27,7 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.3.0.zip` and version-specific staging `dist/thread-0.3.0/`. The ZIP contains
+then creates `dist/thread-0.4.0.zip` and version-specific staging `dist/thread-0.4.0/`. The ZIP contains
 `thread/main.js`, `thread/manifest.json`, `thread/styles.css`, the local PDF
 worker, `pdf-assets.json` and its explicitly listed CMap/font/license resources.
 The inventory is verified by path, byte size and SHA-256 before packaging. No vault, model,
@@ -441,7 +441,7 @@ remain listed: review is explicit and there is no automatic dismissal or history
 rewrite. The queue works with Ollama stopped; optional AI review flows still need
 your downloaded local text model.
 
-The private 0.3.0 package has no hosted runtime charge, subscription or API key.
+The private 0.4.0 package has no hosted runtime charge, subscription or API key.
 Obsidian, local Ollama and the tested Qwen models can run without a paid service.
 You supply storage, memory, hardware and electricity; initial downloads need
 internet. Synthetic Linux acceptance covers the documented runtime/model pair;
@@ -757,8 +757,8 @@ created just before a journal failure may require this conservative path. Restor
 invalid journals only from your own known good backup; never reset history to
 force a retry. This is a new-copy import, not a destructive vault restore.
 
-Release0.3.0 includes191 explicitly inventoried files and preserves earlier build
-artifacts in version-specific staging. `node scripts/verify-package.mjs dist/thread-0.3.0.zip` checks exact paths, ZIP records/CRC, production bytes,
+Release0.4.0 includes192 explicitly inventoried files and preserves earlier build
+artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.0.zip` checks exact paths, ZIP records/CRC, production bytes,
 PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
 from the installed plugin. This private build has no API/hosting subscription;
 local storage, compute and electricity still apply.
@@ -790,3 +790,7 @@ content; importing copies is a separate explicit workflow, not a restore button.
 Use **Review web clip** in Research (or **Thread: Review saved web clip**) to review a deliberately saved local clip, explicitly choose its project, inspect metadata and possible duplicates, then preview a new source copy. Publication, capture and intake dates stay separate; missing or ambiguous metadata stays unknown. The original clip is never overwritten, URLs are not fetched and no AI model is used. Changes require a fresh preview.
 
 Importable article/selection templates and detailed steps are in [the Web Clipper guide](integrations/clipper/README.md). Intake accepts original permitted local text up to2 MiB including saved provenance. The picker covers up to200 indexed notes; duplicate hints cover up to100 current permitted imported sources and do not establish complete coverage or duplicate identity. Browser-extension use remains a separate explicit user action.
+
+## Local update previews
+
+The Linux helper validates a locally selected private Thread package and produces an exact code/asset replacement preview while preserving the installation and vault. It checks fixed inventory/hashes, paths/links, versions, host compatibility and known data schemas. See [local update instructions](docs/local-updates.md). Apply and recovery are not yet available in the preview-only helper. Packages are local artifacts, not a published release; checksums are not publisher signatures.
