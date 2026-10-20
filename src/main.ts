@@ -1,3 +1,4 @@
+import {searchBudget,type SearchLevel} from "./retrieval/budget.ts";
 import { IndexModal } from "./ui/index-modal.ts";
 import { indexBudget } from "./settings/index-budget.ts";
 import { indexCoverage, retainIndexEntries, type IndexReadStats } from "./vault/index-coverage.ts";
@@ -435,7 +436,7 @@ export default class ThreadPlugin extends Plugin {
     return {...bundle,noteHashes};
   }
   async searchEvidence(query:string,vault:boolean,filters:SearchFilters,hybrid:boolean,settings:ThreadSettings,
-    signal:AbortSignal,isCurrent:()=>boolean=()=>true,watch:(paths:string[])=>void=()=>{}):Promise<SearchResult>{
+    signal:AbortSignal,isCurrent:()=>boolean=()=>true,watch:(paths:string[])=>void=()=>{},level:SearchLevel="standard"):Promise<SearchResult>{
     if(!this.index.ready)await this.rebuildIndex();
     let snapshot:IndexEntry[]=[];
     const current=()=>{
@@ -449,10 +450,11 @@ export default class ThreadPlugin extends Plugin {
     snapshot=filterEntries(entries,filters);
     const graph=this.index.graph(settings);
     watch([...new Set(snapshot.flatMap(entry=>[entry.path,...Object.keys(graph.assess(entry.path).dependencies)]))]);
-    const withCoverage=(result:SearchResult):SearchResult=>({...result,coverage:{...result.coverage,indexOmittedNotes:this.index.coverage?.omittedFiles??0}});
-    if(!hybrid||!settings.semanticSearch)return withCoverage(searchEntries(entries,query,filters));
+    const budget=searchBudget(level);
+    const withCoverage=(result:SearchResult):SearchResult=>({...result,coverage:{...result.coverage,indexOmittedNotes:this.index.coverage?.omittedFiles??0,level:budget.level}});
+    if(!hybrid||!settings.semanticSearch)return withCoverage(searchEntries(entries,query,filters,budget.results));
     // Hash only the bounded candidate notes before transmitting their passages.
-    const candidates=semanticCandidates(filterEntries(entries,filters),query).candidates;
+    const selection=await semanticCandidates(filterEntries(entries,filters),query,budget.level,signal,current),{candidates}=selection;
     for(const entry of new Map(candidates.map(hit=>[hit.entry.path,hit.entry])).values()){
       assertCurrent();
       if(!readableText(entry.path,this.settings))throw new Error("Search source is outside read scope.");
@@ -461,7 +463,7 @@ export default class ThreadPlugin extends Plugin {
       const hash=await contentHash(await this.app.vault.read(file));assertCurrent();
       if(file.path!==entry.path||hash!==entry.hash)throw new Error("Search source changed. Refresh the index.");
     }
-    return withCoverage(await this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current));
+    return withCoverage(await this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current,budget.level,selection));
   }
   async evidence(settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
     if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();

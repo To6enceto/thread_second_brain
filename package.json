@@ -16,7 +16,8 @@
     "verify": "npm run typecheck && npm test && npm run build",
     "package": "npm run verify && node scripts/package.mjs",
     "evaluate": "node --experimental-strip-types scripts/evaluate.mjs",
-    "evaluate:index": "node --experimental-strip-types scripts/evaluate-index.mjs"
+    "evaluate:index": "node --experimental-strip-types scripts/evaluate-index.mjs",
+    "evaluate:retrieval": "node --experimental-strip-types scripts/evaluate-retrieval.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

@@ -213,15 +213,17 @@ explicit keyword fallback. Thread never downloads models or runs background
 embedding jobs. The local runtime and embedding model are free; downloads need
 disk space and inference uses your hardware and electricity.
 
-Hybrid combines keyword and cosine similarity ranks. It considers at most 128
-350-character passages, cycling through eligible notes before taking extras;
+Hybrid combines keyword and cosine similarity ranks. The request budget selects
+128/384/768 candidate windows (Standard/Broader/Maximum), each at most 350
+characters, with at most 20/35/50 returned passages. It cycles through notes
+and initial windows across distinct headings before taking extra windows;
 filters and required quoted phrases still apply. Results and saved answers show
 candidate counts, model digest and coverage limits. The fixed 0.45 similarity
 threshold is a conservative heuristic tested with the example model, not a
 universal relevance score. Large vaults can have relevant passages outside this
 bounded candidate set. Missing evidence and incorrect matches remain possible.
 
-At most 512 source vectors stay in memory, keyed by local model digest, full
+At most 1024 source vectors stay in memory, keyed by local model digest, full
 note hash, path and exact passage. They clear on index/scope/model changes and
 plugin unload; no vector database or persistent embedding files are created.
 All embedding calls use the same cloud-disabled loopback checks as generation.
@@ -437,3 +439,34 @@ renderer read is counted separately in native evidence. These are observations
 on this computer, not a guarantee for arbitrary vaults. Run `npm run evaluate:index`
 for the reusable synthetic long-introduction/later-heading regression and prefix
 negative control; `npm run evaluate` checks the authored answer-quality fixtures.
+
+
+Find and Ask include a **Search budget** selector and **Search more** button.
+Search more explicitly advances Standard -> Broader -> Maximum and retrieves
+again. At Maximum it is disabled. Editing the query, filters, scope or method
+returns to Standard. These choices apply only to the request and never modify
+read grants, saved settings, index profiles or the 16000-character chosen model
+context. Search more clears old candidates, choices and answers and invalidates
+old answer-save previews. Ask still requires explicit Generate after inspecting
+the renewed exact context. Retrieval alone never generates or saves an answer.
+
+Keyword search examines current bounded indexed text with three passages/note
+and the selected result cap, even without an embedding model. Hybrid inspects
+unique windows from that same finite index, yielding during candidate scanning,
+and reports considered/available windows, notes and distinct note/heading groups.
+Repeated equal heading names share a group; counts do not prove exact section
+identity, semantic support or complete vault coverage. Source hashes are checked
+before selected candidate text is sent locally. Larger budgets can use more
+CPU/time and up to 1024 in-memory source vectors; no background embeddings or
+model download starts. Search cannot recover text omitted by index/scope limits.
+
+An authored 140-heading fixture placed the only related-wording answer at the
+last heading. Actual local qwen3-embedding:0.6b searched 128 headings in 3183 ms
+and missed it; explicit Broader inspected 140 and retrieved the budget with
+three additional embedding calls, reusing prior vectors. Keyword had no match.
+A real qwen3:4b-instruct answer used a reviewed 483-character source context.
+These fixture observations do not guarantee relevance or latency elsewhere.
+Run `npm run evaluate:retrieval` for deterministic positive/negative controls,
+or `npm run evaluate:retrieval -- --live` to explicitly use that already
+downloaded local embedding model at loopback port 11434. Both retain the same
+context/candidate limits; no model is downloaded by the command.

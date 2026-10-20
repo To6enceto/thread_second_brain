@@ -1,3 +1,5 @@
+import {searchBudget,searchLevels,searchLevel,nextSearchLevel,type SearchLevel} from "../retrieval/budget.ts";
+import type {DropdownComponent} from "obsidian";
 import { Setting } from "obsidian";
 import type { SearchFilters } from "../retrieval/search.ts";
 
@@ -35,4 +37,11 @@ export function searchMethod(parent: HTMLElement, enabled: boolean, changed: () 
       dropdown.onChange(value => { state.hybrid = value === "hybrid"; changed(); });
     });
   return state;
+}
+
+export function searchBudgetControls(parent:HTMLElement,changed:()=>void,more:()=>void,current:()=>boolean):{level:SearchLevel;reset:()=>void} {
+  let select:DropdownComponent;const state={level:'standard' as SearchLevel,reset:()=>{state.level='standard';select.setValue(state.level);update();}};
+  const update=()=>{advance.disabled=!nextSearchLevel(state.level);description.setText(`This request: ${searchBudget(state.level).candidates} local embedding windows, at most ${searchBudget(state.level).results} returned passages. Keyword scans current indexed text without a model. Search more raises only this finite request budget; grants, index limits and the 16000-character chosen context stay unchanged.`);};
+  new Setting(parent).setName('Search budget').addDropdown(d=>{select=d;d.selectEl.setAttribute('aria-label','Search budget');for(const level of searchLevels){const b=searchBudget(level);d.addOption(level,`${level}: ${b.candidates} candidates / ${b.results} results`);}d.setValue(state.level).onChange(value=>{if(!current())return;state.level=searchLevel(value);update();changed();});});
+  const description=parent.createEl('p',{cls:'thread-meta'}),advance=parent.createEl('button',{text:'Search more'});advance.onclick=()=>{if(!current())return;const next=nextSearchLevel(state.level);if(!next)return;state.level=next;select.setValue(next);update();changed();more();};update();return state;
 }

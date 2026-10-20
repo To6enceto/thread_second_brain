@@ -1,3 +1,4 @@
+import {searchBudget,type SearchLevel} from "./budget.ts";
 import type { HybridCoverage } from "./semantic.ts";
 import type { IndexEntry, RecallHit } from "../vault/index.ts";
 import { isWithin, vaultPath } from "../vault/scope.ts";
@@ -9,7 +10,7 @@ export interface SearchFilters { type?: string; status?: string; path?: string; 
 export interface SearchCoverage {
   eligibleNotes: number; filteredNotes: number; matchedNotes: number; matchedPassages: number;
   returnedPassages: number; truncatedNotes: number; limited: boolean; queryTruncated: boolean;
-  indexedSections?: number; representedSections?: number; indexOmittedNotes?: number;
+  level?:SearchLevel; indexedSections?: number; representedSections?: number; indexOmittedNotes?: number;
 }
 export interface SearchResult { hits: RecallHit[]; coverage: SearchCoverage; hybrid?: HybridCoverage; }
 const stopWords = new Set("the a an and or is to of in for what how we our was are did does why with has have can which when where from be it on as by".split(" "));
@@ -106,5 +107,5 @@ export function searchEntries(eligible: IndexEntry[], query: string, filters: Se
 }
 
 export function searchCoverageText(coverage: SearchCoverage): string {
-  return `${coverage.returnedPassages} selected passages; ${coverage.matchedPassages} matches across ${coverage.matchedNotes} notes. ${coverage.filteredNotes} of ${coverage.eligibleNotes} eligible notes pass filters. At most 3 passages per note and 50 results. Index passages are section-balanced within the selected finite profile (${coverage.truncatedNotes} shortened notes; ${coverage.representedSections??"unknown"} of ${coverage.indexedSections??"unknown"} nonempty sections represented in filtered indexed notes). ${coverage.indexOmittedNotes===undefined?"Inspect Text index coverage for omitted permitted files.":`${coverage.indexOmittedNotes} permitted files omitted from the index; their text coverage is unknown.`} ${coverage.queryTruncated ? "The query was shortened to 1000 characters/40 terms. " : ""}Weighted token matching; quoted phrases are required. Results do not establish complete coverage.`;
+  return `${coverage.returnedPassages} selected passages; ${coverage.matchedPassages} matches across ${coverage.matchedNotes} notes. ${coverage.filteredNotes} of ${coverage.eligibleNotes} eligible notes pass filters. At most 3 passages per note and ${searchBudget(coverage.level).results} returned results for the ${searchBudget(coverage.level).level} request budget (50 is the absolute cap). Index passages are section-balanced within the selected finite profile (${coverage.truncatedNotes} shortened notes; ${coverage.representedSections??"unknown"} of ${coverage.indexedSections??"unknown"} nonempty sections represented in filtered indexed notes). ${coverage.indexOmittedNotes===undefined?"Inspect Text index coverage for omitted permitted files.":`${coverage.indexOmittedNotes} permitted files omitted from the index; their text coverage is unknown.`} ${coverage.queryTruncated ? "The query was shortened to 1000 characters/40 terms. " : ""}Weighted token matching; quoted phrases are required. Results do not establish complete coverage.`;
 }

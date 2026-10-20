@@ -8,7 +8,8 @@ import { OllamaClient } from "../intelligence/ollama.ts";
 import { ANSWER_SCHEMA,answerPrompt,validateAnswer,answerMarkdown,type Answer } from "../intelligence/answer.ts";
 import { localDay,noteName } from "../vault/workspace.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
-import { searchFilters,searchMethod } from "./search-filters.ts";
+import type {SearchLevel} from "../retrieval/budget.ts";
+import { searchFilters,searchMethod,searchBudgetControls } from "./search-filters.ts";
 import { hybridCoverageText } from "../retrieval/semantic.ts";
 import { searchCoverageText,type SearchFilters } from "../retrieval/search.ts";
 
@@ -25,24 +26,26 @@ export class AskModal extends ThreadModal {
   onOpen():void{
     const el=this.contentEl;el.createEl("h2",{text:"Ask your vault"});
     el.createEl("p",{text:"Retrieve passages, choose what to include or pin, then generate locally. Citations identify evidence; inspect whether each excerpt supports its claim."});
-    let question="",vault=false;
-    new Setting(el).setName("Question").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Question");t.inputEl.maxLength=1000;t.onChange(v=>{question=v;this.changed("Question changed. Retrieve passages again.");});});
-    new Setting(el).setName("Answer scope").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Answer scope");d.addOption("project","Selected project").addOption("vault","All allowed paths").onChange(v=>{vault=v==="vault";this.changed("Scope changed. Retrieve passages again.");});});
-    const filters=searchFilters(el,()=>this.changed("Filters changed. Retrieve passages again."));
-    const method=searchMethod(el,this.plugin.settings.semanticSearch,()=>this.changed("Search method changed. Retrieve passages again."));
+    let question="",vault=false;let budget:ReturnType<typeof searchBudgetControls>|null=null;
+    const edited=(message:string)=>{budget?.reset();this.changed(message);};
+    new Setting(el).setName("Question").addTextArea(t=>{t.inputEl.setAttribute("aria-label","Question");t.inputEl.maxLength=1000;t.onChange(v=>{question=v;edited("Question changed. Retrieve passages again.");});});
+    new Setting(el).setName("Answer scope").addDropdown(d=>{d.selectEl.setAttribute("aria-label","Answer scope");d.addOption("project","Selected project").addOption("vault","All allowed paths").onChange(v=>{vault=v==="vault";edited("Scope changed. Retrieve passages again.");});});
+    const filters=searchFilters(el,()=>edited("Filters changed. Retrieve passages again."));
+    const method=searchMethod(el,this.plugin.settings.semanticSearch,()=>edited("Search method changed. Retrieve passages again."));
+    budget=searchBudgetControls(el,()=>this.changed("Search budget changed. Retrieve passages again."),()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);},()=>!this.closed&&this.plugin.active);
     this.status=el.createEl("p",{attr:{role:"status","aria-live":"polite"}});
     this.askButton=el.createEl("button",{text:"Retrieve evidence",cls:"mod-cta"});
-    el.createEl("button",{text:"Cancel"}).onclick=()=>this.changed("Canceled. Retrieve evidence to start again.");
-    this.resultEl=el.createDiv();this.askButton.onclick=()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid);};
+    el.createEl("button",{text:"Cancel"}).onclick=()=>edited("Canceled. Retrieve evidence to start again.");
+    this.resultEl=el.createDiv();this.askButton.onclick=()=>{void this.run(question.trim(),vault,structuredClone(filters),method.hybrid,budget!.level);};
   }
-  async run(question:string,vault:boolean,filters:SearchFilters={},hybrid=false):Promise<void>{
+  async run(question:string,vault:boolean,filters:SearchFilters={},hybrid=false,level:SearchLevel="standard"):Promise<void>{
     if(this.closed)return;this.inputs++;this.invalidate();const epoch=this.epoch,settings=structuredClone(this.plugin.settings);
     if(!question||question.length>1000){this.status?.setText("Enter a question of up to 1000 characters.");return;}
     if(!vault&&!settings.selectedProject){this.status?.setText("Select a project in Settings first.");return;}
     const controller=new AbortController();this.controller=controller;this.askButton!.disabled=true;this.status?.setText("Retrieving permitted passages...");
     try{
       if(!this.plugin.index.ready)await this.plugin.rebuildIndex();controller.signal.throwIfAborted();
-      const search=await this.plugin.searchEvidence(question,vault,filters,hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch,paths=>this.watchPaths(paths));
+      const search=await this.plugin.searchEvidence(question,vault,filters,hybrid,settings,controller.signal,()=>!this.closed&&epoch===this.epoch,paths=>this.watchPaths(paths),level);
       const candidates=this.plugin.withDependencies({...await buildEvidence(hitsToNotes(search.hits)),searchCoverage:search.coverage,hybridCoverage:search.hybrid},settings);
       if(!await this.plugin.evidenceCurrent(candidates,settings))throw new Error("Sources changed. Retrieve passages again.");
       controller.signal.throwIfAborted();if(this.closed||epoch!==this.epoch)return;
