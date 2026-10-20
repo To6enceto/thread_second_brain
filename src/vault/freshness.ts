@@ -3,6 +3,7 @@ import { readableText,vaultPath,type ReadScope } from "./scope.ts";
 import { reviewProvenance } from "./review-provenance.ts";
 import { mayReadPdf } from "../pdf/scope.ts";
 import type { PdfRecord } from "../pdf/record.ts";
+import { hasAnswerRecord, answerRecordProjection } from "./answer-record.ts";
 
 export interface PdfCitation{path:string;hash:string;page:number;}
 export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;pdf?:PdfCitation;}
@@ -82,6 +83,12 @@ function privateRecordText(text:string,version:unknown,kind:"question"|"review",
 export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
   const whole={text,ranges:[{from:0,to:text.length}]};
   if(metadata.thread_pdf_version!==undefined||metadata.thread_pdf!==undefined||/^[\t ]*(?:thread_pdf(?:_version)?|["']thread_pdf(?:_version)?["'])\s*:/im.test(text))return{text:"",ranges:[],output:{refs:[],invalid:true,title:"PDF extraction needs current-original verification before evidence reuse."}};
+  if (hasAnswerRecord(text, metadata)) {
+    try {
+      const refs = readSourceReferences(metadata.thread_sources);
+      return { ...answerRecordProjection(text, metadata, refs), output: { refs, invalid: false, title: "Reviewed answer; user classifications are not independent verification" } };
+    } catch { return { text: "", ranges: [], output: { refs: [], invalid: true, title: "Unsupported or changed reviewed answer record" } }; }
+  }
   // Dispatch and line validation share recognition; only standalone canonical
   // markers are valid. Frontmatter is already private in managed records.
   const body=text.slice(bodyStart(text)),markers=privateMarkers(body),markerKinds=markers.kinds;

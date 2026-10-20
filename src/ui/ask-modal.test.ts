@@ -22,7 +22,7 @@ interface Element {textContent:string;value:string;disabled:boolean;children:Ele
 const rendered=(element:Element):string=>element.textContent+'\n'+element.children.map(rendered).join('\n');
 test('actual workbench handlers require reviewed generation and revoke changed choices/previews',async()=>{
  const form={elements:[] as Element[],fields:new Map<string,Element>()};Reflect.set(globalThis,'__workbenchForm',form);
- const settings={...defaultSettings(),allowedPaths:['P'],selectedProject:'P'},created:unknown[]=[],opened:string[]=[];
+ const settings={...defaultSettings(),model:'local',allowedPaths:['P'],selectedProject:'P'},created:unknown[]=[],opened:string[]=[];
  const entries=await Promise.all(['FIRST_CANARY','SECOND_CANARY'].map((text,i)=>indexNote({path:`P/${i}.md`,text,metadata:{type:'source'},modifiedAt:1},()=>null)));
  let calls=0,signal:AbortSignal|undefined,duringCreate=()=>{};const levels:string[]=[];
  const plugin={app:{},active:true,settings,index:{ready:true,revision:1},modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>true,projectIdentity:()=>"project",withDependencies:(v:unknown)=>v,
@@ -53,5 +53,41 @@ test('actual workbench handlers require reviewed generation and revoke changed c
   await button('Search more').onclick!();for(let n=0;modal.controller&&n<100;n++)await new Promise(resolve=>setImmediate(resolve));assert.equal(levels.at(-1),'maximum');assert.equal(button('Search more').disabled,true);
   input('Search note type','source');assert.equal(button('Search more').disabled,false);await modal.askButton!.onclick!({} as PointerEvent);for(let n=0;modal.controller&&n<100;n++)await new Promise(resolve=>setImmediate(resolve));assert.equal(levels.at(-1),'standard');
   const detachedMore=button('Search more'),requestCount=levels.length;modal.close();await detachedMore.onclick!();assert.equal(levels.length,requestCount);
+ }finally{modal.controller?.abort();Reflect.deleteProperty(globalThis,'__workbenchForm');Reflect.deleteProperty(globalThis,'__workbenchModel');}
+});
+
+test("claim correction handlers retain originals and require renewed exact previews",async()=>{
+ const form={elements:[] as Element[],fields:new Map<string,Element>()};Reflect.set(globalThis,'__workbenchForm',form);
+ const settings={...defaultSettings(),model:'local',allowedPaths:['P'],selectedProject:'P'};
+ const entry=await indexNote({path:'P/Source.md',text:'Voice is proposed.',metadata:{type:'source'},modifiedAt:1},()=>null);
+ let calls=0,fresh=true;const created:import('../vault/workspace.ts').NewNote[][]=[];
+ const plugin={app:{},active:true,settings,index:{ready:true,revision:1},modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>fresh,projectIdentity:()=>'project',withDependencies:(v:unknown)=>v,
+  searchEvidence:async()=>({hits:[{entry,heading:'',excerpt:entry.chunks[0]!.excerpt,score:1}]}),
+  createNotes:async(notes:import('../vault/workspace.ts').NewNote[],validate:()=>Promise<void>,current:()=>boolean)=>{await validate();assert.ok(current());created.push(structuredClone(notes));}};
+ const button=(label:string)=>{const found=[...form.elements].reverse().find(e=>e.textContent===label);assert.ok(found,label);return found;};
+ const input=(label:string,value:string)=>{const field=form.fields.get(label);assert.ok(field,label);field.changed!(value);};
+ Reflect.set(globalThis,'__workbenchModel',()=>{calls++;return Promise.resolve(JSON.stringify({supported:true,answer:[{text:'ORIGINAL_MODEL_CANARY',kind:'fact',sourceIds:['S1']}],gaps:[]}));});
+ const modal=new AskModal(plugin as unknown as ThreadPlugin);modal.open();
+ const preview=()=>[...plugin.modals].at(-1) as unknown as import('./new-note-modal.ts').NewNoteModal;
+ try{
+  await modal.run('What is recorded?',false);await button('Generate from chosen evidence').onclick!();
+  const original=JSON.stringify(modal.answer);assert.equal(modal.answer!.answer[0]!.modelKind,'fact');
+  await button('Preview answer note').onclick!();const old=preview(),oldBytes=old.note.content;
+  input('Claim text 1','Compare a text-first alternative.');input('Claim classification 1','suggestion');
+  assert.equal(calls,1,'Editing must not invoke AI');assert.equal(JSON.stringify(modal.answer),original,'Original model result stays immutable');
+  assert.equal(old.apply!.disabled,true);await old.apply!.onclick!({} as PointerEvent);assert.equal(created.length,0);assert.equal(old.note.content,oldBytes,'Existing preview bytes are frozen');
+  input('Claim text 1',' ');assert.equal(button('Preview answer note').disabled,true);
+  const count=plugin.modals.size;await button('Preview answer note').onclick!();assert.equal(plugin.modals.size,count,'Invalid draft cannot preview');
+  input('Claim text 1','Compare a text-first alternative.');assert.equal(button('Preview answer note').disabled,false);
+  await button('Preview answer note').onclick!();const renamed=preview();
+  input('New answer note name','Reviewed answer');assert.equal(renamed.apply!.disabled,true);
+  await button('Preview answer note').onclick!();let latest=preview();const approved={...latest.note};
+  assert.match(approved.content,/User correction - Proposed action/);assert.match(approved.content,/Original model \(fact\): ORIGINAL/);assert.match(approved.content,/thread_answer_version: "1"/);
+  assert.equal(approved.path,'P/Answers/Reviewed answer.md');await latest.apply!.onclick!({} as PointerEvent);assert.deepEqual(created,[[approved]]);
+  await button('Preview answer note').onclick!();latest=preview();fresh=false;await latest.apply!.onclick!({} as PointerEvent);assert.equal(created.length,1);assert.match(latest.status!.textContent!,/changed/);
+  fresh=true;await button('Preview answer note').onclick!();latest=preview();await button('Cancel').onclick!();assert.equal(modal.answer,null);assert.equal(latest.apply!.disabled,true);assert.equal(created.length,1);
+  await modal.run('What is recorded?',false);await button('Generate from chosen evidence').onclick!();
+  assert.ok(!rendered(modal.contentEl as unknown as Element).includes('Compare a text-first alternative.'));
+  await button('Preview answer note').onclick!();latest=preview();modal.close();await latest.apply!.onclick!({} as PointerEvent);assert.equal(created.length,1,'Closing Ask revokes its preview');
  }finally{modal.controller?.abort();Reflect.deleteProperty(globalThis,'__workbenchForm');Reflect.deleteProperty(globalThis,'__workbenchModel');}
 });

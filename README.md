@@ -90,6 +90,21 @@ claims show the cited records' statuses, and adjusted model classifications stay
 visible. Earlier saved notes and their fact/interpretation/suggestion values
 remain compatible. Always compare claims with their supporting excerpts.
 
+In Ask, expand **Edit claim 1** (or another claim) to change its text or
+classification. Your correction is labelled separately and keeps the original
+model wording/type and citations. Editing or changing the note name revokes
+earlier previews: choose **Preview answer note** again, inspect the exact text,
+then **Save previewed note**. Corrections do not modify source notes or verify
+truth, and stale/excluded evidence still blocks saving.
+
+New Ask saves use versioned Markdown records. They retain original output,
+automatic classification, the final user correction and timestamp, generation
+details and evidence. Intermediate unsaved edits are not a history log. Only the
+current reviewed answer is indexed; original model/correction history stays
+readable in the note. Unsupported metadata or manual changes to the managed
+record block reuse; create a new reviewed answer instead. Earlier answers remain
+compatible without conversion. Existing filenames are never overwritten.
+
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 

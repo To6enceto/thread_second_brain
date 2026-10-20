@@ -5,8 +5,10 @@ import { buildEvidence,contextCoverageText,type EvidenceBundle } from "../vault/
 import { selectContext,type EvidenceChoice } from "../vault/workbench.ts";
 import { hitsToNotes } from "../vault/index.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
-import { ANSWER_SCHEMA,answerPrompt,validateAnswer,answerMarkdown,type Answer } from "../intelligence/answer.ts";
+import { ANSWER_SCHEMA,answerPrompt,validateAnswer,type Answer } from "../intelligence/answer.ts";
 import { claimLabel, decisionContext } from "../intelligence/claims.ts";
+import { createAnswerRecord, reviewedAnswerMarkdown, validateCorrection, type ClaimCorrections } from "../vault/answer-record.ts";
+import type { Claim } from "../intelligence/briefing.ts";
 import { localDay,noteName } from "../vault/workspace.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
 import type {SearchLevel} from "../retrieval/budget.ts";
@@ -21,7 +23,11 @@ export class AskModal extends ThreadModal {
   askButton:HTMLButtonElement|null=null;
   private prepared:PreparedContext|null=null;
   private inputs=0;
-  override invalidate(message?:string):void{super.invalidate(message);this.answer=null;this.bundle=null;this.prepared=null;if(this.askButton)this.askButton.disabled=false;}
+  private corrections:ClaimCorrections={};
+  private previews=new Set<NewNoteModal>();
+  private revokePreviews(message:string):void{for(const preview of this.previews)if(!preview.closed)preview.invalidate(message);this.previews.clear();}
+  override invalidate(message?:string):void{super.invalidate(message);this.revokePreviews(message??"Answer or sources changed. Generate a new preview.");this.corrections={};this.answer=null;this.bundle=null;this.prepared=null;if(this.askButton)this.askButton.disabled=false;}
+  override onClose():void{this.inputs++;this.revokePreviews("Answer closed. Generate a new preview.");this.corrections={};this.answer=null;this.bundle=null;this.prepared=null;super.onClose();}
   private changed(message:string):void{this.inputs++;this.invalidate(message);}
   private live(prepared:PreparedContext):boolean{return !this.closed&&this.plugin.active&&this.prepared===prepared&&JSON.stringify(prepared.settings)===JSON.stringify(this.plugin.settings);}
   onOpen():void{
@@ -87,7 +93,7 @@ export class AskModal extends ThreadModal {
       top.createEl("button",{text:`Open evidence ${source.id}`,cls:"thread-source",attr:{title:source.path}}).onclick=()=>{if(!this.live(prepared))return;void this.plugin.openIndexedSource(source.path,prepared.candidates.noteHashes[source.path]!,source.heading,()=>this.live(prepared)).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
       new Setting(top).setName(`Use ${source.id}`).addDropdown(d=>{d.selectEl.setAttribute("aria-label",`Evidence choice ${source.id}`);d.addOption("include","Include").addOption("exclude","Exclude").addOption("pin","Pin first").onChange(value=>{
         if(!this.live(prepared)||!["include","exclude","pin"].includes(value))return;
-        prepared.choices[source.id]=value as EvidenceChoice;this.inputs++;this.epoch++;this.controller?.abort();this.controller=null;this.answer=null;this.bundle=null;answerEl.empty();showContext();this.status?.setText("Evidence choices changed. Generate again from the renewed context.");
+        prepared.choices[source.id]=value as EvidenceChoice;this.inputs++;this.epoch++;this.controller?.abort();this.controller=null;this.revokePreviews("Evidence choices changed. Generate a new preview.");this.corrections={};this.answer=null;this.bundle=null;answerEl.empty();showContext();this.status?.setText("Evidence choices changed. Generate again from the renewed context.");
       });});
       row.createEl("p",{text:`${source.path.split("/").pop()}${source.heading?` › ${source.heading}`:""}`,cls:"thread-evidence-path",attr:{title:source.path}});
       row.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
@@ -96,7 +102,8 @@ export class AskModal extends ThreadModal {
   }
   private async generate(prepared:PreparedContext,bundle:EvidenceBundle,answerEl:HTMLElement,button:HTMLButtonElement):Promise<void>{
     if(!bundle.sources.length||!this.live(prepared))return;
-    const epoch=this.epoch,inputs=this.inputs,controller=new AbortController();this.controller=controller;button.disabled=true;answerEl.empty();
+    this.inputs++;this.revokePreviews("Generating a new answer. Generate a new preview afterward.");this.corrections={};this.answer=null;this.bundle=null;
+    const epoch=this.epoch,controller=new AbortController();this.controller=controller;button.disabled=true;answerEl.empty();
     const current=()=>this.live(prepared)&&epoch===this.epoch&&!controller.signal.aborted;
     this.status?.setText("Generating locally from the chosen context...");
     try{
@@ -104,31 +111,53 @@ export class AskModal extends ThreadModal {
       const raw=await new OllamaClient(prepared.settings.endpoint,prepared.settings.timeoutMs).generate(prepared.settings.model,answerPrompt(prepared.question,bundle),controller.signal,ANSWER_SCHEMA);
       const answer=validateAnswer(raw,bundle);
       if(!await this.plugin.evidenceCurrent(bundle,prepared.settings)||!current())throw new Error("Evidence changed. Retrieve passages again.");
-      this.answer=answer;this.bundle=bundle;this.renderAnswer(prepared,answer,bundle,answerEl,epoch,inputs);
+      this.answer=answer;this.bundle=bundle;this.renderAnswer(prepared,answer,bundle,answerEl,epoch,new Date().toISOString());
       this.status?.setText(answer.supported?"Answer ready. Compare each claim with the cited excerpts.":"The chosen evidence does not establish an answer.");
     }catch(error){if(current())this.status?.setText(error instanceof Error?error.message:"Could not answer.");}
     finally{if(this.controller===controller){this.controller=null;if(this.live(prepared))button.disabled=false;}}
   }
-  private renderAnswer(prepared:PreparedContext,answer:Answer,bundle:EvidenceBundle,root:HTMLElement,epoch:number,inputs:number):void{
+  private renderAnswer(prepared:PreparedContext,answer:Answer,bundle:EvidenceBundle,root:HTMLElement,epoch:number,generatedAt:string):void{
     root.createEl("h3",{text:"Claims and supporting passages"});
     root.createEl("p",{text:"Recorded statements quote notes, not independently verified facts. Interpretations and proposed actions require your judgment.",cls:"thread-meta"});
-    for(const claim of answer.answer){
+    let previewButton:HTMLButtonElement|null=null;
+    const current=()=>this.live(prepared)&&epoch===this.epoch&&this.answer===answer&&this.bundle===bundle;
+    const draftChanged=()=>{
+      this.inputs++;this.revokePreviews("Answer draft changed. Generate a new preview.");
+      try{createAnswerRecord(prepared.question,answer,bundle,prepared.settings.model,generatedAt,this.corrections);if(previewButton)previewButton.disabled=false;this.status?.setText("Draft changed. Review a new exact preview before saving.");}
+      catch(error){if(previewButton)previewButton.disabled=true;this.status?.setText(error instanceof Error?error.message:"Invalid correction.");}
+    };
+    for(const [index,claim] of answer.answer.entries()){
       const row=root.createDiv({cls:"thread-claim-evidence"});const text=row.createDiv().createEl("p",{text:`${claimLabel(claim.kind)}: ${claim.text}`});text.createEl("span",{text:` ${claim.sourceIds.join(", ")}`,cls:"thread-citation-ids"});const evidence=row.createDiv();
       const status=decisionContext(claim,bundle);if(status)row.createEl("p",{text:status,cls:"thread-meta"});
       if(claim.modelKind)row.createEl("p",{text:`Model classification: ${claim.modelKind}; adjusted using the cited records.`,cls:"thread-meta"});
       for(const id of claim.sourceIds){const source=bundle.sources.find(s=>s.id===id)!;evidence.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
         evidence.createEl("button",{text:`${id}: ${source.path}${source.heading?` > ${source.heading}`:""}`,cls:"thread-source"}).onclick=()=>{if(!this.live(prepared)||epoch!==this.epoch)return;void this.plugin.openIndexedSource(source.path,bundle.noteHashes[source.path]!,source.heading,()=>this.live(prepared)&&epoch===this.epoch).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
       }
+      const editor=row.createEl("details",{cls:"thread-claim-editor"});editor.createEl("summary",{text:`Edit claim ${index+1}`});
+      editor.createEl("p",{text:`Original model (${claim.modelKind??claim.kind}): ${claim.text}`,cls:"thread-meta"});
+      editor.createEl("p",{text:"Your correction keeps the original output and source citations. Choosing Recorded statement does not verify truth.",cls:"thread-meta"});
+      let draftText=claim.text,draftKind=claim.kind;
+      const edited=()=>{
+        if(!current())return;
+        this.corrections[index]={text:draftText,kind:draftKind,correctedAt:new Date().toISOString()};
+        draftChanged();
+        try{const correction=validateCorrection(this.corrections[index]);text.setText(`User correction - ${claimLabel(correction.kind)}: ${correction.text}`);text.createEl("span",{text:` ${claim.sourceIds.join(", ")}`,cls:"thread-citation-ids"});}
+        catch{text.setText("Correction is incomplete. Enter valid text before previewing.");}
+      };
+      new Setting(editor).setName("Classification").addDropdown(d=>{d.selectEl.setAttribute("aria-label",`Claim classification ${index+1}`);for(const kind of ["fact","interpretation","suggestion"] as const)d.addOption(kind,claimLabel(kind));d.setValue(draftKind).onChange(value=>{if(!["fact","interpretation","suggestion"].includes(value))return;draftKind=value as Claim["kind"];edited();});});
+      new Setting(editor).setName("Claim text").addTextArea(t=>{t.inputEl.setAttribute("aria-label",`Claim text ${index+1}`);t.inputEl.maxLength=1200;t.setValue(draftText).onChange(value=>{draftText=value;edited();});});
     }
     root.createEl("h3",{text:"Evidence gaps"});for(const gap of answer.gaps)root.createEl("p",{text:gap});if(!answer.supported)return;
     let name=`Answer ${localDay()} ${crypto.randomUUID().slice(0,8)}`;
-    new Setting(root).setName("New answer note name").addText(t=>{t.inputEl.setAttribute("aria-label","New answer note name");t.setValue(name).onChange(value=>name=value);});
-    root.createEl("button",{text:"Preview answer note"}).onclick=()=>{
+    new Setting(root).setName("New answer note name").addText(t=>{t.inputEl.setAttribute("aria-label","New answer note name");t.setValue(name).onChange(value=>{if(!current())return;name=value;draftChanged();});});
+    previewButton=root.createEl("button",{text:"Preview answer note"});previewButton.onclick=()=>{
       try{
-        if(!this.live(prepared)||epoch!==this.epoch)throw new Error("Answer changed. Generate again.");
+        if(!current())throw new Error("Answer changed. Generate again.");
         const folder=prepared.vault?prepared.settings.roles.knowledge:prepared.settings.selectedProject;if(!folder)throw new Error("Map a Knowledge folder to save vault-wide answers.");
-        const note={path:`${folder}/Answers/${noteName(name)}.md`,content:answerMarkdown(prepared.question,answer,bundle,prepared.settings.model,prepared.vault?"":this.plugin.projectIdentity(prepared.settings.selectedProject))};
-        const preview=new NewNoteModal(this.plugin,note,async()=>this.inputs===inputs&&this.plugin.active&&await this.plugin.evidenceCurrent(bundle,prepared.settings)&&this.inputs===inputs);this.plugin.modals.add(preview);preview.open();
+        const record=createAnswerRecord(prepared.question,answer,bundle,prepared.settings.model,generatedAt,this.corrections),revision=this.inputs;
+        const note={path:`${folder}/Answers/${noteName(name)}.md`,content:reviewedAnswerMarkdown(record,bundle,prepared.vault?"":this.plugin.projectIdentity(prepared.settings.selectedProject))};
+        const preview=new NewNoteModal(this.plugin,note,async()=>!this.closed&&this.inputs===revision&&this.plugin.active&&await this.plugin.evidenceCurrent(bundle,prepared.settings)&&!this.closed&&this.inputs===revision);
+        for(const old of this.previews)if(old.closed)this.previews.delete(old);this.previews.add(preview);this.plugin.modals.add(preview);preview.open();
       }catch(error){this.status?.setText(error instanceof Error?error.message:"Preview failed.");}
     };
   }

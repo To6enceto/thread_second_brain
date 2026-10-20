@@ -238,6 +238,9 @@
 .thread-answer-preview > h3 { font: 18px/1.4 var(--thread-serif); margin-top: 0; }
 .thread-answer-preview .thread-claim-evidence { display: block; margin: 12px 0; }
 .thread-answer-preview .thread-claim-evidence > div:first-child { font-family: var(--thread-serif); font-size: 18px; }
+.thread-claim-editor .setting-item { flex-direction: column; align-items: stretch; }
+.thread-claim-editor .setting-item-control { justify-content: flex-start; }
+.thread-claim-editor textarea { width: 100%; min-height: 96px; font-family: var(--font-text); resize: vertical; }
 .thread-answer-preview .thread-source { font-family: var(--font-monospace); font-size: 11px; }
 .thread-answer-preview .setting-item { display: block; }
 .thread-answer-preview .setting-item-control { margin-top: 8px; }
