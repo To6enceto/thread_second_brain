@@ -13,10 +13,15 @@ test("unknown and missing references are omitted and do not turn into verified c
     { text: "Build a prototype", kind: "fact", sourceIds: ["S1"] },
     { text: "Raise money", kind: "fact", sourceIds: ["Invented"] },
     { text: "Hire a team", kind: "fact", sourceIds: [] }
-  ], nextActions: [{ text: "Test the prototype", kind: "fact", sourceIds: ["S1"] }] };
+  ], nextActions: [
+    { text: "Build a prototype", kind: "fact", sourceIds: ["S1"] },
+    { text: "Test the prototype", kind: "suggestion", sourceIds: ["S1"] }
+  ] };
   const result = validateBriefing(JSON.stringify(data), bundle);
   assert.equal(result.sections.objective.length, 1);
   assert.equal(result.sections.nextActions[0]?.kind, "suggestion");
+  assert.deepEqual(result.sections.nextActions.map(claim => claim.text), ["Test the prototype"]);
+  assert.ok(result.gaps.some(gap => gap.includes("omitted from proposed actions")));
   assert.ok(result.gaps.some((gap) => gap.includes("unknown")));
   assert.equal(result.sections.newEvidence.length, 0);
 });

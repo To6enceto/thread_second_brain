@@ -5,6 +5,28 @@ human test data, not recorded model responses. Curated phrase, section, status
 and source-path checks expose regressions; they cannot judge every claim's
 meaning. A pass is not a semantic correctness guarantee.
 
+Classification fixtures also cover recorded postponements, accepted/proposed/
+superseded decisions, unsupported interpretations and genuinely new actions.
+The runtime conservatively labels complete quoted statements from known records
+as recorded statements; paraphrases and model-labelled facts without that match
+remain interpretations. A quoted statement is still only a record, not verified
+truth. Quotes from unknown/generated source kinds are not promoted to records.
+The matcher also requires a whole original section: clipped passages, partial
+index/search windows, selected text and missing boundary provenance do not
+promote model claims. This deliberately rejects some complete interior quotes.
+This deliberately misses some valid paraphrases and unusual Markdown structure.
+Human review of excerpts remains necessary; valid citations and kind labels do
+not prove support. The legacy fact/interpretation/suggestion values are retained.
+
+During feature 38, a local `qwen3:4b-instruct` collection on 2026-10-20 passed
+14 of 15 cases after the complete-line matching refinement (zero infrastructure
+errors). All 11 pre-existing cases passed. The remaining decision-classification
+case expected exact recorded statements; the model paraphrased two statuses, so
+the app conservatively showed interpretations with the original recorded statuses
+alongside them. The earlier 13/15 report and subsequent report are retained in
+the ignored run evidence. Expectations were not weakened to make the model pass.
+Scores describe these synthetic runs, not unseen notes or guaranteed future runs.
+
 ```bash
 npm run evaluate
 ```

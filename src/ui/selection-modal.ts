@@ -4,6 +4,7 @@ import { NewNoteModal } from "./new-note-modal.ts";
 import { selectionQuery,selectionDraft,type SelectionSnapshot,type SelectionAction } from "../vault/selection.ts";
 import { contextCoverageText,type EvidenceBundle } from "../vault/evidence.ts";
 import { ANSWER_SCHEMA,answerPrompt,validateAnswer,answerMarkdown } from "../intelligence/answer.ts";
+import { claimLabel, decisionContext } from "../intelligence/claims.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { localDay,noteName } from "../vault/workspace.ts";
 import { searchCoverageText } from "../retrieval/search.ts";
@@ -84,7 +85,11 @@ export class SelectionModal extends ThreadModal {
           const raw=await new OllamaClient(settings.endpoint,settings.timeoutMs).generate(settings.model,answerPrompt(approved.question,this.bundle),controller.signal,ANSWER_SCHEMA);
           const answer=validateAnswer(raw,this.bundle);await this.current(epoch);controller.signal.throwIfAborted();
           this.resultEl!.createEl("p",{text:contextCoverageText(this.bundle),cls:"thread-meta"});
-          for(const claim of answer.answer)this.resultEl!.createEl("p",{text:`${claim.kind}: ${claim.text} (${claim.sourceIds.join(", ")})`});
+          this.resultEl!.createEl("p",{text:"Recorded statements quote notes, not independently verified facts. Review interpretations and proposed actions.",cls:"thread-meta"});
+          for(const claim of answer.answer){
+            this.resultEl!.createEl("p",{text:`${claimLabel(claim.kind)}: ${claim.text} (${claim.sourceIds.join(", ")})`});
+            const status=decisionContext(claim,this.bundle);if(status)this.resultEl!.createEl("p",{text:status,cls:"thread-meta"});
+          }
           for(const gap of answer.gaps)this.resultEl!.createEl("p",{text:`Gap: ${gap}`});
           if(answer.supported){
             let answerName=`Selected answer ${localDay()} ${crypto.randomUUID().slice(0,8)}`;

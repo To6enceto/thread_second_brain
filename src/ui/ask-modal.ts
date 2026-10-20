@@ -6,6 +6,7 @@ import { selectContext,type EvidenceChoice } from "../vault/workbench.ts";
 import { hitsToNotes } from "../vault/index.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { ANSWER_SCHEMA,answerPrompt,validateAnswer,answerMarkdown,type Answer } from "../intelligence/answer.ts";
+import { claimLabel, decisionContext } from "../intelligence/claims.ts";
 import { localDay,noteName } from "../vault/workspace.ts";
 import type { ThreadSettings } from "../settings/settings.ts";
 import type {SearchLevel} from "../retrieval/budget.ts";
@@ -110,8 +111,11 @@ export class AskModal extends ThreadModal {
   }
   private renderAnswer(prepared:PreparedContext,answer:Answer,bundle:EvidenceBundle,root:HTMLElement,epoch:number,inputs:number):void{
     root.createEl("h3",{text:"Claims and supporting passages"});
+    root.createEl("p",{text:"Recorded statements quote notes, not independently verified facts. Interpretations and proposed actions require your judgment.",cls:"thread-meta"});
     for(const claim of answer.answer){
-      const row=root.createDiv({cls:"thread-claim-evidence"});const text=row.createDiv().createEl("p",{text:`${claim.kind}: ${claim.text}`});text.createEl("span",{text:` ${claim.sourceIds.join(", ")}`,cls:"thread-citation-ids"});const evidence=row.createDiv();
+      const row=root.createDiv({cls:"thread-claim-evidence"});const text=row.createDiv().createEl("p",{text:`${claimLabel(claim.kind)}: ${claim.text}`});text.createEl("span",{text:` ${claim.sourceIds.join(", ")}`,cls:"thread-citation-ids"});const evidence=row.createDiv();
+      const status=decisionContext(claim,bundle);if(status)row.createEl("p",{text:status,cls:"thread-meta"});
+      if(claim.modelKind)row.createEl("p",{text:`Model classification: ${claim.modelKind}; adjusted using the cited records.`,cls:"thread-meta"});
       for(const id of claim.sourceIds){const source=bundle.sources.find(s=>s.id===id)!;evidence.createEl("pre",{text:source.excerpt,cls:"thread-excerpt"});
         evidence.createEl("button",{text:`${id}: ${source.path}${source.heading?` > ${source.heading}`:""}`,cls:"thread-source"}).onclick=()=>{if(!this.live(prepared)||epoch!==this.epoch)return;void this.plugin.openIndexedSource(source.path,bundle.noteHashes[source.path]!,source.heading,()=>this.live(prepared)&&epoch===this.epoch).catch(error=>{if(this.live(prepared))this.status?.setText(error instanceof Error?error.message:"Source unavailable.");});};
       }

@@ -14,3 +14,15 @@ test("answers omit unknown citations and respect unsupported flag",async()=>{
  assert.equal(escapeMarkdown("<script>"),"\\<script\\>");
  assert.throws(()=>answerMarkdown("Q",{supported:false,answer:[],gaps:[]},bundle,"local"));
 });
+
+test("new answer Markdown explains legacy kind values and retains decision/model context",async()=>{
+ const bundle=await buildEvidence([{path:"P/Decision.md",text:"## Choice\nUse text practice.",metadata:{type:"decision",status:"proposed"},modifiedAt:1}]);
+ const answer=validateAnswer(JSON.stringify({supported:true,answer:[{text:"Use text practice.",kind:"suggestion",sourceIds:["S1"]}],gaps:[]}),bundle);
+ const md=answerMarkdown("What is recorded?",answer,bundle,"local");
+ assert.match(md,/Recorded statement \(fact\)/);
+ assert.match(md,/S1: proposed/);
+ assert.match(md,/Model classification: suggestion/);
+ assert.match(md,/not independently verified facts/);
+ assert.equal(answer.answer[0]?.text,"Use text practice.");
+ assert.match(md,/thread_sources:/);
+});

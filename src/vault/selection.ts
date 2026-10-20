@@ -31,7 +31,7 @@ export async function savedSelection(path:string,saved:string,editor:string,from
 }
 export async function selectionEvidence(snapshot:SelectionSnapshot,metadata:Record<string,unknown>,modifiedAt:number):Promise<EvidenceBundle>{
   const identity=Object.fromEntries(["id","type","status","recorded_on","decided_on","updated","captured_on","created"].flatMap(key=>typeof metadata[key]==="string"?[[key,metadata[key]]]:[]));
-  return buildEvidence([{path:snapshot.path,text:snapshot.text,metadata:identity,modifiedAt,fullHash:snapshot.hash}]);
+  return buildEvidence([{partial:true,path:snapshot.path,text:snapshot.text,metadata:identity,modifiedAt,fullHash:snapshot.hash}]);
 }
 export function selectionQuery(text:string):string{
   return [...new Set(tokens(text).filter(word=>word.length>1))].slice(0,12).join(" ").slice(0,1000);

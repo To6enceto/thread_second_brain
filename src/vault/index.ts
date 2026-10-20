@@ -101,10 +101,14 @@ export class LocalIndex {
 export function hitsToNotes(hits: RecallHit[]): SourceNote[] {
   const notes=new Map<string,SourceNote>();
   for(const hit of hits){
+    // A whole indexed section is provable only when its sole chunk was retained
+    // without index clipping. Other windows may begin/end inside a statement.
+    const section = hit.entry.chunks.filter(chunk => chunk.heading === hit.heading);
+    const partial = !hit.entry.sectionCoverage || hit.entry.truncated || section.length !== 1 || section[0]?.excerpt !== hit.excerpt;
     const chunk=`${hit.heading?`## ${hit.heading}\n`:""}${hit.excerpt}\n`;
     const existing=notes.get(hit.entry.path);
-    if(existing){existing.text+=chunk;existing.focusTerms=[...new Set([...(existing.focusTerms??[]),...(hit.matchedTerms??[])])];existing.focusPhrases=[...new Set([...(existing.focusPhrases??[]),...(hit.requiredPhrases??[])])];}
-    else notes.set(hit.entry.path,{path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash,relevance:hit.score,focusTerms:hit.matchedTerms??[],focusPhrases:hit.requiredPhrases??[],...(hit.entry.pdf?{pdf:hit.entry.pdf}:{})});
+    if(existing){existing.partial ||= partial;existing.text+=chunk;existing.focusTerms=[...new Set([...(existing.focusTerms??[]),...(hit.matchedTerms??[])])];existing.focusPhrases=[...new Set([...(existing.focusPhrases??[]),...(hit.requiredPhrases??[])])];}
+    else notes.set(hit.entry.path,{partial,path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash,relevance:hit.score,focusTerms:hit.matchedTerms??[],focusPhrases:hit.requiredPhrases??[],...(hit.entry.pdf?{pdf:hit.entry.pdf}:{})});
   }
   return [...notes.values()];
 }

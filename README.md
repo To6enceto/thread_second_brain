@@ -80,6 +80,16 @@ view. Repeated workspace opens reuse its tab. Thread source links open new tabs
 to preserve existing notes. Obsidian restores only the selected area; current
 saved project permissions still apply and restoration never generates AI output.
 
+Answer claims distinguish **Recorded statement**, **AI interpretation** and
+**Proposed action**. Recorded statements quote complete statements from known
+records; they do not certify truth. Paraphrases are conservatively shown as
+interpretations. Clipped passages, partial search windows and selected text
+cannot promote model claims to recorded statements; full original sections are
+required for that automatic classification. A recorded postponement is not a new proposed action. Decision
+claims show the cited records' statuses, and adjusted model classifications stay
+visible. Earlier saved notes and their fact/interpretation/suggestion values
+remain compatible. Always compare claims with their supporting excerpts.
+
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 

@@ -3,6 +3,7 @@ import type ThreadPlugin from "../main.ts";
 import { OllamaClient } from "../intelligence/ollama.ts";
 import { briefingPrompt, validateBriefing, SECTION_KEYS, type Briefing, type Claim, type SectionKey } from "../intelligence/briefing.ts";
 import { recordedBriefing, composeBriefing } from "../intelligence/recorded.ts";
+import { claimLabel } from "../intelligence/claims.ts";
 import { readableText,isWithin } from "../vault/scope.ts";
 import { contextCoverageText, type Evidence, type EvidenceBundle } from "../vault/evidence.ts";
 import { permittedProjects, projectHome, type ProjectHome, type HomeItem } from "../vault/project-home.ts";
@@ -241,7 +242,7 @@ export class BriefingView extends ItemView {
 
   private renderClaim(parent: HTMLElement, claim: Claim): void {
     const item = parent.createDiv({ cls: "thread-claim" });
-    item.createEl("span", { text: claim.kind, cls: `thread-kind thread-kind-${claim.kind}` });
+    item.createEl("span", { text: claimLabel(claim.kind), cls: `thread-kind thread-kind-${claim.kind}` });
     item.createEl("p", { text: claim.text });
     for (const id of claim.sourceIds) {
       const source = this.bundle?.sources.find(candidate => candidate.id === id);

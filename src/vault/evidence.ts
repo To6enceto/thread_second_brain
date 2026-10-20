@@ -6,6 +6,8 @@ import type { PdfRecord } from "../pdf/record.ts";
 import type { PdfCitation } from "./freshness.ts";
 
 export interface SourceNote {
+  /** Selected/indexed text whose original statement boundaries are not known. */
+  partial?: boolean;
   pdf?:PdfRecord;
   path: string;
   text: string;
@@ -18,6 +20,8 @@ export interface SourceNote {
 }
 
 export interface Evidence {
+  /** True only when excerpt selection preserved an entire original section. */
+  excerptComplete?: boolean;
   pdf?:PdfCitation;
   id: string;
   path: string;
@@ -197,7 +201,7 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
       truncated ||= excerpt.length !== section.excerpt.length;
       const source: Evidence = {
         id: `S${sources.length + 1}`, path: note.path, heading: section.heading,
-        excerpt, contentHash: await contentHash(excerpt), modifiedAt: note.modifiedAt, ...recordedDate(note)
+        excerpt, excerptComplete: false, contentHash: await contentHash(excerpt), modifiedAt: note.modifiedAt, ...recordedDate(note)
       };
       if(note.pdf){const page=Number(/^PDF page (\d+)$/.exec(section.heading)?.[1]);if(!note.pdf.pages.some(p=>p.page===page))continue;source.pdf={path:note.pdf.path,hash:note.pdf.hash,page};}
       if (section.property) source.property = section.property;
@@ -221,6 +225,7 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
       source.excerpt = focusedExcerpt(section.excerpt, low, note.focusTerms, note.focusPhrases);
       if (!source.excerpt) { truncated = true; continue; }
       truncated ||= source.excerpt.length !== excerpt.length;
+      source.excerptComplete = !note.partial && note.text.length <= MAX_NOTE && source.excerpt === section.excerpt;
       source.contentHash = await contentHash(source.excerpt);
       remaining -= JSON.stringify(source).length + 2;
       sources.push(source);

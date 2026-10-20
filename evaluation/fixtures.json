@@ -716,6 +716,306 @@
         "Blue"
       ],
       "supported": true
+    },
+    {
+      "id": "recorded-postponement",
+      "mode": "answer",
+      "question": "What is recorded about live voice and the hosting budget?",
+      "notes": [
+        {
+          "path": "Projects/Classification Evaluation/Overview.md",
+          "text": "## Constraints\nThe hosting budget is 20 euros. Live voice is postponed to stay within that budget.",
+          "metadata": {
+            "type": "project"
+          },
+          "modifiedAt": 1791979200000
+        }
+      ],
+      "requirements": [
+        {
+          "section": "answer",
+          "terms": [
+            "live voice",
+            "postponed"
+          ],
+          "kind": "fact",
+          "sourcePaths": [
+            "Projects/Classification Evaluation/Overview.md"
+          ]
+        }
+      ],
+      "emptySections": [],
+      "forbidden": [],
+      "supported": true,
+      "reference": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Live voice is postponed to stay within that budget.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "knownWrong": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Live voice is postponed to stay within that budget.",
+            "kind": "suggestion",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      }
+    },
+    {
+      "id": "recorded-decision-classifications",
+      "mode": "answer",
+      "question": "What statuses are recorded for the keyboard, voice and cloud choices?",
+      "notes": [
+        {
+          "path": "Projects/Classification Evaluation/A Keyboard.md",
+          "text": "## Choice\nKeyboard practice is accepted.",
+          "metadata": {
+            "type": "decision",
+            "status": "accepted"
+          },
+          "modifiedAt": 1791979200000
+        },
+        {
+          "path": "Projects/Classification Evaluation/B Voice.md",
+          "text": "## Choice\nThe voice experiment is proposed.",
+          "metadata": {
+            "type": "decision",
+            "status": "proposed"
+          },
+          "modifiedAt": 1791979200000
+        },
+        {
+          "path": "Projects/Classification Evaluation/C Cloud.md",
+          "text": "## Choice\nThe cloud service choice is superseded.",
+          "metadata": {
+            "type": "decision",
+            "status": "superseded"
+          },
+          "modifiedAt": 1791979200000
+        }
+      ],
+      "requirements": [
+        {
+          "section": "answer",
+          "terms": [
+            "keyboard",
+            "accepted"
+          ],
+          "kind": "fact",
+          "sourcePaths": [
+            "Projects/Classification Evaluation/A Keyboard.md"
+          ]
+        },
+        {
+          "section": "answer",
+          "terms": [
+            "voice",
+            "proposed"
+          ],
+          "kind": "fact",
+          "sourcePaths": [
+            "Projects/Classification Evaluation/B Voice.md"
+          ]
+        },
+        {
+          "section": "answer",
+          "terms": [
+            "cloud",
+            "superseded"
+          ],
+          "kind": "fact",
+          "sourcePaths": [
+            "Projects/Classification Evaluation/C Cloud.md"
+          ]
+        }
+      ],
+      "emptySections": [],
+      "forbidden": [],
+      "supported": true,
+      "reference": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Keyboard practice is accepted.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          },
+          {
+            "text": "The voice experiment is proposed.",
+            "kind": "fact",
+            "sourceIds": [
+              "S2"
+            ]
+          },
+          {
+            "text": "The cloud service choice is superseded.",
+            "kind": "fact",
+            "sourceIds": [
+              "S3"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "knownWrong": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Keyboard practice is accepted.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          },
+          {
+            "text": "The voice experiment is accepted.",
+            "kind": "fact",
+            "sourceIds": [
+              "S2"
+            ]
+          },
+          {
+            "text": "The cloud service choice is accepted.",
+            "kind": "fact",
+            "sourceIds": [
+              "S3"
+            ]
+          }
+        ],
+        "gaps": []
+      }
+    },
+    {
+      "id": "unsupported-improvement-interpretation",
+      "mode": "answer",
+      "question": "Do the notes establish that voice improves scores, and what evidence is missing?",
+      "notes": [
+        {
+          "path": "Projects/Classification Evaluation/Study.md",
+          "text": "## Evidence\nNo voice experiment has been run. No learning scores have been measured.",
+          "metadata": {
+            "type": "source"
+          },
+          "modifiedAt": 1791979200000
+        }
+      ],
+      "requirements": [
+        {
+          "section": "answer",
+          "terms": [
+            "no",
+            "experiment"
+          ],
+          "sourcePaths": [
+            "Projects/Classification Evaluation/Study.md"
+          ]
+        }
+      ],
+      "emptySections": [],
+      "forbidden": [],
+      "supported": true,
+      "reference": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "No voice experiment has been run.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "knownWrong": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Voice improves learning scores.",
+            "kind": "interpretation",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      }
+    },
+    {
+      "id": "genuine-proposed-action",
+      "mode": "answer",
+      "question": "Suggest how to compare text-only alternatives within the recorded budget.",
+      "notes": [
+        {
+          "path": "Projects/Classification Evaluation/Overview.md",
+          "text": "## Constraints\nThe hosting budget is 20 euros. No text-only alternative has been evaluated.",
+          "metadata": {
+            "type": "project"
+          },
+          "modifiedAt": 1791979200000
+        }
+      ],
+      "requirements": [
+        {
+          "section": "answer",
+          "terms": [
+            "text"
+          ],
+          "alternatives": [
+            "compare",
+            "test",
+            "evaluate"
+          ],
+          "kind": "suggestion",
+          "sourcePaths": [
+            "Projects/Classification Evaluation/Overview.md"
+          ]
+        }
+      ],
+      "emptySections": [],
+      "forbidden": [],
+      "supported": true,
+      "reference": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "Compare a free text-only prototype with the current workflow.",
+            "kind": "suggestion",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "knownWrong": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "A free text-only prototype has already been compared.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      }
     }
   ]
 }
