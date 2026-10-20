@@ -3,6 +3,7 @@ import { ThreadModal } from "./thread-modal.ts";
 import type { ChangeBatch } from "../vault/changes.ts";
 import { editableBody,lineDiff } from "../vault/change-draft.ts";
 import { readableText } from "../vault/scope.ts";
+import { mayReadPdf } from "../pdf/scope.ts";
 import { FreshnessGraph,outputProjection,type FreshNote } from "../vault/freshness.ts";
 import { readMetadata } from "../vault/evidence.ts";
 
@@ -34,8 +35,8 @@ export class ChangeReviewModal extends ThreadModal {
         const metadata=readMetadata(op.before,parseYaml);const output=outputProjection(op.before,metadata).output;
         notes.set(op.path,{path:op.path,hash:op.beforeHash,metadata,...(typeof metadata.id==="string"?{id:metadata.id}:{}),...(output?{output}:{})});
       }
-      const graph=new FreshnessGraph([...notes.values()],this.plugin.settings,this.plugin.index.renames,this.plugin.index.identityComplete);
-      return Object.entries(data.noteHashes).every(([path,hash])=>typeof hash==="string"&&readableText(path,this.plugin.settings)&&graph.scopeAllows(path,hash));}
+      const graph=new FreshnessGraph([...notes.values()],this.plugin.settings,this.plugin.index.renames,this.plugin.index.identityComplete,this.plugin.index.binaries);
+      return Object.entries(data.noteHashes).every(([path,hash])=>typeof hash==="string"&&(readableText(path,this.plugin.settings)||mayReadPdf(path,this.plugin.settings))&&graph.scopeAllows(path,hash));}
     catch{return false;}
   }
   private allowed(batch:ChangeBatch):boolean{return this.contextAllowed(batch)&&batch.operations.every(op=>this.plugin.changePathAllowed(op.path));}

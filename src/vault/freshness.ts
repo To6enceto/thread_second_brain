@@ -1,11 +1,14 @@
 import { object } from "../settings/settings.ts";
 import { readableText,vaultPath,type ReadScope } from "./scope.ts";
 import { reviewProvenance } from "./review-provenance.ts";
+import { mayReadPdf } from "../pdf/scope.ts";
+import type { PdfRecord } from "../pdf/record.ts";
 
-export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;}
+export interface PdfCitation{path:string;hash:string;page:number;}
+export interface SourceReference{path:string;id?:string;heading:string;hash:string;noteHash:string;noteType?:string;noteStatus?:string;pdf?:PdfCitation;}
 export interface OutputProvenance{refs:SourceReference[];invalid:boolean;title:string;}
 export interface SourceRange{from:number;to:number;}
-export interface FreshNote{path:string;id?:string;hash:string;metadata:Record<string,unknown>;output?:OutputProvenance;}
+export interface FreshNote{path:string;id?:string;hash:string;metadata:Record<string,unknown>;output?:OutputProvenance;pdf?:PdfRecord;}
 export type FreshState="current"|"renamed"|"changed"|"unavailable"|"ambiguous"|"invalid"|"dependency";
 export interface ReferenceState{ref:SourceReference;state:FreshState;path?:string;hash?:string;reason:string;}
 export interface Freshness{state:FreshState;usable:boolean;references:ReferenceState[];dependencies:Record<string,string>;reason:string;}
@@ -18,8 +21,10 @@ export function readSourceReferences(value:unknown,allowEmpty=false):SourceRefer
   return raw.map(v=>{
     const r=object(v);if(typeof r.path!=="string"||r.path.length>4096||vaultPath(r.path)!==r.path||!digest(r.hash)||!digest(r.noteHash)||typeof r.heading!=="string"||r.heading.length>4000)throw new Error("Invalid source reference.");
     for(const key of ["id","noteType","noteStatus"] as const)if(r[key]!==undefined&&(typeof r[key]!=="string"||!r[key].trim()||r[key].length>200))throw new Error("Invalid source identity.");
+    let pdf:PdfCitation|undefined;
+    if(r.pdf!==undefined){const p=object(r.pdf);if(typeof p.path!=="string"||p.path.length>4096||vaultPath(p.path)!==p.path||!p.path.toLowerCase().endsWith(".pdf")||!digest(p.hash)||!Number.isInteger(p.page)||Number(p.page)<1||Number(p.page)>200||Object.keys(p).sort().join("|")!=="hash|page|path")throw new Error("Invalid PDF page citation.");pdf={path:p.path,hash:p.hash,page:Number(p.page)};}
     // Reference excerpts stay in authoritative Markdown, never the derived index metadata.
-    return {path:r.path,heading:r.heading,hash:r.hash,noteHash:r.noteHash,...(typeof r.id==="string"?{id:r.id}:{}),...(typeof r.noteType==="string"?{noteType:r.noteType}:{}),...(typeof r.noteStatus==="string"?{noteStatus:r.noteStatus}:{})};
+    return {path:r.path,heading:r.heading,hash:r.hash,noteHash:r.noteHash,...(pdf?{pdf}:{}),...(typeof r.id==="string"?{id:r.id}:{}),...(typeof r.noteType==="string"?{noteType:r.noteType}:{}),...(typeof r.noteStatus==="string"?{noteStatus:r.noteStatus}:{})};
   });
 }
 
@@ -139,9 +144,12 @@ function movedPath(path:string,renames:RenameMap):string|null{
 export class FreshnessGraph{
   notes:Map<string,FreshNote>;ids=new Map<string,FreshNote[]>();renames:RenameMap;scope:ReadScope;memo=new Map<string,Freshness>();scopeMemo=new Map<string,boolean>();
   identityComplete:boolean;
-  constructor(entries:FreshNote[],scope:ReadScope,renames:RenameMap={},identityComplete=true){
+  binaries:ReadonlyMap<string,string>;
+  constructor(entries:FreshNote[],scope:ReadScope,renames:RenameMap={},identityComplete=true,binaries:ReadonlyMap<string,string>=new Map()){
     this.identityComplete=identityComplete;
     this.scope=scope;this.renames=renames;this.notes=new Map(entries.filter(e=>readableText(e.path,scope)).map(e=>[e.path,e]));
+    this.binaries=new Map([...binaries].filter(([path,hash])=>digest(hash)&&mayReadPdf(path,scope)));
+    for(const [path,hash]of this.binaries)this.notes.set(path,{path,hash,metadata:{type:"pdf"}});
     for(const e of this.notes.values())if(e.id){const group=this.ids.get(e.id)??[];group.push(e);this.ids.set(e.id,group);}
   }
   resolve(ref:SourceReference):ReferenceState{
@@ -155,7 +163,8 @@ export class FreshnessGraph{
       if(current&&moved&&current.path!==moved.path&&current.hash===ref.noteHash&&moved.hash===ref.noteHash)return {ref,state:"ambiguous",reason:"Legacy path and renamed note both match; select the intended source explicitly."};
       note=current?.hash===ref.noteHash?current:moved??current;
     }
-    if(!note||!readableText(note.path,this.scope))return {ref,state:"unavailable",reason:"Source is missing or unavailable in the current read scope."};
+    if(!note||!(this.binaries.has(note.path)?mayReadPdf(note.path,this.scope):readableText(note.path,this.scope)))return {ref,state:"unavailable",reason:"Source is missing or unavailable in the current read scope. PDF originals require exact consent and a current bounded verification."};
+    if(ref.pdf&&(!note.pdf||ref.pdf.path!==note.pdf.path||ref.pdf.hash!==note.pdf.hash||!note.pdf.pages.some(p=>p.page===ref.pdf!.page)||ref.heading!==`PDF page ${ref.pdf.page}`))return{ref,state:"invalid",reason:"PDF page mapping does not match its validated extraction."};
     const changed=note.hash!==ref.noteHash||(ref.noteType!==undefined&&note.metadata.type!==ref.noteType)||(ref.noteStatus!==undefined&&note.metadata.status!==ref.noteStatus);
     return {ref,state:changed?"changed":note.path!==ref.path?"renamed":"current",path:note.path,hash:note.hash,reason:changed?"Source note changed; this includes properties and edits outside the cited passage.":note.path!==ref.path?"Source moved; allowed identity and content still match.":"Source content and identity match."};
   }

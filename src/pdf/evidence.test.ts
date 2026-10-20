@@ -1,0 +1,38 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {pdfSource,readPdfSource,pdfEvidenceText} from './record.ts';
+import {indexNote,LocalIndex,hitsToNotes} from '../vault/index.ts';
+import {buildEvidence,readMetadata} from '../vault/evidence.ts';
+import {defaultSettings} from '../settings/settings.ts';
+import {sourceReferences,evidenceMarkdown} from '../intelligence/answer.ts';
+import {readSourceReferences} from '../vault/freshness.ts';
+import {IndexUpdates} from '../vault/index-updates.ts';
+import {reviewSnapshot,reviewEventMarkdown} from '../vault/review-events.ts';
+import {projectReviewQueue} from '../vault/review-queue.ts';
+import {inspectVaultHealth} from '../vault/health.ts';
+const hash='a'.repeat(64),path='P/Original.pdf',source='P/Extract.md';
+const metadata=(raw:string)=>readMetadata(raw,yaml=>Object.fromEntries(yaml.split('\n').map(line=>{const at=line.indexOf(': ');return[line.slice(0,at),JSON.parse(line.slice(at+2))];})));
+const scope={...defaultSettings(),allowedPaths:['P'],pdfPaths:[path],selectedProject:'P'};
+const make=async()=>{const raw=await pdfSource({totalPages:2,pages:[{page:1,text:'Budget 47 euros.',shortened:false},{page:2,text:'Project Amber.\n## fake page 999',shortened:false}]},path,hash);return{raw,entry:await indexNote({path:source,text:raw,metadata:metadata(raw),modifiedAt:1},()=>null)};};
+test('strict pages need volatile exact original authority; page identity and original dependency survive retrieval',async()=>{
+ const {raw,entry}=await make(),index=new LocalIndex();index.replace([entry],scope);assert.equal(index.recall('Amber',scope,null).length,0);assert.equal(index.graph(scope).assess(source).usable,false);
+ index.binaries.set(path,hash);index.replace([entry],scope);const hits=index.recall('Amber',scope,null);assert.equal(hits.length,1);assert.equal(hits[0]!.heading,'PDF page 2');assert.ok(!entry.chunks.some(c=>c.heading==='fake page 999'));
+ const health=await inspectVaultHealth(index,scope,{read:async()=>raw,resolve:()=>null,parse:yaml=>Object.fromEntries(yaml.split('\n').map(line=>{const at=line.indexOf(': ');return[line.slice(0,at),JSON.parse(line.slice(at+2))];}))});assert.equal(health.counts.format,0);
+ assert.equal(index.graph(scope).assess(source).dependencies[path],hash);
+ const bundle=await buildEvidence(hitsToNotes(hits));assert.equal(bundle.sources[0]!.pdf?.page,2);assert.equal(bundle.sources[0]!.pdf?.path,path);assert.equal(bundle.sources[0]!.noteId,entry.id);
+ const refs=readSourceReferences(sourceReferences(bundle));assert.deepEqual(refs[0]!.pdf,bundle.sources[0]!.pdf);assert.match(evidenceMarkdown(bundle),/Original.pdf#page=2/);
+ const validated=await readPdfSource(raw,metadata(raw));assert.ok(pdfEvidenceText(validated.extraction).includes('> \\#\\# fake page 999'));
+ const output=await indexNote({path:'P/Answer.md',text:'Answer Amber',metadata:{type:'answer',thread_sources:JSON.stringify(sourceReferences(bundle))},modifiedAt:1},()=>null);
+ index.replace([entry,output],scope);assert.equal(index.graph(scope).assess(output.path).usable,true);
+ index.binaries.set(path,'b'.repeat(64));index.replace([entry,output],scope);assert.equal(index.graph(scope).assess(output.path).usable,false);assert.equal(index.entries.find(e=>e.path===source)!.chunks.length,0);
+ const revoked={...scope,pdfPaths:[]};index.binaries.set(path,hash);index.replace([entry,output],revoked);assert.equal(index.graph(revoked).assess(output.path).usable,false);
+ index.clear();assert.equal(index.binaries.size,0);
+});
+test('tampered canonical text and invented PDF page refs fail closed; binary invalidation scrubs transitive copies',async()=>{
+ const {entry,raw}=await make(),bad=await indexNote({path:source,text:raw.replace('47 euros','99 euros'),metadata:metadata(raw),modifiedAt:1},()=>null);assert.equal(bad.output?.invalid,true);assert.equal(bad.chunks.length,0);
+ const index=new LocalIndex();index.binaries.set(path,hash);const bundle=await buildEvidence(hitsToNotes([{entry,heading:'PDF page 1',excerpt:'Budget 47 euros',score:1}]));
+ const refs=sourceReferences(bundle),output=await indexNote({path:'P/Answer.md',text:'Budget 47 euros',metadata:{type:'answer',thread_sources:JSON.stringify(refs)},modifiedAt:1},()=>null);
+ index.replace([entry,output],scope);const snapshot=await reviewSnapshot(index,scope,{path:output.path,hash:output.hash,kind:'stale-output',heading:'',text:'',related:[]},async()=>[]);assert.equal(snapshot.hashes[path],hash);const event=reviewEventMarkdown('p',snapshot,{path:output.path,hash:output.hash,kind:'stale-output',heading:'',text:'',related:[]},'reviewed','Inspected original');const eventEntry=await indexNote({path:'P/Review.md',text:event,metadata:metadata(event),modifiedAt:1},()=>null);assert.ok(eventEntry.reviewManifestHash);assert.ok(!projectReviewQueue(index,scope).limits.some(s=>s.includes('unavailable reference occurrences')));
+ const forged=readSourceReferences(refs);forged[0]!.pdf!.page=999;assert.equal(index.graph(scope).resolve(forged[0]!).state,'invalid');
+ const updates=new IndexUpdates(index),affected=updates.invalidate([path],scope);assert.ok(affected.has(source)&&affected.has(output.path));assert.equal(index.binaries.has(path),false);assert.ok(index.entries.every(e=>e.chunks.length===0));assert.equal(index.ready,false);
+});

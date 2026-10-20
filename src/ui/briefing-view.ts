@@ -206,6 +206,7 @@ export class BriefingView extends ItemView {
     if (!bundle || !await this.plugin.evidenceCurrent(bundle, this.plugin.settings)) {
       this.invalidate("Evidence changed or is no longer allowed. Generate a fresh briefing."); return;
     }
+    if(source.pdf){const revision=this.revision;await this.plugin.openIndexedSource(source.path,bundle.noteHashes[source.path]!,source.heading,()=>!this.closed&&this.bundle===bundle&&revision===this.revision);return;}
     const file = this.app.vault.getAbstractFileByPath(source.path);
     if (!(file instanceof TFile) || !readableText(file.path, this.plugin.settings)) return;
     await this.app.workspace.getLeaf(false).openFile(file, {
@@ -233,6 +234,7 @@ export class BriefingView extends ItemView {
       await client.check(settings.model, controller.signal);
       if (revision !== this.revision || this.closed || controller.signal.aborted) return;
       this.message = "Recorded context ready. Generating AI interpretations locally..."; this.render();
+      if(!await this.plugin.evidenceCurrent(bundle,settings)||revision!==this.revision||this.closed||controller.signal.aborted)throw Error("Project evidence changed before generation. Resume again.");
       const raw = await client.generate(settings.model, briefingPrompt(settings.selectedProject, bundle), controller.signal);
       const result = validateBriefing(raw, bundle);
       const current = await this.plugin.evidenceCurrent(bundle, settings);

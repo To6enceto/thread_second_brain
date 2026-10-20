@@ -2,8 +2,11 @@ import { contentHash } from "./scope.ts";
 import type { HybridCoverage } from "../retrieval/semantic.ts";
 import type { SearchCoverage } from "../retrieval/search.ts";
 import { tokenSpans } from "../retrieval/tokens.ts";
+import type { PdfRecord } from "../pdf/record.ts";
+import type { PdfCitation } from "./freshness.ts";
 
 export interface SourceNote {
+  pdf?:PdfRecord;
   path: string;
   text: string;
   metadata: Record<string, unknown>;
@@ -15,6 +18,7 @@ export interface SourceNote {
 }
 
 export interface Evidence {
+  pdf?:PdfCitation;
   id: string;
   path: string;
   noteId?: string;
@@ -195,6 +199,7 @@ export async function buildEvidence(notes: SourceNote[], now = Date.now()): Prom
         id: `S${sources.length + 1}`, path: note.path, heading: section.heading,
         excerpt, contentHash: await contentHash(excerpt), modifiedAt: note.modifiedAt, ...recordedDate(note)
       };
+      if(note.pdf){const page=Number(/^PDF page (\d+)$/.exec(section.heading)?.[1]);if(!note.pdf.pages.some(p=>p.page===page))continue;source.pdf={path:note.pdf.path,hash:note.pdf.hash,page};}
       if (section.property) source.property = section.property;
       if (typeof note.metadata.id === "string") source.noteId = note.metadata.id;
       if (typeof note.metadata.type === "string") source.noteType = note.metadata.type.slice(0, 100);

@@ -9,7 +9,7 @@ const childEnv={...process.env};delete childEnv.NODE_TEST_CONTEXT;
 const run=(...args:string[])=>{const r=spawnSync(process.execPath,["--experimental-strip-types",script,...args],{stdio:"ignore",timeout:10000,env:childEnv});assert.ifError(r.error);return r.status;};
 const dir=mkdtempSync(join(tmpdir(),"thread-quality-"));try{
  // Inspect the CLI's explicit report file, independently of runner stdout.
- const path=join(dir,"report.json");assert.equal(run("--output",path),0);const report=JSON.parse(readFileSync(path,"utf8"));assert.equal(report.mode,"reference-and-negative-control-self-check");assert.equal(report.passed,10);assert.equal(report.failed,0);assert.equal(report.model,null);
+ const path=join(dir,"report.json");assert.equal(run("--output",path),0);const report=JSON.parse(readFileSync(path,"utf8"));assert.equal(report.mode,"reference-and-negative-control-self-check");assert.equal(report.total,JSON.parse(readFileSync(new URL("../../evaluation/fixtures.json",import.meta.url),"utf8")).cases.length);assert.equal(report.passed,report.total);assert.ok(report.total>=11);assert.equal(report.failed,0);assert.equal(report.model,null);
  assert.notEqual(run("--live"),0);
  assert.notEqual(run("--endpoint","http://192.0.2.1"),0);
  assert.notEqual(run("--unknown"),0);

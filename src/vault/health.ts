@@ -2,6 +2,8 @@ import type { ThreadSettings } from "../settings/settings.ts";
 import { LocalIndex, type IndexEntry } from "./index.ts";
 import { readMetadata, noteSections } from "./evidence.ts";
 import { outputProjection } from "./freshness.ts";
+import {readPdfSource,pdfEvidenceText} from "../pdf/record.ts";
+import {mayReadPdf} from "../pdf/scope.ts";
 import { permittedProjects } from "./project-home.ts";
 import { questionReviewReferences } from "./review-events.ts";
 import { questionRecord } from "./questions.ts";
@@ -66,12 +68,13 @@ export async function inspectVaultHealth(index:LocalIndex,settings:ThreadSetting
     if(entry.id&&(graph.ids.get(entry.id)?.length??0)>1)add(entry,"duplicate-id","This note shares its ID with other permitted notes.","Stable citations, project associations or source snapshots can be ambiguous.","Compare permitted duplicates manually and preserve their history. No ID is reassigned and excluded notes are not enumerated.");
     for(const key of healthDateKeys)if(metadata[key]!==undefined&&!recognizedDate(key,metadata[key]))add(entry,"invalid-date",`The ${key} property is not a supported calendar date.`,"Chronology, comparison baselines or due-date handling can be unavailable or misleading.","Enter the actual recorded date explicitly as YYYY-MM-DD. Do not infer it from modification time. Complex properties require manual editing.",key);
     if(metadata.selected_at!==undefined&&(typeof metadata.selected_at!=="string"||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(metadata.selected_at)||!calendarDate(metadata.selected_at.slice(0,10))||!Number.isFinite(Date.parse(metadata.selected_at))||new Date(metadata.selected_at).toISOString()!==metadata.selected_at))add(entry,"invalid-date","The selected_at capture timestamp is unsupported.","The chosen next action may be indeterminate.","Preserve the selection and correct its actual capture timestamp manually; Thread never invents one.");
-    const projection=outputProjection(raw,metadata);
+    let projection=outputProjection(raw,metadata);
+    if(entry.pdf){const pdf=await readPdfSource(raw,metadata);current();projection={text:pdfEvidenceText(pdf.extraction),ranges:[]};}
     if(projection.output?.invalid)add(entry,"format","Managed evidence or generated provenance is unsupported.","Derived evidence is hidden until normalized; raw note contents remain unchanged.","Preserve private markers, versions and history. Review the format manually or create a new supported record.");
     let unavailable=0,unsupported=Boolean(entry.decisionSources?.invalid);
     for(const ref of [...entry.output?.refs??[],...entry.decisionSources?.refs??[]])if(!["current","renamed","changed"].includes(graph.resolve(ref).state))unavailable++;
     if(metadata.type==="question"&&metadata.thread_question_version!==undefined){try{for(const ref of questionReviewReferences(raw,port.parse))if(!["current","renamed","changed"].includes(graph.resolve(ref).state))unavailable++;}catch{unsupported=true;}}
-    if(metadata.type==="review-event"){try{for(const path of Object.keys(reviewProvenance(raw,metadata).hashes))if(!readableText(path,settings)||!graph.notes.has(path))unavailable++;}catch{unsupported=true;}}
+    if(metadata.type==="review-event"){try{for(const path of Object.keys(reviewProvenance(raw,metadata).hashes))if(!(readableText(path,settings)||mayReadPdf(path,settings))||!graph.notes.has(path))unavailable++;}catch{unsupported=true;}}
     for(const link of (entry.linkTexts??[]).slice(0,200)){const path=port.resolve(entry.path,link);if(!path||!readableText(path,settings)||!graph.notes.has(path))unavailable++;}
     if(unavailable||unsupported)add(entry,"references",`${unavailable} unavailable or ambiguous reference occurrences${unsupported?"; unsupported source-reference format":""}.`,"Source navigation, exact snapshots or freshness validation can be incomplete. Changed content alone is handled by Source freshness.","Inspect the original note and its currently permitted links manually. Missing and excluded targets are indistinguishable here; their paths and copied contents are hidden.");
     const associated=["session","decision","question","questions","review","review-event","milestone","next-action"].includes(String(metadata.type));

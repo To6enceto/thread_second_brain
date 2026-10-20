@@ -22,6 +22,7 @@ export class ReviewActionModal extends ThreadModal {
     const revision=this.plugin.index.revision,entries=this.plugin.index.entries;
     const now=await reviewSnapshot(this.plugin.index,settings,this.row.item,(path,hash)=>this.plugin.questionReviewReferences(path,hash));
     if(!allowed()||this.plugin.index.revision!==revision||now.key!==snapshot.key||now.digest!==snapshot.digest)return false;
+    if(Object.keys(snapshot.hashes).some(path=>/\.pdf$/i.test(path)))return allowed()&&await this.plugin.snapshotCurrent(snapshot.hashes,settings)&&allowed()&&revision===this.plugin.index.revision&&entries===this.plugin.index.entries;
     for(const [path,hash]of Object.entries(snapshot.hashes)){
       if(!allowed()||!readableText(path,this.plugin.settings))return false;
       const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))return false;

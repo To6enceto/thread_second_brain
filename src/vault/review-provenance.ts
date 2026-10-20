@@ -21,7 +21,7 @@ export function reviewProvenance(raw:string,metadata:Record<string,unknown>):{ki
   if(!match)throw new Error("Missing review evidence schema.");
   const data:unknown=JSON.parse(match[2]!),target=decodeURIComponent(match[1]!);
   if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).sort().join(",")!=="hashes,kind,schemaVersion"||!("schemaVersion" in data)||data.schemaVersion!==1||!("kind" in data)||!queueKinds.includes(data.kind as QueueKind)||!("hashes" in data)||!data.hashes||typeof data.hashes!=="object"||Array.isArray(data.hashes))throw new Error("Unsupported review evidence schema.");
-  const pairs=Object.entries(data.hashes);if(!pairs.length||pairs.length>200||target.length>4096||pairs.some(([path,hash])=>path.length>4096||vaultPath(path)!==path||!/\.(?:md|txt)$/i.test(path)||!digest(hash))||!Object.hasOwn(data.hashes,target))throw new Error("Invalid review source snapshots.");
+  const pairs=Object.entries(data.hashes);if(!pairs.length||pairs.length>200||target.length>4096||pairs.some(([path,hash])=>path.length>4096||vaultPath(path)!==path||!/\.(?:md|txt|pdf)$/i.test(path)||!digest(hash))||!Object.hasOwn(data.hashes,target)||!/\.(?:md|txt)$/i.test(target))throw new Error("Invalid review source snapshots.");
   return{kind:data.kind as QueueKind,target,hashes:Object.fromEntries(pairs) as Record<string,string>};
 }
 export function reviewManifestHash(kind:QueueKind,target:string,hashes:Record<string,string>):Promise<string>{

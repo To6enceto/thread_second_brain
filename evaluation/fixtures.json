@@ -641,6 +641,81 @@
       "forbidden": [
         "is unlimited"
       ]
+    },
+    {
+      "id": "pdf-page-support",
+      "mode": "answer",
+      "question": "What budget and protocol are established by the extracted pages?",
+      "notes": [
+        {
+          "path": "Projects/Quality Evaluation/PDF pages.md",
+          "text": "## PDF page 1\n> The project budget is 47 euros.\n\n## PDF page 2\n> The chosen protocol is Amber.",
+          "metadata": {
+            "type": "source"
+          },
+          "modifiedAt": 1791979200000
+        }
+      ],
+      "requirements": [
+        {
+          "section": "answer",
+          "terms": [
+            "47",
+            "euros"
+          ],
+          "sourcePaths": [
+            "Projects/Quality Evaluation/PDF pages.md"
+          ]
+        },
+        {
+          "section": "answer",
+          "terms": [
+            "Amber"
+          ],
+          "sourcePaths": [
+            "Projects/Quality Evaluation/PDF pages.md"
+          ]
+        }
+      ],
+      "reference": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "The budget is 47 euros.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          },
+          {
+            "text": "The protocol is Amber.",
+            "kind": "fact",
+            "sourceIds": [
+              "S2"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "knownWrong": {
+        "supported": true,
+        "answer": [
+          {
+            "text": "The budget is 470 euros and protocol is Blue.",
+            "kind": "fact",
+            "sourceIds": [
+              "S1"
+            ]
+          }
+        ],
+        "gaps": []
+      },
+      "emptySections": [],
+      "forbidden": [
+        "470",
+        "Blue"
+      ],
+      "supported": true
     }
   ]
 }

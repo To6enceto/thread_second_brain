@@ -49,7 +49,7 @@ export class PdfModal extends ThreadModal{
      if(this.closed||epoch!==this.epoch)return;preview.disabled=true;
      try{if(!await ready(path,snapshot.hash,settings,inputs,new AbortController().signal))throw Error('PDF consent, original or destination changed. Extract again.');if(!settings.roles.sources)throw Error('Map a Sources folder in Thread setup before saving.');const content=await pdfSource(extraction,path,snapshot.hash),note={path:`${settings.roles.sources}/${noteName(name)}.md`,content};if(this.closed||epoch!==this.epoch||this.inputs!==inputs)throw Error('PDF preview changed. Extract again.');const modal=new NewNoteModal(this.plugin,note,()=>ready(path,snapshot.hash,settings,inputs,new AbortController().signal));this.plugin.modals.add(modal);modal.open();}catch(error){if(!this.closed)this.status?.setText(error instanceof Error?error.message:'Could not prepare exact PDF source preview.');}finally{if(!this.closed&&epoch===this.epoch)preview.disabled=false;}
     };
-    this.status?.setText('Page text ready. Inspect coverage and exact new-note preview before saving. PDF evidence reuse remains disabled until current-original verification is available.');
+    this.status?.setText('Page text ready. Inspect coverage and exact new-note preview before saving. Reuse checks the approved original PDF and opens citations at their recorded page. Changed originals require explicit extraction to a new source note.');
    }catch(error){if(!this.closed&&epoch===this.epoch&&!controller.signal.aborted)this.status?.setText(error instanceof Error?error.message:'PDF extraction unavailable. Original is unchanged.');}
    finally{if(this.controller===controller){this.controller=null;this.refreshControls();}}
   };

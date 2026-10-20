@@ -59,3 +59,8 @@ claim. The CDP helper is developer tooling, never bundled into the plugin.
 Test runtimes, weights and collected reports stay ignored.
 
 Live briefing cases evaluate the recorded-first Resume composition. Reports retain `modelOutput` separately so model mistakes remain inspectable. Default reference/negative-control self-checks continue to exercise the curated evaluator directly.
+
+The `pdf-page-support` quality case checks answer support across two authored
+page excerpts. It is a text-quality fixture, not binary consent or parser proof.
+PDF binary/page/hash/freshness regressions run in Verify; native PDF acceptance
+uses the packaged worker, authored PDFs, exact consent and the actual viewer.

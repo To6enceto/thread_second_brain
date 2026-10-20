@@ -35,10 +35,10 @@ export function projectReviewQueue(index:LocalIndex,settings:ThreadSettings,day=
  const sources=(refs:SourceReference[])=>{
   const related=new Map<string,QueueSource>();let needsReview=false,missing=0;
   for(const ref of refs){
-   const state=graph.resolve(ref),entry=state.path?all.get(state.path):undefined;
+   const state=graph.resolve(ref),entry=state.path?(all.get(state.path)??(graph.binaries.has(state.path)?graph.notes.get(state.path):undefined)):undefined;
    if(!entry){needsReview=true;missing++;continue;}
    related.set(entry.path,{path:entry.path,hash:entry.hash});
-   if(state.state==="changed")changed.set(entry.path,{path:entry.path,hash:entry.hash,kind:"changed-source",heading:"",text:"This source differs from at least one recorded supporting snapshot. Inspect its current note; this is not an event-date claim.",related:[]});
+   if(state.state==="changed"&&!graph.binaries.has(entry.path))changed.set(entry.path,{path:entry.path,hash:entry.hash,kind:"changed-source",heading:"",text:"This source differs from at least one recorded supporting snapshot. Inspect its current note; this is not an event-date claim.",related:[]});
    if(!["current","renamed"].includes(state.state)||!graph.assess(entry.path).usable)needsReview=true;
   }
   unavailable+=missing;return{related:[...related.values()],needsReview,missing};

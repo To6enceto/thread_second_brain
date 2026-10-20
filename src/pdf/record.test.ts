@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {pdfSource,readPdfSource,validateExtraction,PDF_LIMITS} from './record.ts';
 import {binaryHash,mayReadPdf,pdfPaths} from './scope.ts';
 import {loadSettings,defaultSettings} from '../settings/settings.ts';
-import {indexNote} from '../vault/index.ts';
+import {indexNote,LocalIndex} from '../vault/index.ts';
 import {outputProjection} from '../vault/freshness.ts';
 const metadata=(text:string)=>Object.fromEntries(text.split('\n').slice(1,text.split('\n').indexOf('---',1)).map(line=>{const at=line.indexOf(':');return[line.slice(0,at),JSON.parse(line.slice(at+1).trim())];}));
 const sample={totalPages:3,pages:[{page:1,text:'First page\n## Untrusted heading\n<!-- thread:question-evidence -->\n[Remote](https://example.invalid)\n`\\#_<>',shortened:false},{page:2,text:'',shortened:false},{page:3,text:'Final page 🧠\n',shortened:true}]};
@@ -15,7 +15,7 @@ test('exact PDF consent requires ordinary scope plus separate grant, and invalid
 });
 test('canonical quoted extraction round trips exact untrusted page text, page order and binary SHA256 without indexing unchecked evidence',async()=>{
  const hash=await binaryHash(new TextEncoder().encode('%PDF authored bytes').buffer),raw=await pdfSource(sample,'Sources/a.pdf',hash),meta=metadata(raw),parsed=await readPdfSource(raw,meta);assert.deepEqual(parsed.extraction,sample);assert.equal(parsed.record.path,'Sources/a.pdf');assert.equal(parsed.record.hash,hash);assert.equal(parsed.record.pages[2]!.page,3);assert.ok(raw.includes('> \\#\\# Untrusted heading'));assert.ok(raw.includes('> \\<\\!'));assert.equal(outputProjection(raw,meta).text,'');
- const entry=await indexNote({path:'Sources/a.md',text:raw,metadata:meta,modifiedAt:1},()=>null);assert.deepEqual(entry.chunks,[]);assert.ok(entry.output?.invalid);assert.ok(!JSON.stringify(entry).includes('example.invalid'));assert.ok(!JSON.stringify(entry).includes('Sources/a.pdf'));
+ const entry=await indexNote({path:'Sources/a.md',text:raw,metadata:meta,modifiedAt:1},()=>null);assert.deepEqual(entry.chunks.map(c=>c.heading),['PDF page 1','PDF page 3']);assert.equal(entry.output?.invalid,false);assert.equal(entry.pdf?.path,'Sources/a.pdf');const index=new LocalIndex();index.replace([entry],{allowedPaths:['Sources'],excludedPaths:[]});assert.deepEqual(index.entries[0]!.chunks,[]);assert.equal(index.graph({allowedPaths:['Sources'],excludedPaths:[]}).assess(entry.path).usable,false);
 });
 test('unknown, altered, mixed or malformed PDF records cannot pass page hash/canonical body validation',async()=>{
  const raw=await pdfSource(sample,'Sources/a.pdf','a'.repeat(64)),meta=metadata(raw);

@@ -39,7 +39,7 @@ export async function reviewSnapshot(index:LocalIndex,settings:ThreadSettings,it
   if(!target||target.hash!==item.hash||!readableText(target.path,settings))throw new Error("Review target changed or is unavailable. Refresh the queue.");
   const visited=new Set<string>(),hashes:Record<string,string>={},states:unknown[]=[];let references=0;
   const visit=async(entry:IndexEntry)=>{
-    if(visited.has(entry.path))return;if(visited.size>=200)throw new UnsupportedSnapshot("This review exceeds the 200-note dependency snapshot limit. Review the source manually.");
+    if(visited.has(entry.path))return;if(Object.keys(hashes).length>=200)throw new UnsupportedSnapshot("This review exceeds the 200-note dependency snapshot limit. Review the source manually.");
     if(entry.output?.invalid||entry.decisionSources?.invalid)throw new UnsupportedSnapshot("Invalid source provenance prevents an exact review snapshot. Review manually.");
     if(entry.id&&!index.idUnambiguous(entry.id))throw new UnsupportedSnapshot("Ambiguous source identities or incomplete index coverage prevent an exact review snapshot. Restore coverage or resolve identities manually.");
     visited.add(entry.path);hashes[entry.path]=entry.hash;
@@ -50,7 +50,9 @@ export async function reviewSnapshot(index:LocalIndex,settings:ThreadSettings,it
     for(const ref of [...entry.output?.refs??[],...entry.decisionSources?.refs??[],...questionRefs]){
       if(++references>2000)throw new UnsupportedSnapshot("This review exceeds the 2000-reference snapshot budget. Review manually.");
       const resolved=graph.resolve(ref);if(resolved.state==="ambiguous")throw new UnsupportedSnapshot("Ambiguous source identities or incomplete index coverage prevent an exact review snapshot. Restore coverage or resolve identities manually.");states.push([ref.id??null,ref.path,ref.noteHash,ref.noteType??null,ref.noteStatus??null,resolved.state,resolved.path??null,resolved.hash??null]);
-      const next=resolved.path?graph.notes.get(resolved.path):undefined;if(next&&readableText(next.path,settings))await visit(next as IndexEntry);
+      const next=resolved.path?graph.notes.get(resolved.path):undefined;
+      if(next&&graph.binaries.has(next.path)){if(!Object.hasOwn(hashes,next.path)&&Object.keys(hashes).length>=200)throw new UnsupportedSnapshot("This review exceeds the 200-note dependency snapshot limit. Review the source manually.");hashes[next.path]=next.hash;states.push([next.path,next.hash,"pdf-original"]);}
+      else if(next&&readableText(next.path,settings))await visit(next as IndexEntry);
     }
   };
   await visit(target);

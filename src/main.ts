@@ -1,4 +1,6 @@
 import {PdfModal} from "./ui/pdf-modal.ts";
+import {PdfChecks} from "./pdf/checks.ts";
+import {readPdfSource,pdfEvidenceText} from "./pdf/record.ts";
 import {readPdfOriginal} from "./pdf/original.ts";
 import {mayReadPdf} from "./pdf/scope.ts";
 import {searchBudget,type SearchLevel} from "./retrieval/budget.ts";
@@ -148,6 +150,10 @@ export default class ThreadPlugin extends Plugin {
   async readPdf(path:string,settings:ThreadSettings,signal:AbortSignal):Promise<{hash:string;bytes:ArrayBuffer}>{
     const snapshot=JSON.stringify(settings);return readPdfOriginal(path,settings,{get:path=>{const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?file:null;},read:file=>this.app.vault.readBinary(file)},()=>this.active&&snapshot===JSON.stringify(this.settings),signal);
   }
+  private async checkedPdf(checks:PdfChecks,path:string,settings:ThreadSettings,signal:AbortSignal):Promise<string|null>{
+    if(!mayReadPdf(path,settings)||JSON.stringify(settings)!==JSON.stringify(this.settings))return null;
+    return checks.verify(path,()=>{const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?file.stat.size:null;},()=>this.readPdf(path,settings,signal),signal);
+  }
   async readPdfAsset(path:string):Promise<ArrayBuffer>{
     if(!this.active||!(path==="pdf-assets.json"||path==="pdf-extract-worker.js"||/^pdf-resources\/(?:cmaps|standard_fonts)\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/.test(path)))throw Error("Unsupported local PDF asset.");
     return this.app.vault.adapter.readBinary(`${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/${path}`);
@@ -222,7 +228,7 @@ export default class ThreadPlugin extends Plugin {
         const data=JSON.parse(context) as {settings:unknown;noteHashes:unknown};
         if(JSON.stringify(data.settings)!==settingsText||!data.noteHashes||typeof data.noteHashes!=="object"||Array.isArray(data.noteHashes))return false;
         for(const [path,hash] of Object.entries(data.noteHashes)){
-          if(typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)||!readableText(path,settings))return false;noteHashes[path]=hash;
+          if(typeof hash!=="string"||!/^[a-f0-9]{64}$/.test(hash)||!(readableText(path,settings)||mayReadPdf(path,settings)))return false;noteHashes[path]=hash;
         }
       }catch{return false;}
     }
@@ -317,11 +323,12 @@ export default class ThreadPlugin extends Plugin {
   }
   async rebuildIndex(): Promise<void> {
     if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
-    const cancelEpoch=this.indexCancelEpoch;let statsSettings="",startedAt=performance.now(),stats:IndexReadStats={rawBytesRead:0,filesRead:0,sizeSkips:0,readBudgetSkips:0,elapsedMs:0};
+    const cancelEpoch=this.indexCancelEpoch;let statsSettings="",startedAt=performance.now(),pdfChecks=new PdfChecks(),pdfEpoch=this.indexUpdates.epoch,stats:IndexReadStats={rawBytesRead:0,filesRead:0,sizeSkips:0,readBudgetSkips:0,elapsedMs:0};
     while(this.active){
       if(cancelEpoch!==this.indexCancelEpoch)throw new DOMException("Index work canceled.","AbortError");
       if(this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size)return;
       const settings=structuredClone(this.settings),settingsText=JSON.stringify(settings),epoch=this.indexUpdates.epoch,budget=indexBudget(settings.indexProfile);
+      if(epoch!==pdfEpoch){pdfChecks=new PdfChecks();pdfEpoch=epoch;}
       if(settingsText!==statsSettings){statsSettings=settingsText;startedAt=performance.now();stats={rawBytesRead:0,filesRead:0,sizeSkips:0,readBudgetSkips:0,elapsedMs:0};}
       const files=this.app.vault.getFiles().filter(file=>readableText(file.path,settings)).sort((a,b)=>a.path.localeCompare(b.path)),admitted=new Set(files.slice(0,budget.maxFiles).map(file=>file.path));let entryBudgetSkips=0;
       const current=()=>this.active&&cancelEpoch===this.indexCancelEpoch&&epoch===this.indexUpdates.epoch&&settingsText===JSON.stringify(this.settings);
@@ -339,7 +346,9 @@ export default class ThreadPlugin extends Plugin {
             if(text.length>budget.maxFileBytes){stats.sizeSkips++;return null;}
             const bytes=new TextEncoder().encode(text).length;stats.rawBytesRead+=bytes;
             if(bytes>budget.maxFileBytes){stats.sizeSkips++;return null;}if(stats.rawBytesRead>budget.maxReadBytes){stats.readBudgetSkips++;return null;}
-            return indexNote({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime},target=>this.resolveIndexLink(path,target,settings),{budget,signal});
+            const entry=await indexNote({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime},target=>this.resolveIndexLink(path,target,settings),{budget,signal});
+            if(entry.pdf){const hash=await this.checkedPdf(pdfChecks,entry.pdf.path,settings,signal);signal.throwIfAborted();if(!current())throw new DOMException("PDF snapshot changed.","AbortError");if(hash)this.index.binaries.set(entry.pdf.path,hash);else this.index.binaries.delete(entry.pdf.path);}
+            return entry;
           },
           retain:entries=>{
             const complete=this.index.identityComplete,previous=this.index.entries,kept=retainIndexEntries(entries,admitted,budget);entryBudgetSkips=kept.entryBudgetSkips;
@@ -350,7 +359,7 @@ export default class ThreadPlugin extends Plugin {
           published:()=>{this.index.coverage=coverage(this.index.entries);this.indexProgressChanged();},
           progress:(done,total)=>{if(current())this.setIndexProgress("running",done,total,"Processing current permitted files; omissions and byte limits appear in coverage.");},
           resolve:(path,target)=>this.resolveIndexLink(path,target,settings),affected:paths=>this.notifySources(paths),persist:()=>this.persistIndex()});
-        if(current()&&this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size){this.setIndexProgress("ready",this.indexProgress.done,this.indexProgress.total,"Text index snapshot ready. Inspect coverage before assuming completeness.");return;}
+        if(current()&&this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size){this.setIndexProgress("ready",this.indexProgress.done,this.indexProgress.total,"Text index snapshot ready. Inspect coverage before assuming completeness. "+pdfChecks.summary);return;}
       }catch(error){
         if(cancelEpoch!==this.indexCancelEpoch)throw new DOMException("Index work canceled.","AbortError");
         if(!(error instanceof DOMException&&error.name==="AbortError")||!this.active){if(this.active)this.setIndexProgress("failed",0,files.length,"Index work failed. Check vault access and rebuild; original notes and history are preserved.");throw error;}
@@ -368,6 +377,18 @@ export default class ThreadPlugin extends Plugin {
     const file=this.app.vault.getAbstractFileByPath(path);
     if(!(file instanceof TFile))throw new Error("Source is missing. Search again.");
     const revision=this.index.revision;
+    const settings=structuredClone(this.settings),entry=this.index.entries.find(e=>e.path===path),original=this.index.binaries.get(path);
+    if(entry?.pdf||original){
+      const bundle=this.withDependencies({sources:[],truncated:false,noteHashes:{[path]:hash}},settings);
+      if(!await this.evidenceCurrent(bundle,settings)||!isCurrent()||revision!==this.index.revision)throw Error("PDF evidence changed or access is unavailable. Extract a new source explicitly.");
+      const raw=entry?.pdf?await this.app.vault.read(file):null;
+      if(raw!==null&&await contentHash(raw)!==hash)throw Error("Extraction note changed. Search again.");
+      const pdf=entry?.pdf,requested=heading?Number(/^PDF page (\d+)$/.exec(heading)?.[1]):pdf?.pages.find(p=>p.chars>0)?.page??1;
+      if(!Number.isInteger(requested)||pdf&&!pdf.pages.some(p=>p.page===requested))throw Error("The selected PDF page is not in this extraction.");
+      const target=this.app.vault.getAbstractFileByPath(pdf?.path??path);
+      if(!(target instanceof TFile)||!isCurrent()||revision!==this.index.revision||JSON.stringify(settings)!==JSON.stringify(this.settings)||!mayReadPdf(target.path,this.settings))throw Error("PDF access changed. Search again.");
+      await this.app.workspace.getLeaf(false).openFile(target,{eState:{subpath:`#page=${requested}`}});return;
+    }
     await verifyThenOpenSource(hash,()=>this.app.vault.read(file),()=>isCurrent()&&revision===this.index.revision&&file.path===path&&readableText(path,this.settings),
       ()=>this.app.workspace.getLeaf(false).openFile(file,{eState:{subpath:heading?`#${heading}`:""}}));
   }
@@ -423,7 +444,9 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
-    if(!folder&&mayReadPdf(path,this.settings)){this.index.revision++;this.notifySources(new Set([path]));return;}
+    if(!folder&&/\.pdf$/i.test(path)&&(mayReadPdf(path,this.settings)||this.index.binaries.has(path)||this.index.entries.some(e=>e.pdf?.path===path))){
+      const affected=this.indexUpdates.invalidate([path],this.settings);this.notifySources(affected);void this.persistIndex().catch(()=>new Notice("Thread could not scrub PDF-derived cache. Check vault write access and rebuild."));this.queueIndex();return;
+    }
     const allowed=readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"));
     if(!allowed)return;
     if(folder){this.scheduleIndex();for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
@@ -465,9 +488,11 @@ export default class ThreadPlugin extends Plugin {
     watch([...new Set(snapshot.flatMap(entry=>[entry.path,...Object.keys(graph.assess(entry.path).dependencies)]))]);
     const budget=searchBudget(level);
     const withCoverage=(result:SearchResult):SearchResult=>({...result,coverage:{...result.coverage,indexOmittedNotes:this.index.coverage?.omittedFiles??0,level:budget.level}});
-    if(!hybrid||!settings.semanticSearch)return withCoverage(searchEntries(entries,query,filters,budget.results));
+    const verifyEntries=async(selected:IndexEntry[])=>{const noteHashes=Object.fromEntries(selected.map(e=>[e.path,e.hash]));if(!await this.evidenceCurrent(this.withDependencies({sources:[],truncated:false,noteHashes},settings),settings))throw Error("Search evidence or original PDF changed. Refresh and explicitly re-extract changed PDFs.");assertCurrent();};
+    if(!hybrid||!settings.semanticSearch){const result=searchEntries(entries,query,filters,budget.results);await verifyEntries([...new Map(result.hits.map(h=>[h.entry.path,h.entry])).values()]);return withCoverage(result);}
     // Hash only the bounded candidate notes before transmitting their passages.
     const selection=await semanticCandidates(filterEntries(entries,filters),query,budget.level,signal,current),{candidates}=selection;
+    await verifyEntries([...new Map(candidates.map(h=>[h.entry.path,h.entry])).values()]);
     for(const entry of new Map(candidates.map(hit=>[hit.entry.path,hit.entry])).values()){
       assertCurrent();
       if(!readableText(entry.path,this.settings))throw new Error("Search source is outside read scope.");
@@ -476,7 +501,7 @@ export default class ThreadPlugin extends Plugin {
       const hash=await contentHash(await this.app.vault.read(file));assertCurrent();
       if(file.path!==entry.path||hash!==entry.hash)throw new Error("Search source changed. Refresh the index.");
     }
-    return withCoverage(await this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current,budget.level,selection));
+    const result=await this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current,budget.level,selection);await verifyEntries([...new Map(result.hits.map(h=>[h.entry.path,h.entry])).values()]);return withCoverage(result);
   }
   async evidence(settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
     if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();
@@ -493,8 +518,8 @@ export default class ThreadPlugin extends Plugin {
       const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error(`Source missing: ${path}.`);
       const raw=await this.app.vault.read(file);signal.throwIfAborted();if(file.path!==path)throw new Error("Source moved while reading.");
       const fullHash=await contentHash(raw);if(fullHash!==entry.hash)throw new Error("Source changed since indexing. Rebuild and try again.");
-      const metadata=readMetadata(raw,parseYaml);const projected=outputProjection(raw,metadata);
-      notes.push({path,text:projected.text,metadata,modifiedAt:file.stat.mtime,fullHash});
+      const metadata=readMetadata(raw,parseYaml),pdf=entry.pdf?await readPdfSource(raw,metadata):undefined;const projected=outputProjection(raw,metadata);
+      notes.push({path,text:pdf?pdfEvidenceText(pdf.extraction):projected.text,metadata,modifiedAt:file.stat.mtime,fullHash,...(pdf?{pdf:pdf.record}:{})});
     }
     const bundle=this.withDependencies(await buildEvidence(notes),settings);signal.throwIfAborted();
     if(!await this.evidenceCurrent(bundle,settings))throw new Error("Supporting evidence changed. Generate again.");signal.throwIfAborted();return bundle;
@@ -505,11 +530,17 @@ export default class ThreadPlugin extends Plugin {
     const graph=this.index.graph(settings),entries=new Map(this.index.entries.map(entry=>[entry.path,entry]));
     for(const [path,hash] of Object.entries(bundle.noteHashes)){
       const state=graph.assess(path);
-      if(entries.get(path)?.hash!==hash||!state.usable||Object.entries(state.dependencies).some(([dependency,value])=>bundle.noteHashes[dependency]!==value))return false;
+      if((this.index.binaries.get(path)??entries.get(path)?.hash)!==hash||!state.usable||Object.entries(state.dependencies).some(([dependency,value])=>bundle.noteHashes[dependency]!==value))return false;
     }
+    return this.snapshotCurrent(bundle.noteHashes,settings);
+  }
+  /** Also supports explicit review of stale outputs; does not declare them fresh. */
+  async snapshotCurrent(noteHashes:Record<string,string>,settings:ThreadSettings):Promise<boolean>{
     const revision=this.index.revision;
     if (JSON.stringify(settings) !== JSON.stringify(this.settings)) return false;
-    for (const [path, hash] of Object.entries(bundle.noteHashes)) {
+    const checks=new PdfChecks(),signal=new AbortController().signal;
+    for (const [path, hash] of Object.entries(noteHashes)) {
+      if(/\.pdf$/i.test(path)){if(await this.checkedPdf(checks,path,settings,signal)!==hash){this.invalidatePath(path);return false;}continue;}
       const file = this.app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile) || !readableText(path, this.settings)) return false;
       if (await contentHash(await this.app.vault.read(file)) !== hash) return false;

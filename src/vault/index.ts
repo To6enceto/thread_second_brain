@@ -1,4 +1,5 @@
 import { reviewProvenance, reviewManifestHash } from "./review-provenance.ts";
+import { readPdfSource,pdfEvidenceText,type PdfRecord } from "../pdf/record.ts";
 import { outputProjection,FreshnessGraph,readSourceReferences,type OutputProvenance,type RenameMap,type SourceReference } from "./freshness.ts";
 import type { SourceNote } from "./evidence.ts";
 import { sectionChunks, type SectionCoverage } from "./sections.ts";
@@ -8,6 +9,7 @@ import { contentHash, isWithin, readableText, type ReadScope } from "./scope.ts"
 import { searchEntries, keywordTerms, type SearchResult, type SearchFilters } from "../retrieval/search.ts";
 
 export interface IndexEntry {
+  pdf?:PdfRecord;
   sectionCoverage?:SectionCoverage;
   reviewManifestHash?:string;
   decisionSources?: {refs:SourceReference[];invalid:boolean};
@@ -35,7 +37,10 @@ export function linkTargets(text: string): string[] {
 export async function indexNote(note: SourceNote, resolve: (link: string) => string | null, options:{budget?:IndexBudget;signal?:AbortSignal}={}): Promise<IndexEntry> {
   options.signal?.throwIfAborted();const budget=options.budget??indexBudget("standard");
   if(new TextEncoder().encode(note.text).length>budget.maxFileBytes)throw new Error("Note exceeds the selected raw-file index budget.");
-  const projected=outputProjection(note.text,note.metadata);
+  let projected=outputProjection(note.text,note.metadata),pdf:PdfRecord|undefined;
+  if(note.metadata.thread_pdf_version!==undefined||note.metadata.thread_pdf!==undefined){
+    try{const validated=await readPdfSource(note.text,note.metadata);pdf=validated.record;projected={text:pdfEvidenceText(validated.extraction),ranges:[],output:{refs:[{path:pdf.path,heading:"",hash:pdf.hash,noteHash:pdf.hash,noteType:"pdf"}],invalid:false,title:"Extracted PDF text; original verification required"}};}catch{/* Keep the fail-closed projection for unsupported or edited extractions. */}
+  }
   const selected=await sectionChunks(projected.text,budget,options.signal),chunks=selected.chunks;
   const linkTexts=[...new Set(chunks.flatMap(chunk=>linkTargets(`${chunk.heading}\n${chunk.excerpt}`)))];
   const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version","thread_review_version","thread_review_key","thread_review_snapshot","action","event_on","thread_milestone_version","thread_next_action_version","selected_at"]);
@@ -51,7 +56,7 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
   }
   const review=note.metadata.type==="review-event"&&note.metadata.thread_review_version==="1"&&!projected.output?.invalid?reviewProvenance(note.text,note.metadata):undefined;
   const hash=await contentHash(note.text);options.signal?.throwIfAborted();
-  return {sectionCoverage:selected.coverage,...(review?{reviewManifestHash:await reviewManifestHash(review.kind,review.target,review.hashes)}:{}),path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
+  return {...(pdf?{pdf}:{}),sectionCoverage:selected.coverage,...(review?{reviewManifestHash:await reviewManifestHash(review.kind,review.target,review.hashes)}:{}),path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
     ...(decisionSources?{decisionSources}:{}),
     title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata,...(projected.output?{output:projected.output}:{}),
     hash,modifiedAt:note.modifiedAt,chunks,linkTexts,
@@ -62,6 +67,8 @@ export function queryTerms(query: string): string[] {
   return keywordTerms(query.slice(0,1000)).slice(0,40);
 }
 export class LocalIndex {
+  /** Binary authority is never restored from the persisted text index. */
+  binaries=new Map<string,string>();
   entries: IndexEntry[]=[];
   coverage:IndexCoverage|null=null;
   ready=false;
@@ -69,13 +76,13 @@ export class LocalIndex {
   renames:RenameMap={};
   get identityComplete():boolean{return this.coverage===null||this.coverage.omittedFiles===0;}
   idUnambiguous(id:string):boolean{return this.ready&&this.identityComplete&&this.entries.filter(e=>e.id===id).length===1;}
-  graph(scope:ReadScope):FreshnessGraph{return new FreshnessGraph(this.entries,scope,this.renames,this.identityComplete);}
+  graph(scope:ReadScope):FreshnessGraph{return new FreshnessGraph(this.entries,scope,this.renames,this.identityComplete,this.binaries);}
   replace(entries:IndexEntry[],scope:ReadScope):void{
     const allowed=entries.filter(e=>readableText(e.path,scope));
-    const graph=new FreshnessGraph(allowed,scope,this.renames,this.identityComplete);
+    const graph=new FreshnessGraph(allowed,scope,this.renames,this.identityComplete,this.binaries);
     this.entries=allowed.map(e=>e.output&&!graph.assess(e.path).usable?{...e,chunks:[],links:[],linkTexts:[]}:e);this.ready=true;
   }
-  clear(): void {this.entries=[];this.coverage=null;this.ready=false;this.revision++;}
+  clear(): void {this.entries=[];this.binaries.clear();this.coverage=null;this.ready=false;this.revision++;}
   projectRecords(scope:ReadScope,project:string):IndexEntry[]{
     return projectMembers(this.entries.filter(entry=>readableText(entry.path,scope)),project);
   }
@@ -97,7 +104,7 @@ export function hitsToNotes(hits: RecallHit[]): SourceNote[] {
     const chunk=`${hit.heading?`## ${hit.heading}\n`:""}${hit.excerpt}\n`;
     const existing=notes.get(hit.entry.path);
     if(existing){existing.text+=chunk;existing.focusTerms=[...new Set([...(existing.focusTerms??[]),...(hit.matchedTerms??[])])];existing.focusPhrases=[...new Set([...(existing.focusPhrases??[]),...(hit.requiredPhrases??[])])];}
-    else notes.set(hit.entry.path,{path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash,relevance:hit.score,focusTerms:hit.matchedTerms??[],focusPhrases:hit.requiredPhrases??[]});
+    else notes.set(hit.entry.path,{path:hit.entry.path,text:chunk,metadata:hit.entry.metadata,modifiedAt:hit.entry.modifiedAt,fullHash:hit.entry.hash,relevance:hit.score,focusTerms:hit.matchedTerms??[],focusPhrases:hit.requiredPhrases??[],...(hit.entry.pdf?{pdf:hit.entry.pdf}:{})});
   }
   return [...notes.values()];
 }

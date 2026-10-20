@@ -497,9 +497,9 @@ folder; existing notes are refused. Original PDF full SHA-256, exact page text
 hashes, parser/extraction version and page mappings are recorded with a new UUID
 in readable canonical Markdown. Saving rechecks original bytes, consent, inputs
 and settings; PDF changes during an in-flight save revoke its preview. Sources,
-import/rename/change history and original PDFs remain unchanged. In this feature
-baseline, managed PDF text stays unavailable to AI/retrieval until feature32
-adds current-original verification; raw Markdown remains readable.
+import/rename/change history and original PDFs remain unchanged. Managed PDF
+text is reused only with current-original verification; raw Markdown remains
+readable independently.
 
 Selectable-text extraction uses the pinned Apache-2.0
 [PDF.js 6.4.299 release](https://github.com/mozilla/pdf.js/releases/tag/v6.4.299)
@@ -542,3 +542,19 @@ asset inventory; preserve every listed asset when installing.
 Encryption refusal also checks the parser encryption filter after opening: an
 encrypted PDF with an empty user password is refused even when PDF.js opens it
 without prompting. A valid authored encrypted regression fixture is included.
+
+PDF evidence in Find, Ask, Resume and reviews carries the extraction note ID and
+full hash, original PDF hash and actual page number. Source buttons verify both
+files, then open the original at that page. Saved Markdown also links the
+original page; opening an ordinary Markdown link is not a freshness check.
+Only extracted page text enters evidence; extraction metadata is not a fact.
+
+Indexing and evidence operations verify at most 10 distinct PDF originals and
+32 MiB of binary data per operation (16 MiB/file). The index status reports PDF
+verification coverage; omitted or unavailable originals leave their extractions
+unusable. Binary authority is never restored from cached text. Changes, missing
+files, renames, exclusions or revoked consent invalidate extracted evidence,
+dependent outputs and vectors. Exact consent does not follow renamed PDFs.
+Use Extract local PDF explicitly with a new source name to restore evidence;
+old extractions, notes and original PDFs are preserved. Keyword search, recorded
+Resume context and explicit review remain usable without a model.

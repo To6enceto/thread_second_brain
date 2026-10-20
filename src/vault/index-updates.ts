@@ -43,6 +43,7 @@ export class IndexUpdates {
   stop(): void { this.epoch++; this.controller?.abort(); }
   invalidate(paths: Iterable<string>, scope: ReadScope, folder = false): Set<string> {
     const direct = new Set(paths);
+    for(const path of direct)this.index.binaries.delete(path);
     if (folder) for (const entry of this.index.entries) if ([...direct].some(path => isWithin(entry.path, path))) direct.add(entry.path);
     const affected = affectedEntries(this.index.entries, direct, scope, this.index.renames);
     for (const path of affected) { this.pending.add(path); this.notified.add(path); }
