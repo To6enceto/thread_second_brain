@@ -105,6 +105,24 @@ readable in the note. Unsupported metadata or manual changes to the managed
 record block reuse; create a new reviewed answer instead. Earlier answers remain
 compatible without conversion. Existing filenames are never overwritten.
 
+After an answer, choose **Continue with follow-up** and enter the next question.
+Choose **Reuse previous evidence** to revalidate the previous chosen passages, or
+**Retrieve evidence** to search again. Inspect Include/Exclude/Pin first and the
+exact context, then explicitly generate. Earlier turns remain read-only and
+labelled as AI conversation context; they never become authoritative sources.
+
+Conversations allow six turns. Earlier context uses at most 4000 serialized
+characters, keeping whole recent turns only when all their supporting passages
+are still selected. The workbench shows omitted turns and reasons; excluded
+passages cannot return through history. Current evidence retains its 16000-character
+budget; the whole prompt is limited to 24000 characters. These are character,
+not token, limits. **Start new conversation**, Cancel, close, relevant source
+changes and scope/project/settings changes revoke affected conversation outputs.
+
+**Preview answer note** still saves only the current reviewed answer and its
+provenance. Earlier turns are held in memory, never saved automatically. Explicit
+conversation saves are the next planned feature.
+
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 

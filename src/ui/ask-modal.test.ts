@@ -12,9 +12,9 @@ const compiled=await build({entryPoints:[new URL('./ask-modal.ts',import.meta.ur
  `:`
  const state=()=>globalThis.__workbenchForm;
  class Element {constructor(tag='div',options={}){this.tagName=tag;this.textContent=options.text??'';this.children=[];this.disabled=false;this.value='';state().elements.push(this);if(options.attr?.['aria-label'])state().fields.set(options.attr['aria-label'],this);}
- createEl(tag,options={}){const child=new Element(tag,options);this.children.push(child);return child;}createDiv(options={}){return this.createEl('div',options);}addClass(){}empty(){this.children=[];this.textContent='';}setText(value){this.textContent=value;}setAttribute(key,value){if(key==='aria-label')state().fields.set(value,this);}}
+ createEl(tag,options={}){const child=new Element(tag,options);this.children.push(child);return child;}createDiv(options={}){return this.createEl('div',options);}addClass(){}focus(){state().focused=this;}empty(){this.children=[];this.textContent='';}setText(value){this.textContent=value;}setAttribute(key,value){if(key==='aria-label')state().fields.set(value,this);}}
  export class Modal {constructor(app){this.app=app;this.contentEl=new Element();this.modalEl=new Element();}open(){this.onOpen();this.selection={win:{},range:null,focusEl:null,focusVisible:false};}close(){this.onClose();}}
- export class Setting {constructor(parent){}setName(){return this;}setDesc(){return this;}addDropdown(fn){return this.component(fn);}addText(fn){return this.component(fn);}addTextArea(fn){return this.component(fn);}component(fn){const inputEl=new Element('input');fn({inputEl,selectEl:inputEl,addOption(){return this;},setPlaceholder(){return this;},setValue(value){inputEl.value=value;return this;},onChange(callback){inputEl.changed=callback;return this;}});return this;}}
+ export class Setting {constructor(parent){}setName(){return this;}setDesc(){return this;}addDropdown(fn){return this.component(fn);}addText(fn){return this.component(fn);}addTextArea(fn){return this.component(fn);}component(fn){const inputEl=new Element('input');fn({inputEl,selectEl:inputEl,addOption(value){if(!inputEl.hasOptions){inputEl.value=value;inputEl.hasOptions=true;}return this;},setPlaceholder(){return this;},setValue(value){inputEl.value=value;return this;},onChange(callback){inputEl.changed=callback;return this;}});return this;}}
  `}));
 }}]});
 const {AskModal}=await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0]!.text).toString('base64')}`) as typeof import('./ask-modal.ts');
@@ -90,4 +90,79 @@ test("claim correction handlers retain originals and require renewed exact previ
   assert.ok(!rendered(modal.contentEl as unknown as Element).includes('Compare a text-first alternative.'));
   await button('Preview answer note').onclick!();latest=preview();modal.close();await latest.apply!.onclick!({} as PointerEvent);assert.equal(created.length,1,'Closing Ask revokes its preview');
  }finally{modal.controller?.abort();Reflect.deleteProperty(globalThis,'__workbenchForm');Reflect.deleteProperty(globalThis,'__workbenchModel');}
+});
+
+async function conversationFixture(){
+ const form={elements:[] as Element[],fields:new Map<string,Element>(),focused:null as Element|null};Reflect.set(globalThis,'__workbenchForm',form);
+ const settings={...defaultSettings(),model:'local',allowedPaths:['P'],selectedProject:'P'};
+ const entries=await Promise.all(['Budget is 20 euros.','Voice is postponed.'].map((text,i)=>indexNote({path:`P/${i}.md`,text,metadata:{type:'source'},modifiedAt:1},()=>null)));
+ const state={fresh:true,identity:'project',calls:[] as {earlierConversation:unknown[];evidence:{id:string;excerpt:string}[]}[],created:[] as import('../vault/workspace.ts').NewNote[][],searches:0};
+ const plugin={app:{},active:true,settings,index:{ready:true,revision:1},modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>state.fresh,projectIdentity:()=>state.identity,withDependencies:(v:unknown)=>v,
+  searchEvidence:async()=>{state.searches++;return{hits:entries.map(entry=>({entry,heading:'',excerpt:entry.chunks[0]!.excerpt,score:1}))};},
+  createNotes:async(notes:import('../vault/workspace.ts').NewNote[],validate:()=>Promise<void>,current:()=>boolean)=>{await validate();assert.ok(current());state.created.push(structuredClone(notes));},openIndexedSource:async()=>{}};
+ const model=(prompt:string)=>{const data=JSON.parse(prompt);state.calls.push(data);return Promise.resolve(JSON.stringify({supported:true,answer:[{text:data.evidence[0].excerpt,kind:'fact',sourceIds:[data.evidence[0].id]}],gaps:[]}));};Reflect.set(globalThis,'__workbenchModel',model);
+ const modal=new AskModal(plugin as unknown as ThreadPlugin);modal.open();
+ const elements=(e:Element):Element[]=>[e,...e.children.flatMap(elements)];
+ const button=(label:string)=>{const found=elements(modal.contentEl as unknown as Element).find(e=>e.textContent===label);assert.ok(found,label);return found;};
+ const input=(label:string,value:string)=>{const field=form.fields.get(label);assert.ok(field,label);field.value=value;field.changed!(value);};
+ const generate=()=>button('Generate from chosen evidence').onclick!();
+ const begin=async()=>{input('Question','What budget is recorded?');await modal.run('What budget is recorded?',false);await generate();};
+ const follow=async()=>{await button('Continue with follow-up').onclick!();input('Question','Why?');await button('Reuse previous evidence').onclick!();};
+ const clean=()=>{modal.close();Reflect.deleteProperty(globalThis,'__workbenchForm');Reflect.deleteProperty(globalThis,'__workbenchModel');};
+ return{modal,plugin,state,form,button,input,generate,begin,follow,clean,model};
+}
+
+test('follow-ups explicitly reuse chosen evidence, preserve corrections and keep current-answer previews exact',async()=>{
+ const f=await conversationFixture();try{
+  f.input('Question','What budget is recorded?');await f.modal.run('What budget is recorded?',false);f.input('Evidence choice S2','exclude');f.input('Evidence choice S1','pin');await f.generate();
+  f.input('Claim text 1','Check the recorded budget.');f.input('Claim classification 1','suggestion');
+  await f.button('Preview answer note').onclick!();const old=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  await f.follow();assert.equal(old.apply!.disabled,true);assert.equal(f.state.calls.length,1);assert.equal(f.state.searches,1);
+  assert.equal(f.form.fields.get('Evidence choice S1')!.value,'pin','Reused pin intent must be visible in its native dropdown');
+  assert.equal(f.form.focused,f.form.fields.get('Question'));
+  assert.match(rendered(f.modal.contentEl as unknown as Element),/Earlier turn 1/);
+  await f.generate();assert.equal(f.state.calls.length,2);assert.equal(f.state.calls[1]!.evidence.length,1);
+  assert.match(JSON.stringify(f.state.calls[1]!.earlierConversation),/Check the recorded budget/);assert.ok(!JSON.stringify(f.state.calls[1]!).includes('Voice is postponed'));
+  await f.button('Preview answer note').onclick!();const latest=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  const expected=structuredClone(latest.note);await latest.apply!.onclick!({} as PointerEvent);assert.deepEqual(f.state.created,[[expected]]);
+  assert.ok(!expected.content.includes('Check the recorded budget'),'Single-answer save must not silently persist the prior conversation');
+  await f.follow();await f.generate();assert.equal(f.state.calls[2]!.earlierConversation.length,2);
+  f.input('Answer scope','vault');assert.equal(f.modal.answer,null);assert.ok(!rendered(f.modal.contentEl as unknown as Element).includes('Earlier turn 1'));assert.equal(f.button('Reuse previous evidence').disabled,true);
+ }finally{f.clean();}
+});
+
+test('conversation revokes history, previews and pending inference on source changes, cancel, settings, project identity and close',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.follow();await f.generate();await f.button('Preview answer note').onclick!();const preview=[...f.plugin.modals].at(-1) as import('./new-note-modal.ts').NewNoteModal;
+  f.modal.invalidatePaths(new Set(['P/0.md']));assert.equal(f.modal.answer,null);assert.equal(preview.apply!.disabled,true);assert.ok(!rendered(f.modal.contentEl as unknown as Element).includes('Budget is 20 euros'));
+  await f.begin();await f.follow();f.state.fresh=false;await f.generate();assert.equal(f.modal.answer,null);assert.equal(f.button('Reuse previous evidence').disabled,true);f.state.fresh=true;
+  await f.begin();await f.button('Continue with follow-up').onclick!();f.state.identity='changed-project';f.input('Question','Why?');await f.button('Reuse previous evidence').onclick!();assert.equal(f.button('Reuse previous evidence').disabled,true);
+  await f.begin();await f.button('Continue with follow-up').onclick!();f.plugin.settings={...f.plugin.settings,excludedPaths:['P/0.md']};f.input('Question','Why?');await f.button('Reuse previous evidence').onclick!();assert.equal(f.button('Reuse previous evidence').disabled,true);
+  await f.begin();await f.follow();let signal:AbortSignal|undefined,resolve!: (value:string)=>void;
+  Reflect.set(globalThis,'__workbenchModel',(_p:string,s:AbortSignal)=>{signal=s;return new Promise<string>(r=>{resolve=r;});});
+  const pending=f.generate();for(let i=0;!signal&&i<100;i++)await new Promise(r=>setImmediate(r));assert.ok(signal);
+  await f.button('Cancel').onclick!();assert.ok(signal.aborted);resolve(JSON.stringify({supported:true,answer:[{text:'LATE_CANARY',kind:'fact',sourceIds:['S1']}],gaps:[]}));await pending;
+  assert.equal(f.modal.answer,null);assert.ok(!rendered(f.modal.contentEl as unknown as Element).includes('LATE_CANARY'));assert.equal(f.button('Reuse previous evidence').disabled,true);
+  Reflect.set(globalThis,'__workbenchModel',f.model);await f.begin();await f.follow();const detached=f.button('Generate from chosen evidence');const before=f.state.calls.length;f.modal.close();await detached.onclick!();assert.equal(f.state.calls.length,before);
+ }finally{f.clean();}
+});
+
+test('new evidence selection omits prior context, finite turn limit is enforced, unsupported answers can continue',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Continue with follow-up').onclick!();await f.modal.run('What is postponed?',false);f.input('Evidence choice S1','exclude');await f.generate();assert.equal(f.state.calls.at(-1)!.earlierConversation.length,0);assert.match(rendered(f.modal.contentEl as unknown as Element),/1 \(evidence selection\)/);
+  await f.button('Start new conversation').onclick!();assert.equal(f.button('Reuse previous evidence').disabled,true);
+  await f.begin();for(let turn=2;turn<=6;turn++){await f.follow();await f.generate();}
+  assert.equal(f.button('Continue with follow-up').disabled,true);const before=f.state.calls.length;await f.button('Continue with follow-up').onclick!();assert.equal(f.state.calls.length,before);assert.match(rendered(f.modal.contentEl as unknown as Element),/Six-turn limit/);
+  await f.button('Start new conversation').onclick!();Reflect.set(globalThis,'__workbenchModel',()=>Promise.resolve(JSON.stringify({supported:false,answer:[],gaps:['No relevant evidence.']})));
+  await f.begin();assert.equal(f.modal.answer!.supported,false);await f.follow();assert.match(rendered(f.modal.contentEl as unknown as Element),/No relevant evidence/);
+ }finally{f.clean();}
+});
+
+test('late evidence-reuse check cannot clear a newer conversation',async()=>{
+ const f=await conversationFixture();try{
+  await f.begin();await f.button('Continue with follow-up').onclick!();f.input('Question','Why?');
+  let resolve!: (value:boolean)=>void;f.plugin.evidenceCurrent=()=>new Promise<boolean>(r=>{resolve=r;});const old=f.button('Reuse previous evidence').onclick!();
+  await f.button('Start new conversation').onclick!();f.plugin.evidenceCurrent=async()=>true;await f.begin();const current=f.modal.answer;resolve(false);await old;
+  assert.equal(f.modal.answer,current);assert.match(f.modal.status!.textContent!,/Answer ready/);
+ }finally{f.clean();}
 });
