@@ -76,6 +76,7 @@ function privateRecordText(text:string,version:unknown,kind:"question"|"review",
 
 export function outputProjection(text:string,metadata:Record<string,unknown>):{text:string;ranges:SourceRange[];output?:OutputProvenance}{
   const whole={text,ranges:[{from:0,to:text.length}]};
+  if(metadata.thread_pdf_version!==undefined||metadata.thread_pdf!==undefined||/^[\t ]*(?:thread_pdf(?:_version)?|["']thread_pdf(?:_version)?["'])\s*:/im.test(text))return{text:"",ranges:[],output:{refs:[],invalid:true,title:"PDF extraction needs current-original verification before evidence reuse."}};
   // Dispatch and line validation share recognition; only standalone canonical
   // markers are valid. Frontmatter is already private in managed records.
   const body=text.slice(bodyStart(text)),markers=privateMarkers(body),markerKinds=markers.kinds;

@@ -12,3 +12,7 @@ coverage/
 # Keep real personal vaults, model data, and scratch content out of source control.
 local-vault/
 .thread-local/
+
+/pdf-extract-worker.js
+/pdf-assets.json
+/pdf-resources/

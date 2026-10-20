@@ -1,3 +1,4 @@
+import {pdfPaths} from "../pdf/scope.ts";
 import { indexProfile, type IndexProfile } from "./index-budget.ts";
 import { vaultPath, type ReadScope } from "../vault/scope.ts";
 
@@ -13,6 +14,7 @@ export function loadRoles(value: unknown): FolderRoles {
 
 export interface ThreadSettings extends ReadScope {
   schemaVersion: 1;
+  pdfPaths:string[];
   endpoint: string;
   model: string;
   semanticSearch: boolean;
@@ -36,7 +38,7 @@ export function localEndpoint(input: string): string {
 export function defaultSettings(): ThreadSettings {
   return {
     schemaVersion: 1, endpoint: "http://127.0.0.1:11434", model: "", semanticSearch: false, embeddingModel: "",
-    allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000, indexProfile: "standard",
+    allowedPaths: [], excludedPaths: [], pdfPaths:[], selectedProject: "", timeoutMs: 180000, indexProfile: "standard",
     roles: loadRoles({})
   };
 }
@@ -63,11 +65,12 @@ export function loadSettings(value: unknown): ThreadSettings {
   settings.indexProfile = indexProfile(data.indexProfile);
   if (typeof data.embeddingModel === "string") settings.embeddingModel = data.embeddingModel.trim();
   settings.allowedPaths = validPaths(data.allowedPaths);
+  settings.pdfPaths=pdfPaths(data.pdfPaths);
   settings.excludedPaths = validPaths(data.excludedPaths);
   if (data.excludedPaths !== undefined && (!Array.isArray(data.excludedPaths)
     || data.excludedPaths.some((path) => {
       try { if (typeof path !== "string") return true; vaultPath(path); return false; } catch { return true; }
-    }))) settings.allowedPaths = [];
+    }))) {settings.allowedPaths = [];settings.pdfPaths=[];}
   if (typeof data.selectedProject === "string") {
     try { settings.selectedProject = vaultPath(data.selectedProject); } catch { /* Empty selection grants no access. */ }
   }

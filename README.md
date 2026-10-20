@@ -21,8 +21,10 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.2.0.zip` and `dist/thread/`. The ZIP contains exactly
-`thread/main.js`, `thread/manifest.json` and `thread/styles.css`. No vault, model,
+then creates `dist/thread-0.2.0.zip` and `dist/thread/`. The ZIP contains
+`thread/main.js`, `thread/manifest.json`, `thread/styles.css`, the local PDF
+worker, `pdf-assets.json` and its explicitly listed CMap/font/license resources.
+The inventory is verified by path, byte size and SHA-256 before packaging. No vault, model,
 settings or recovery data is included. Repeated builds of the same source and
 locked tools produce the same package bytes.
 
@@ -35,7 +37,7 @@ plugins**, allow Community plugins, reload Obsidian and enable **Thread**.
 explains where to find the plugins folder. Thread is not in the Browse directory.
 
 For an update, disable Thread, preserve its existing `data.json`, `changes.json`,
-`imports.json` and `renames.json`, replace only the three package files, reload Obsidian and enable
+`imports.json` and `renames.json`, replace the package code/styles/manifest and inventoried PDF assets, reload Obsidian and enable
 Thread again. Reloading also refreshes the installed manifest version. Keep an independent vault backup; the bounded change journal is not a
 complete backup system.
 
@@ -84,7 +86,8 @@ Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choos
    edits and refresh saves also need their destination inside allowed paths.
 4. Save settings, close the dialog and choose **Resume project**.
 
-First-use read scope is empty. Thread reads only permitted `.md` and `.txt` files.
+First-use read scope is empty. Text indexing reads permitted `.md` and `.txt` files.
+PDF bytes additionally require explicit exact-file consent as described below.
 Hidden configuration folders are excluded. Project evidence uses containment,
 project IDs and explicit links, always within read scope. **All allowed paths**
 is an explicit wider scope, not permission to read the entire vault. Legacy notes
@@ -470,3 +473,72 @@ Run `npm run evaluate:retrieval` for deterministic positive/negative controls,
 or `npm run evaluate:retrieval -- --live` to explicitly use that already
 downloaded local embedding model at loopback port 11434. Both retain the same
 context/candidate limits; no model is downloaded by the command.
+
+
+Run **Thread: Extract local PDF**, or choose **Local PDF extraction** in project
+home's More actions / advanced setup. Add external PDFs through Obsidian first;
+Thread selects existing local vault PDFs and writes only a new Markdown source.
+It never replaces, moves or silently copies the original binary. The picker
+shows at most 500 current permitted PDF names from metadata without reading
+PDF bytes; excluded names are hidden.
+
+Select a PDF inside ordinary allowed paths and choose **Allow ongoing binary
+reads** for that exact displayed path. This separate consent permits extraction
+and later original-file hash checks; text grants alone never enable PDF reads.
+It is stored compatibly in settings schema1 with at most 100 exact paths.
+Exclusions always win. Revoke any grant in the same dialog; unavailable grants
+hide their paths. Changing/revoking scope clears previews immediately. Check
+write-access errors before reopening if a grant change could not be persisted.
+
+Choose a source note name, then **Extract page text**. Inspect individual page
+text, examined/omitted/empty/shortened coverage and **Preview new PDF source
+note** before Save. The exact new destination is under your mapped Sources
+folder; existing notes are refused. Original PDF full SHA-256, exact page text
+hashes, parser/extraction version and page mappings are recorded with a new UUID
+in readable canonical Markdown. Saving rechecks original bytes, consent, inputs
+and settings; PDF changes during an in-flight save revoke its preview. Sources,
+import/rename/change history and original PDFs remain unchanged. In this feature
+baseline, managed PDF text stays unavailable to AI/retrieval until feature32
+adds current-original verification; raw Markdown remains readable.
+
+Selectable-text extraction uses the pinned Apache-2.0
+[PDF.js 6.4.299 release](https://github.com/mozilla/pdf.js/releases/tag/v6.4.299)
+and its [license](https://github.com/mozilla/pdf.js/blob/v6.4.299/LICENSE).
+Worker code, CMaps, fonts and all required license notices are packaged locally.
+No CDN, document URL, remote font, document script, XFA/annotation rendering or
+OCR runs. No model, Ollama server or paid service is needed. Parser resource
+reads are restricted to the verified plugin inventory. Dev-only optional Node
+canvas support is not part of the browser plugin package.
+
+Limits are 16 MiB PDF input, at most 200 document pages accepted, first 40 pages
+examined, 8000 retained characters/page, 100000 total retained characters and a
+30-second owner-worker deadline. Cancel terminates that worker and discards
+late results. The current page stream drains without retaining overflow, then
+extraction stops before additional pages when the total cap is reached. These
+limits do not certify a hard internal parser heap limit or streaming filesystem
+read. Text order, missing glyphs/fonts, complex layouts, off-page text and limits
+can omit content; inspect the original. Image-only/encrypted/malformed/oversized
+files get explicit guidance rather than guessed text.
+
+Synthetic Obsidian acceptance used the actual packaged worker/fonts offline:
+two authored pages preserved their order/text, document action/link canaries
+remained inert, and image-only/encrypted/malformed documents were refused.
+Bound tests examined 40/45 pages, retained 100000 characters over 13 shortened
+pages, and terminated an injected stalled actual worker at 30001 ms. Eight
+native workflow cases verified consent/no-read, exact saves, collisions, held
+save concurrency, worker cancellation, revocation, exclusions and unchanged
+originals/history with zero model calls. These measurements are fixture
+observations on this computer.
+
+Run `npm run fixtures:pdf` to create authored synthetic PDFs in a new
+`.thread-local/pdf-fixtures` folder, or pass `-- --output .thread-local/new-name`.
+Existing output folders are refused. Add copies to a separate Obsidian test
+vault and repeat the native workflow; do not substitute personal documents for
+automated acceptance. `npm run verify` includes consent, strict record/page
+hashes, parser resource boundaries, stream draining, cancellation and actual
+PDF modal-handler regressions. `npm run build` generates the explicit PDF
+asset inventory; preserve every listed asset when installing.
+
+Encryption refusal also checks the parser encryption filter after opening: an
+encrypted PDF with an empty user password is refused even when PDF.js opens it
+without prompting. A valid authored encrypted regression fixture is included.

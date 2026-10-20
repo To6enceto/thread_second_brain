@@ -1,0 +1,10 @@
+import{mkdirSync,writeFileSync,lstatSync}from'node:fs';
+import{resolve,dirname,basename}from'node:path';
+import{fileURLToPath}from'node:url';
+import{authoredPdf,emptyPasswordPdf}from'../src/pdf/test-fixtures.ts';
+const args=process.argv.slice(2);if(args.length&&!(args.length===2&&args[0]==='--output'))throw Error('Use optional --output .thread-local/new-folder. Existing folders are refused.');
+const root=resolve(fileURLToPath(new URL('..',import.meta.url))),local=resolve(root,'.thread-local'),target=resolve(root,args[1]??'.thread-local/pdf-fixtures');if(dirname(target)!==local||basename(target).startsWith('.')||lstatSync(local).isSymbolicLink()||!lstatSync(local).isDirectory())throw Error('Export only to a new direct child of the ordinary project .thread-local directory.');
+mkdirSync(target);
+const fixtures={'Selectable.pdf':authoredPdf(['The project budget is 47 euros.','The chosen protocol is Amber.']),'Image only.pdf':authoredPdf(['']),'Empty password encrypted.pdf':emptyPasswordPdf(),'Encrypted.pdf':authoredPdf(['Locked test text'],{encrypted:true}),'Script and URI.pdf':authoredPdf(['Safe selectable text.'],{scriptUri:true}),'Page limit.pdf':authoredPdf(Array(45).fill('Page text.')),'Text limit.pdf':authoredPdf(Array(20).fill('word '.repeat(2400)),{denseText:true}),'Too many pages.pdf':authoredPdf(Array(201).fill('One line')),'Malformed.pdf':new TextEncoder().encode('%PDF-1.4 malformed authored bytes').buffer};
+for(const[name,bytes]of Object.entries(fixtures))writeFileSync(resolve(target,name),Buffer.from(bytes),{flag:'wx'});
+console.log(JSON.stringify({fixture:'thread-authored-pdfs-v1',path:target,files:Object.keys(fixtures),scope:'Authored synthetic selectable/empty/encryption-dictionary/malformed/action-link and bounds fixtures; no personal documents.'},null,2));

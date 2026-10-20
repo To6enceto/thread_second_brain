@@ -1,3 +1,6 @@
+import {PdfModal} from "./ui/pdf-modal.ts";
+import {readPdfOriginal} from "./pdf/original.ts";
+import {mayReadPdf} from "./pdf/scope.ts";
 import {searchBudget,type SearchLevel} from "./retrieval/budget.ts";
 import { IndexModal } from "./ui/index-modal.ts";
 import { indexBudget } from "./settings/index-budget.ts";
@@ -93,6 +96,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
+    this.addCommand({id:"extract-pdf",name:"Extract local PDF",callback:()=>this.openPdf()});
     this.addCommand({id:"index-coverage",name:"Text index coverage and budgets",callback:()=>this.openIndexCoverage()});
     this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
     this.addCommand({id:"all-projects",name:"All permitted projects",callback:()=>this.openProjectOverview()});
@@ -140,6 +144,14 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
+  openPdf():void{const modal=new PdfModal(this);this.modals.add(modal);modal.open();}
+  async readPdf(path:string,settings:ThreadSettings,signal:AbortSignal):Promise<{hash:string;bytes:ArrayBuffer}>{
+    const snapshot=JSON.stringify(settings);return readPdfOriginal(path,settings,{get:path=>{const file=this.app.vault.getAbstractFileByPath(path);return file instanceof TFile?file:null;},read:file=>this.app.vault.readBinary(file)},()=>this.active&&snapshot===JSON.stringify(this.settings),signal);
+  }
+  async readPdfAsset(path:string):Promise<ArrayBuffer>{
+    if(!this.active||!(path==="pdf-assets.json"||path==="pdf-extract-worker.js"||/^pdf-resources\/(?:cmaps|standard_fonts)\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/.test(path)))throw Error("Unsupported local PDF asset.");
+    return this.app.vault.adapter.readBinary(`${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/${path}`);
+  }
   openIndexCoverage():void{const modal=new IndexModal(this);this.modals.add(modal);modal.open();}
   openHealth():void{const modal=new HealthModal(this);this.modals.add(modal);modal.open();}
   openProjectOverview():void{const modal=new ProjectOverviewModal(this);this.modals.add(modal);modal.open();}
@@ -411,6 +423,7 @@ export default class ThreadPlugin extends Plugin {
   }
 
   private invalidatePath(path: string, folder = false): void {
+    if(!folder&&mayReadPdf(path,this.settings)){this.index.revision++;this.notifySources(new Set([path]));return;}
     const allowed=readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"));
     if(!allowed)return;
     if(folder){this.scheduleIndex();for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();

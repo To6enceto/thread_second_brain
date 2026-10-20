@@ -17,12 +17,16 @@
     "package": "npm run verify && node scripts/package.mjs",
     "evaluate": "node --experimental-strip-types scripts/evaluate.mjs",
     "evaluate:index": "node --experimental-strip-types scripts/evaluate-index.mjs",
-    "evaluate:retrieval": "node --experimental-strip-types scripts/evaluate-retrieval.mjs"
+    "evaluate:retrieval": "node --experimental-strip-types scripts/evaluate-retrieval.mjs",
+    "fixtures:pdf": "node --experimental-strip-types scripts/pdf-fixtures.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
     "esbuild": "0.28.2",
     "obsidian": "1.14.4",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.4.299"
   }
 }

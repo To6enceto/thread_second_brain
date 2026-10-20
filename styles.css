@@ -35,3 +35,9 @@
 .thread-claim-evidence { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 12px; margin: 16px 0; border-top: 1px solid var(--background-modifier-border); }
 .thread-project-card { margin: 20px 0; padding-top: 12px; border-top: 1px solid var(--background-modifier-border); overflow-wrap: anywhere; }
 .thread-project-card > button { max-width: 100%; height: auto; white-space: normal; text-align: left; overflow-wrap: anywhere; margin: 4px 4px 4px 0; }
+
+.thread-modal .thread-wrap-action { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+
+.thread-pdf-picker .setting-item-info { flex: 1 1 35%; min-width: 0; }
+.thread-pdf-picker .setting-item-control { flex: 1 1 60%; min-width: 0; }
+.thread-pdf-picker select { width: 100%; max-width: 100%; min-width: 0; }
