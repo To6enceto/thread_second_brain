@@ -201,7 +201,7 @@ Resume loads **Recorded context** before contacting Ollama. Recognized Objective
 
 Thread opens to a **Project home** with recent sessions, explicit decision statuses, recorded questions and visible pending proposals. The Project selector switches among already permitted projects without changing read grants. Refresh home reloads its bounded snapshot without AI. Resume, Ask and Wrap up stay directly available; other tools are under More actions.
 
-Find and Ask rank keyword matches using titles, headings, explicit note aliases and passage text. Use double quotes for required phrases and Search filters for type, status, path and record dates. Filters only narrow your permitted scope. Keyword search works without a model. Results balance notes, keep relevance in bounded AI context and show omitted coverage; only the first 50000 body characters per note are indexed. Record dates can fall back to modification dates and never establish when an event happened.
+Find and Ask rank keyword matches using titles, headings, explicit note aliases and passage text. Use double quotes for required phrases and Search filters for type, status, path and record dates. Filters only narrow your permitted scope. Keyword search works without a model. Results balance notes, keep relevance in bounded AI context and show omitted coverage; indexing reserves passages across nonempty sections within the selected finite profile, including later headings beyond 50000 characters. Inspect Text index coverage for omitted notes and sections. Record dates can fall back to modification dates and never establish when an event happened.
 
 
 Optional local semantic search is off by default. In Thread settings, enable
@@ -316,7 +316,7 @@ Source-change items compare recorded decision/output references, with the latest
 readable saved review as a visible baseline when it has a valid nonfuture date.
 Uncited changes and unrecognized structure can be absent. Each category shows
 at most 20 items with total counts; each item shows at most five related sources.
-The existing 50000-character note index limit still applies. Missing/excluded
+The selected finite index profile can omit notes or sections. Missing/excluded
 reference paths and stale excerpts are hidden. Older retained stale outputs can
 remain listed: review is explicit and there is no automatic dismissal or history
 rewrite. The queue works with Ollama stopped; optional AI review flows still need
@@ -381,7 +381,7 @@ Open **Thread: Project timeline**, also under Project home's More actions. It sh
 
 Expand **Record a user-reported milestone** to enter your title, detail and event date on/before today. Inspect the exact new note before saving. New `type: milestone` / `thread_milestone_version: "1"` records keep stable identity, project, `event_on` and separate capture dates. They are user reports, not independently verified achievements. Collisions, changed inputs/project identity, excluded paths and protected write locations refuse saving.
 
-Coverage is bounded to 200 events from the 2000 most recently modified project records and indexed sections (currently the first 50000 body characters). Repeated dated headings combine entries; later replacement links after long reasons may be omitted. A replacement button opens a current permitted decision at the recorded path. Legacy links do not archive replacement identities/hashes, so they cannot prove historical identity or follow renames reliably. No unsaved earlier note contents or complete historical event log is reconstructed.
+Coverage is bounded to 200 events from the 2000 most recently modified project records and indexed sections (section-balanced passages within the selected finite index profile). Repeated dated headings combine entries; later replacement links after long reasons may be omitted. A replacement button opens a current permitted decision at the recorded path. Legacy links do not archive replacement identities/hashes, so they cannot prove historical identity or follow renames reliably. No unsaved earlier note contents or complete historical event log is reconstructed.
 
 ### All permitted projects
 
@@ -398,3 +398,42 @@ Open **Thread: Vault health and compatibility**, also under Project home's More 
 The diagnostic pass examines at most 500 indexed permitted files in alphabetical order, 1 MiB UTF-8 per file and 8 MiB cumulative text; it displays at most 200 diagnostics with detected counts and visible omissions. Oversized inspection reads are skipped. Heading checks use current indexed coverage and nonempty recognized sections; unexamined files, arbitrary prose and semantic correctness are not certified. Scanning runs no inference and changes no notes.
 
 For eligible writable, unambiguous and current notes, **Prepare individual repair** accepts your actual date for an existing invalid simple scalar property, or your explicit choice of one heading and its recognized meaning. Review the highlighted exact before/after proposal and apply separately. All other bytes and private evidence markers remain intact. IDs, associations, complex frontmatter, protected originals and unsupported/stale records require manual editing. No bulk cleanup or read-grant expansion occurs. After a write, let the index finish and use **Refresh change review** before opening scope-guarded Undo or recovery controls; stored originals and conflict checks preserve later edits.
+
+
+Run **Thread: Text index coverage and budgets** (also in project home's More
+actions or advanced setup) to inspect local work and choose a finite profile.
+Standard permits 2000 files, 2 MiB raw/file, 16 MiB raw reads/run, 200000 retained
+characters/200 passages and 2000 section prefixes per note, and 8 MiB serialized
+entries. Conservative uses 500 files, 1/8 MiB raw limits, 60000 characters/60
+passages/500 section prefixes and 2 MiB entries; Larger uses 5000 files, 8/64 MiB
+raw limits, 500000 characters/500 passages/5000 section prefixes and 32 MiB
+entries. File and entry admission is alphabetical. Overlapping passages consume
+the character budget. No model or PDF access is added by a profile change.
+
+Indexing considers headings outside fences across each bounded permitted note
+and reserves initial passages across retained nonempty sections before extras.
+Coverage shows omitted files, represented sections, retained text, unknown
+omitted-file text, actual serialized bytes, read work and elapsed time. If a
+permitted file is omitted, stable-ID uniqueness is unproven: identity-dependent
+reuse, project identity, review snapshots and related writes require restored
+complete coverage. Retained current originals remain searchable. Choose a larger
+profile or explicitly narrow allowed scope and rebuild; Thread never does this
+for you. Cancellation leaves work pending and evidence unready; Resume/Rebuild
+is explicit, though a later ordinary vault event can start fresh work.
+
+Full raw hashes still detect changes outside retained passages. Profile/scope
+changes clear derived text and vectors immediately and scrub the derived cache;
+settings schema 1 and durable histories remain intact. Raw reads use Obsidian's
+whole-file API with stat-before and size/hash-after checks, not streaming or an
+atomic filesystem size guarantee. Index limits do not enlarge the 16000-character
+model context; direct raw-note briefing context retains its separate 50000 body
+character limit. Search and other views have additional result limits.
+
+The authored Linux/Obsidian 1.14.4 fixture measured 122 eligible notes, 1765809 raw
+bytes and all 124 nonempty sections represented in 107 ms (1512145 serialized
+entry bytes); one long section was shortened. An edit outside retained text
+caused two Thread reads (the source and dependent answer); a separate host
+renderer read is counted separately in native evidence. These are observations
+on this computer, not a guarantee for arbitrary vaults. Run `npm run evaluate:index`
+for the reusable synthetic long-introduction/later-heading regression and prefix
+negative control; `npm run evaluate` checks the authored answer-quality fixtures.

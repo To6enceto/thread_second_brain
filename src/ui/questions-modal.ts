@@ -69,7 +69,7 @@ export class QuestionsModal extends ThreadModal{
         }else{
           const entry=records.find(e=>e.path===approved.path);if(!entry||!this.plugin.changePathAllowed(entry.path))throw new Error("Choose a writable managed question. Protected original/source locations need manual editing.");
           const before=await this.plugin.readReviewedTarget(entry.path);if(before===null||await contentHash(before)!==entry.hash)throw new Error("Question changed. Refresh it first.");
-          const metadata=readMetadata(before,parseYaml),record=questionRecord(metadata);if(this.plugin.index.entries.filter(e=>e.id===record.id).length!==1)throw new Error("Question ID is duplicated. Resolve it manually before updating.");
+          const metadata=readMetadata(before,parseYaml),record=questionRecord(metadata);if(!this.plugin.index.idUnambiguous(record.id))throw new Error("Question identity is ambiguous or index coverage is incomplete. Resolve duplicates or restore complete coverage before updating.");
           bundle=this.plugin.withDependencies({...bundle,noteHashes:{...bundle.noteHashes,[entry.path]:entry.hash}},settings);
           if(!await this.plugin.evidenceCurrent(bundle,settings)||!current())throw new Error("Question/evidence changed. Prepare a new preview.");
           const after=updateQuestion(before,metadata,{status:approved.state,answer:approved.answer,reason:approved.reason,day:approved.day},bundle);

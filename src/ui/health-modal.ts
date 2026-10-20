@@ -35,7 +35,7 @@ export class HealthRepairModal extends ThreadModal {
         before=await readHealthNote(this.plugin,this.issue.path,this.issue.hash,current);if(!current())return;
         if(!this.plugin.changePathAllowed(this.issue.path)||!this.plugin.index.graph(settings).assess(this.issue.path).usable)throw new Error("This note is protected, unsupported or stale. Preserve it and follow the manual guidance; permissions stay unchanged.");
         const metadata=healthMetadata(before,parseYaml),entry=this.plugin.index.entries.find(e=>e.path===this.issue.path);
-        if(entry?.id&&this.plugin.index.entries.filter(e=>e.id===entry.id).length!==1)throw new Error("Duplicate identities need manual reconciliation before repair.");
+        if(entry?.id&&!this.plugin.index.idUnambiguous(entry.id))throw new Error("Ambiguous identities or incomplete index coverage need manual reconciliation before repair.");
         headings.replaceChildren(new Option("Choose the intended existing heading",""));for(const heading of healthHeadings(before,metadata))headings.add(new Option(heading.heading,String(heading.at)));
         targets.replaceChildren(new Option("Choose its explicit recorded meaning",""));for(const heading of recognizedHeadings(metadata))targets.add(new Option(heading,heading));
         if(!current())return;prepare.disabled=false;this.status?.setText("Ready for one explicit correction. No proposal or write has run.");
@@ -45,7 +45,7 @@ export class HealthRepairModal extends ThreadModal {
       if(prepare.disabled||before===null)return;prepare.disabled=true;const inputs=this.inputs,approved={before,value,headingAt};const valid=()=>current()&&inputs===this.inputs;
       try{
         if(!valid()||!this.plugin.changePathAllowed(this.issue.path)||await readHealthNote(this.plugin,this.issue.path,this.issue.hash,valid)!==approved.before)throw new Error("Note, inputs or permissions changed. Refresh vault health.");
-        const entry=this.plugin.index.entries.find(e=>e.path===this.issue.path);if(!entry||entry.hash!==this.issue.hash||entry.id&&this.plugin.index.entries.filter(e=>e.id===entry.id).length!==1)throw new Error("Note identity changed or is ambiguous. Refresh vault health.");
+        const entry=this.plugin.index.entries.find(e=>e.path===this.issue.path);if(!entry||entry.hash!==this.issue.hash||entry.id&&!this.plugin.index.idUnambiguous(entry.id))throw new Error("Note identity changed or is ambiguous. Refresh vault health.");
         const after=this.issue.dateKey?repairHealthDate(approved.before,this.issue.dateKey,approved.value,parseYaml):approved.headingAt!==""?repairHealthHeading(approved.before,Number(approved.headingAt),approved.value,parseYaml):null;
         if(after===null)throw new Error("Choose one existing heading and its explicit replacement meaning.");
         const bundle=this.plugin.withDependencies({sources:[],truncated:false,noteHashes:{[this.issue.path]:this.issue.hash}},settings);
@@ -79,7 +79,7 @@ export class HealthModal extends ThreadModal {
           const row=results.createEl("section",{cls:"thread-health-issue"});row.createEl("h3",{text:`${issue.kind}: ${issue.path}`});row.createEl("p",{text:issue.message});row.createEl("p",{text:issue.effect});row.createEl("p",{text:issue.guidance});
           row.createEl("button",{text:"Open raw note (does not validate evidence)",cls:"thread-source"}).onclick=()=>{void verifyThenOpenSource(issue.hash,()=>readHealthNote(this.plugin,issue.path,issue.hash,current),current,async()=>{const file=this.app.vault.getAbstractFileByPath(issue.path);if(!current()||!readableText(issue.path,this.plugin.settings)||!(file instanceof TFile))throw new Error("Note changed or is unavailable.");await this.app.workspace.getLeaf(false).openFile(file);}).catch(error=>this.status?.setText(error instanceof Error?error.message:"Note unavailable. Refresh health."));};
           if(issue.dateKey||issue.kind==="heading"){
-            const entry=this.plugin.index.entries.find(e=>e.path===issue.path),allowed=this.plugin.changePathAllowed(issue.path)&&this.plugin.index.graph(settings).assess(issue.path).usable&&(!entry?.id||this.plugin.index.entries.filter(e=>e.id===entry.id).length===1);
+            const entry=this.plugin.index.entries.find(e=>e.path===issue.path),allowed=this.plugin.changePathAllowed(issue.path)&&this.plugin.index.graph(settings).assess(issue.path).usable&&(!entry?.id||this.plugin.index.idUnambiguous(entry.id));
             const repair=row.createEl("button",{text:"Prepare individual repair"});repair.disabled=!allowed;repair.onclick=()=>{if(!current()||!allowed)return;const modal=new HealthRepairModal(this.plugin,issue,settings);this.plugin.modals.add(modal);modal.open();};
             if(!allowed)row.createEl("p",{text:"This note is protected, stale, unsupported or has an ambiguous ID. Follow the manual guidance; no write policy or read grant is changed."});
           }

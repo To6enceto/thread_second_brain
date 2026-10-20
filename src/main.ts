@@ -1,3 +1,6 @@
+import { IndexModal } from "./ui/index-modal.ts";
+import { indexBudget } from "./settings/index-budget.ts";
+import { indexCoverage, retainIndexEntries, type IndexReadStats } from "./vault/index-coverage.ts";
 import { HealthModal } from "./ui/health-modal.ts";
 import { QuestionsModal } from "./ui/questions-modal.ts";
 import { ProjectOverviewModal } from "./ui/project-overview-modal.ts";
@@ -42,6 +45,18 @@ export default class ThreadPlugin extends Plugin {
   setupModal: ThreadSetupModal | null = null;
   modals = new Set<Modal>();
   index=new LocalIndex();
+  indexCancelEpoch=0;
+  indexListeners=new Set<()=>void>();
+  indexProgress:{phase:"idle"|"queued"|"running"|"ready"|"canceled"|"failed";done:number;total:number;detail:string}={phase:"idle",done:0,total:0,detail:"Text index has not started."};
+  private indexProgressChanged():void{for(const listener of this.indexListeners)listener();}
+  private setIndexProgress(phase:typeof this.indexProgress.phase,done:number,total:number,detail:string):void{this.indexProgress={phase,done,total,detail};this.indexProgressChanged();}
+  cancelIndexing():void{
+    if(!this.indexUpdates.task&&!this.indexTimer)return;
+    this.indexCancelEpoch++;this.indexUpdates.stop();if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
+    this.index.ready=false;this.index.revision++;this.setIndexProgress("canceled",0,0,"Index work canceled. Pending work remains; rebuild explicitly when ready.");
+    for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Index work canceled. Rebuild or refresh before reuse.");
+    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Index work canceled. Rebuild before Resume.");
+  }
   semantic=new SemanticSearch();
   indexUpdates=new IndexUpdates(this.index);
   indexTimer: ReturnType<typeof setTimeout> | null=null;
@@ -77,6 +92,7 @@ export default class ThreadPlugin extends Plugin {
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
     this.addCommand({id:"project-questions",name:"Project questions",callback:()=>this.openQuestions()});
+    this.addCommand({id:"index-coverage",name:"Text index coverage and budgets",callback:()=>this.openIndexCoverage()});
     this.addCommand({id:"vault-health",name:"Vault health and compatibility",callback:()=>this.openHealth()});
     this.addCommand({id:"all-projects",name:"All permitted projects",callback:()=>this.openProjectOverview()});
     this.addCommand({id:"project-timeline",name:"Project timeline",callback:()=>this.openTimeline()});
@@ -123,6 +139,7 @@ export default class ThreadPlugin extends Plugin {
   openRecall(): void {const modal=new RecallModal(this);this.modals.add(modal);modal.open();}
   openAsk(): void {const modal=new AskModal(this);this.modals.add(modal);modal.open();}
   openQuestions():void{const modal=new QuestionsModal(this);this.modals.add(modal);modal.open();}
+  openIndexCoverage():void{const modal=new IndexModal(this);this.modals.add(modal);modal.open();}
   openHealth():void{const modal=new HealthModal(this);this.modals.add(modal);modal.open();}
   openProjectOverview():void{const modal=new ProjectOverviewModal(this);this.modals.add(modal);modal.open();}
   openTimeline():void{const modal=new TimelineModal(this);this.modals.add(modal);modal.open();}
@@ -251,11 +268,11 @@ export default class ThreadPlugin extends Plugin {
     }finally{this.imports.rebuilding=false;}
   }
   projectIdentity(path=this.settings.selectedProject): string {
-    return identityFromIndex(this.index.entries,path,this.index.ready);
+    return identityFromIndex(this.index.entries,path,this.index.ready,this.index.identityComplete);
   }
 
   private persistIndex():Promise<void>{
-    const revision=this.index.revision,settings=JSON.stringify(this.settings),text=JSON.stringify({schemaVersion:1,entries:this.index.entries});
+    const revision=this.index.revision,settings=JSON.stringify(this.settings),text=JSON.stringify({schemaVersion:2,entries:this.index.entries,coverage:this.index.coverage});
     this.cacheWrite=this.cacheWrite.catch(()=>{}).then(async()=>{
       if(!this.active||revision!==this.index.revision||settings!==JSON.stringify(this.settings))return;
       await this.app.vault.adapter.write(this.indexPath(),text);
@@ -268,7 +285,7 @@ export default class ThreadPlugin extends Plugin {
     });},300);
   }
   private scheduleIndex(): void {
-    this.semantic.clear();this.indexUpdates.reset();
+    this.semantic.clear();this.indexUpdates.reset();this.setIndexProgress("queued",0,0,"Index reset. Waiting to read current permitted text files.");
     void this.persistIndex().catch(()=>new Notice("Thread could not clear its derived cache. Check vault write access and rebuild."));
     this.queueIndex();
   }
@@ -287,20 +304,44 @@ export default class ThreadPlugin extends Plugin {
   }
   async rebuildIndex(): Promise<void> {
     if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
+    const cancelEpoch=this.indexCancelEpoch;let statsSettings="",startedAt=performance.now(),stats:IndexReadStats={rawBytesRead:0,filesRead:0,sizeSkips:0,readBudgetSkips:0,elapsedMs:0};
     while(this.active){
-      const settings=structuredClone(this.settings);
-      const current=()=>this.active&&JSON.stringify(settings)===JSON.stringify(this.settings);
+      if(cancelEpoch!==this.indexCancelEpoch)throw new DOMException("Index work canceled.","AbortError");
+      if(this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size)return;
+      const settings=structuredClone(this.settings),settingsText=JSON.stringify(settings),epoch=this.indexUpdates.epoch,budget=indexBudget(settings.indexProfile);
+      if(settingsText!==statsSettings){statsSettings=settingsText;startedAt=performance.now();stats={rawBytesRead:0,filesRead:0,sizeSkips:0,readBudgetSkips:0,elapsedMs:0};}
+      const files=this.app.vault.getFiles().filter(file=>readableText(file.path,settings)).sort((a,b)=>a.path.localeCompare(b.path)),admitted=new Set(files.slice(0,budget.maxFiles).map(file=>file.path));let entryBudgetSkips=0;
+      const current=()=>this.active&&cancelEpoch===this.indexCancelEpoch&&epoch===this.indexUpdates.epoch&&settingsText===JSON.stringify(this.settings);
+      if(!this.indexUpdates.task)this.setIndexProgress("running",0,admitted.size,"Reading bounded permitted text sections...");
+      const coverage=(entries:IndexEntry[])=>{stats.elapsedMs=Math.round(performance.now()-startedAt);return indexCoverage(settings.indexProfile,files.length,admitted.size,entries,stats,entryBudgetSkips);};
       try{
-        await this.indexUpdates.flush({scope:settings,current,paths:()=>this.app.vault.getFiles().filter(file=>readableText(file.path,settings)).map(file=>file.path),
+        await this.indexUpdates.flush({scope:settings,current,paths:()=>[...admitted],
           read:async(path,signal)=>{
             signal.throwIfAborted();if(!current()||!readableText(path,this.settings))throw new DOMException("Read scope changed.","AbortError");
-            const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))return null;
-            const text=await this.app.vault.read(file);signal.throwIfAborted();
+            if(!admitted.has(path))return null;const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))return null;
+            if(file.stat.size>budget.maxFileBytes){stats.sizeSkips++;return null;}
+            if(file.stat.size>budget.maxReadBytes-stats.rawBytesRead){stats.readBudgetSkips++;return null;}
+            stats.filesRead++;const text=await this.app.vault.read(file);signal.throwIfAborted();
             if(!current()||file.path!==path||!readableText(path,this.settings))throw new DOMException("Read scope changed.","AbortError");
-            return indexNote({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime},target=>this.resolveIndexLink(path,target,settings));
-          },resolve:(path,target)=>this.resolveIndexLink(path,target,settings),affected:paths=>this.notifySources(paths),persist:()=>this.persistIndex()});
-        if(current()&&this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size)return;
-      }catch(error){if(!(error instanceof DOMException&&error.name==="AbortError")||!this.active)throw error;}
+            if(text.length>budget.maxFileBytes){stats.sizeSkips++;return null;}
+            const bytes=new TextEncoder().encode(text).length;stats.rawBytesRead+=bytes;
+            if(bytes>budget.maxFileBytes){stats.sizeSkips++;return null;}if(stats.rawBytesRead>budget.maxReadBytes){stats.readBudgetSkips++;return null;}
+            return indexNote({path,text,metadata:readMetadata(text,parseYaml),modifiedAt:file.stat.mtime},target=>this.resolveIndexLink(path,target,settings),{budget,signal});
+          },
+          retain:entries=>{
+            const complete=this.index.identityComplete,previous=this.index.entries,kept=retainIndexEntries(entries,admitted,budget);entryBudgetSkips=kept.entryBudgetSkips;
+            this.index.coverage=coverage(kept.entries);const paths=new Set(kept.entries.map(e=>e.path)),invalidate=new Set([...kept.removed,...previous.filter(e=>!paths.has(e.path)).map(e=>e.path)]);
+            if(complete!==this.index.identityComplete)for(const entry of [...previous,...entries])invalidate.add(entry.path);
+            return{entries:kept.entries,invalidate};
+          },
+          published:()=>{this.index.coverage=coverage(this.index.entries);this.indexProgressChanged();},
+          progress:(done,total)=>{if(current())this.setIndexProgress("running",done,total,"Processing current permitted files; omissions and byte limits appear in coverage.");},
+          resolve:(path,target)=>this.resolveIndexLink(path,target,settings),affected:paths=>this.notifySources(paths),persist:()=>this.persistIndex()});
+        if(current()&&this.index.ready&&!this.indexUpdates.full&&!this.indexUpdates.pending.size){this.setIndexProgress("ready",this.indexProgress.done,this.indexProgress.total,"Text index snapshot ready. Inspect coverage before assuming completeness.");return;}
+      }catch(error){
+        if(cancelEpoch!==this.indexCancelEpoch)throw new DOMException("Index work canceled.","AbortError");
+        if(!(error instanceof DOMException&&error.name==="AbortError")||!this.active){if(this.active)this.setIndexProgress("failed",0,files.length,"Index work failed. Check vault access and rebuild; original notes and history are preserved.");throw error;}
+      }
     }
     throw new DOMException("Thread stopped.","AbortError");
   }
@@ -373,6 +414,9 @@ export default class ThreadPlugin extends Plugin {
     if(!allowed)return;
     if(folder){this.scheduleIndex();for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
       for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Project folders changed. Refresh the project.");return;}
+    if(this.index.coverage?.omittedFiles){
+      const paths=new Set([...this.index.entries.map(e=>e.path),path]);this.scheduleIndex();this.notifySources(paths);return;
+    }
     const affected=this.indexUpdates.invalidate([path],this.settings);
     this.notifySources(affected);
     void this.persistIndex().catch(()=>new Notice("Thread could not scrub its derived cache. Check vault write access and rebuild."));
@@ -405,7 +449,8 @@ export default class ThreadPlugin extends Plugin {
     snapshot=filterEntries(entries,filters);
     const graph=this.index.graph(settings);
     watch([...new Set(snapshot.flatMap(entry=>[entry.path,...Object.keys(graph.assess(entry.path).dependencies)]))]);
-    if(!hybrid||!settings.semanticSearch)return searchEntries(entries,query,filters);
+    const withCoverage=(result:SearchResult):SearchResult=>({...result,coverage:{...result.coverage,indexOmittedNotes:this.index.coverage?.omittedFiles??0}});
+    if(!hybrid||!settings.semanticSearch)return withCoverage(searchEntries(entries,query,filters));
     // Hash only the bounded candidate notes before transmitting their passages.
     const candidates=semanticCandidates(filterEntries(entries,filters),query).candidates;
     for(const entry of new Map(candidates.map(hit=>[hit.entry.path,hit.entry])).values()){
@@ -416,7 +461,7 @@ export default class ThreadPlugin extends Plugin {
       const hash=await contentHash(await this.app.vault.read(file));assertCurrent();
       if(file.path!==entry.path||hash!==entry.hash)throw new Error("Search source changed. Refresh the index.");
     }
-    return this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current);
+    return withCoverage(await this.semantic.search(entries,query,filters,settings.embeddingModel,new OllamaClient(settings.endpoint,settings.timeoutMs),signal,current));
   }
   async evidence(settings:ThreadSettings,signal:AbortSignal):Promise<EvidenceBundle>{
     if(!this.index.ready)await this.rebuildIndex();signal.throwIfAborted();

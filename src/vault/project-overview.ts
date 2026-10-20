@@ -22,9 +22,10 @@ export interface ProjectCard {
 export interface ProjectsOverview {cards:ProjectCard[];permitted:number;matching:number;limits:string[];}
 
 export function overviewIdentity(index:LocalIndex,settings:ThreadSettings,path:string):ProjectIdentity {
-  const graph=index.graph(settings),headers=index.projectEntries(settings,null).filter(e=>e.path.slice(0,e.path.lastIndexOf("/"))===path&&e.metadata.type==="project"),ids=new Set(headers.flatMap(e=>e.id?[e.id]:[]));
+  const headers=index.projectEntries(settings,null).filter(e=>e.path.slice(0,e.path.lastIndexOf("/"))===path&&e.metadata.type==="project"),ids=new Set(headers.flatMap(e=>e.id?[e.id]:[]));
   const hashes=Object.fromEntries(headers.map(e=>[e.path,e.hash]));
-  if(ids.size>1||headers.some(e=>e.id&&(graph.ids.get(e.id)?.length??0)!==1))return{id:null,hashes,reason:"Project IDs are conflicting or duplicated in permitted notes. Resolve them manually before choosing an action; associated record counts are unavailable."};
+  if(!index.identityComplete)return{id:null,hashes,reason:"Index budgets omitted permitted files. Restore complete index coverage to establish project identity and associated counts."};
+  if(ids.size>1||headers.some(e=>e.id&&!index.idUnambiguous(e.id)))return{id:null,hashes,reason:"Project IDs are conflicting or duplicated in permitted notes. Resolve them manually before choosing an action; associated record counts are unavailable."};
   return{id:[...ids][0]??path,hashes,reason:""};
 }
 function statusOf(entries:IndexEntry[]):ProjectStatus {
@@ -42,7 +43,7 @@ export function nextActionMarkdown(project:string,action:string,now=new Date()):
 }
 function chosenAction(entries:IndexEntry[],index:LocalIndex,settings:ThreadSettings,projectId:string,now:Date):{chosen:ChosenAction|null;limit:string} {
   const graph=index.graph(settings),actions=entries.filter(e=>e.metadata.type==="next-action");
-  const valid=actions.filter(e=>e.metadata.thread_next_action_version==="1"&&e.id&&e.id.length<=200&&(graph.ids.get(e.id)?.length??0)===1&&graph.assess(e.path).usable
+  const valid=actions.filter(e=>e.metadata.thread_next_action_version==="1"&&e.id&&e.id.length<=200&&index.idUnambiguous(e.id)&&graph.assess(e.path).usable
     &&e.metadata.project===projectId&&timestamp(e.metadata.selected_at)&&e.metadata.selected_at<=now.toISOString()
     &&calendarDay(e.metadata.recorded_on)&&calendarDay(e.metadata.created)&&calendarDay(e.metadata.recorded_on)!<=localDay(now)&&calendarDay(e.metadata.created)!<=localDay(now)
     &&e.chunks.some(c=>c.heading==="Chosen next action"&&c.excerpt.trim()));

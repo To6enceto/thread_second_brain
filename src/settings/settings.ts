@@ -1,3 +1,4 @@
+import { indexProfile, type IndexProfile } from "./index-budget.ts";
 import { vaultPath, type ReadScope } from "../vault/scope.ts";
 
 export const roleNames = ["projects", "inbox", "sources", "knowledge", "reviews", "templates"] as const;
@@ -15,6 +16,7 @@ export interface ThreadSettings extends ReadScope {
   endpoint: string;
   model: string;
   semanticSearch: boolean;
+  indexProfile: IndexProfile;
   embeddingModel: string;
   selectedProject: string;
   timeoutMs: number;
@@ -34,7 +36,7 @@ export function localEndpoint(input: string): string {
 export function defaultSettings(): ThreadSettings {
   return {
     schemaVersion: 1, endpoint: "http://127.0.0.1:11434", model: "", semanticSearch: false, embeddingModel: "",
-    allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000,
+    allowedPaths: [], excludedPaths: [], selectedProject: "", timeoutMs: 180000, indexProfile: "standard",
     roles: loadRoles({})
   };
 }
@@ -58,6 +60,7 @@ export function loadSettings(value: unknown): ThreadSettings {
   try { if (typeof data.endpoint === "string") settings.endpoint = localEndpoint(data.endpoint); } catch { /* Invalid endpoints reset to loopback. */ }
   if (typeof data.model === "string") settings.model = data.model.trim();
   settings.semanticSearch = data.semanticSearch === true;
+  settings.indexProfile = indexProfile(data.indexProfile);
   if (typeof data.embeddingModel === "string") settings.embeddingModel = data.embeddingModel.trim();
   settings.allowedPaths = validPaths(data.allowedPaths);
   settings.excludedPaths = validPaths(data.excludedPaths);

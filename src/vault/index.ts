@@ -1,10 +1,14 @@
 import { reviewProvenance, reviewManifestHash } from "./review-provenance.ts";
 import { outputProjection,FreshnessGraph,readSourceReferences,type OutputProvenance,type RenameMap,type SourceReference } from "./freshness.ts";
-import { noteSections, type SourceNote } from "./evidence.ts";
+import type { SourceNote } from "./evidence.ts";
+import { sectionChunks, type SectionCoverage } from "./sections.ts";
+import { indexBudget, type IndexBudget } from "../settings/index-budget.ts";
+import type { IndexCoverage } from "./index-coverage.ts";
 import { contentHash, isWithin, readableText, type ReadScope } from "./scope.ts";
 import { searchEntries, keywordTerms, type SearchResult, type SearchFilters } from "../retrieval/search.ts";
 
 export interface IndexEntry {
+  sectionCoverage?:SectionCoverage;
   reviewManifestHash?:string;
   decisionSources?: {refs:SourceReference[];invalid:boolean};
   path: string; id?: string; title: string; metadata: Record<string, unknown>;
@@ -12,8 +16,9 @@ export interface IndexEntry {
   links: string[]; linkTexts?: string[]; truncated: boolean; output?:OutputProvenance;
 }
 export interface RecallHit { entry: IndexEntry; heading: string; excerpt: string; score: number; matchedTerms?: string[]; requiredPhrases?: string[]; }
-export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean): string {
+export function identityFromIndex(entries:IndexEntry[],project:string,ready:boolean,complete=true): string {
   if(!ready)throw new Error("Project evidence is still loading. Refresh and preview again.");
+  if(!complete)throw new Error("Index budgets omitted permitted files. Complete coverage is required to establish project identity; choose a larger profile or explicitly narrow scope, then rebuild.");
   if(!project)throw new Error("Select a project in Settings first.");
   const ids=new Set(entries.filter(e=>e.path.slice(0,e.path.lastIndexOf("/"))===project&&e.metadata.type==="project"&&e.id?.trim()).map(e=>e.id!));
   if(ids.size>1)throw new Error("This folder contains multiple project IDs. Select a specific project folder or resolve its project metadata first.");
@@ -27,19 +32,16 @@ export function linkTargets(text: string): string[] {
       try{return [decodeURIComponent(target).trim()];}catch{return [];}
     }).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
 }
-export async function indexNote(note: SourceNote, resolve: (link: string) => string | null): Promise<IndexEntry> {
+export async function indexNote(note: SourceNote, resolve: (link: string) => string | null, options:{budget?:IndexBudget;signal?:AbortSignal}={}): Promise<IndexEntry> {
+  options.signal?.throwIfAborted();const budget=options.budget??indexBudget("standard");
+  if(new TextEncoder().encode(note.text).length>budget.maxFileBytes)throw new Error("Note exceeds the selected raw-file index budget.");
   const projected=outputProjection(note.text,note.metadata);
-  const body=projected.text.replace(/^(?:\uFEFF)?---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/,"");
-  const text=body.slice(0,50000);
+  const selected=await sectionChunks(projected.text,budget,options.signal),chunks=selected.chunks;
+  const linkTexts=[...new Set(chunks.flatMap(chunk=>linkTargets(`${chunk.heading}\n${chunk.excerpt}`)))];
   const fields=new Set(["id","type","status","project","created","updated","captured_on","recorded_on","decided_on","generated_on","thread_model","thread_import_hash","thread_original_name","thread_original_url","thread_period_start","thread_period_end","thread_previous_output","revisit_on","thread_question_version","thread_review_version","thread_review_key","thread_review_snapshot","action","event_on","thread_milestone_version","thread_next_action_version","selected_at"]);
   const metadata=Object.fromEntries(Object.entries(note.metadata).filter(([key,value])=>fields.has(key)&&typeof value==="string"));
   const aliases = typeof note.metadata.aliases === "string" ? [note.metadata.aliases] : note.metadata.aliases;
   if (Array.isArray(aliases)) metadata.aliases = aliases.filter((value): value is string => typeof value === "string").slice(0, 20).map(value => value.slice(0, 100));
-  const chunks=noteSections(text).flatMap(section=>{
-    const result: {heading:string;excerpt:string}[]=[];
-    for(let start=0;start<section.excerpt.length;start+=1000)result.push({heading:section.heading,excerpt:section.excerpt.slice(start,start+1200)});
-    return result;
-  });
   let decisionSources:IndexEntry["decisionSources"];
   if(note.metadata.type==="decision"&&note.metadata.thread_sources!==undefined){
     try{
@@ -48,29 +50,32 @@ export async function indexNote(note: SourceNote, resolve: (link: string) => str
     }catch{decisionSources={refs:[],invalid:true};}
   }
   const review=note.metadata.type==="review-event"&&note.metadata.thread_review_version==="1"&&!projected.output?.invalid?reviewProvenance(note.text,note.metadata):undefined;
-  return {...(review?{reviewManifestHash:await reviewManifestHash(review.kind,review.target,review.hashes)}:{}),path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
+  const hash=await contentHash(note.text);options.signal?.throwIfAborted();
+  return {sectionCoverage:selected.coverage,...(review?{reviewManifestHash:await reviewManifestHash(review.kind,review.target,review.hashes)}:{}),path:note.path,...(typeof note.metadata.id==="string"?{id:note.metadata.id}:{}),
     ...(decisionSources?{decisionSources}:{}),
     title:note.path.split("/").at(-1)!.replace(/\.(md|txt)$/i,""),metadata,...(projected.output?{output:projected.output}:{}),
-    hash:await contentHash(note.text),modifiedAt:note.modifiedAt,chunks,
-    linkTexts:linkTargets(text),
-    links:[...new Set(linkTargets(text).map(resolve).filter((p):p is string=>Boolean(p)))],
-    truncated:body.length>50000};
+    hash,modifiedAt:note.modifiedAt,chunks,linkTexts,
+    links:[...new Set(linkTexts.map(resolve).filter((p):p is string=>Boolean(p)))],
+    truncated:selected.coverage.limited};
 }
 export function queryTerms(query: string): string[] {
   return keywordTerms(query.slice(0,1000)).slice(0,40);
 }
 export class LocalIndex {
   entries: IndexEntry[]=[];
+  coverage:IndexCoverage|null=null;
   ready=false;
   revision=0;
   renames:RenameMap={};
-  graph(scope:ReadScope):FreshnessGraph{return new FreshnessGraph(this.entries,scope,this.renames);}
+  get identityComplete():boolean{return this.coverage===null||this.coverage.omittedFiles===0;}
+  idUnambiguous(id:string):boolean{return this.ready&&this.identityComplete&&this.entries.filter(e=>e.id===id).length===1;}
+  graph(scope:ReadScope):FreshnessGraph{return new FreshnessGraph(this.entries,scope,this.renames,this.identityComplete);}
   replace(entries:IndexEntry[],scope:ReadScope):void{
     const allowed=entries.filter(e=>readableText(e.path,scope));
-    const graph=new FreshnessGraph(allowed,scope,this.renames);
+    const graph=new FreshnessGraph(allowed,scope,this.renames,this.identityComplete);
     this.entries=allowed.map(e=>e.output&&!graph.assess(e.path).usable?{...e,chunks:[],links:[],linkTexts:[]}:e);this.ready=true;
   }
-  clear(): void {this.entries=[];this.ready=false;this.revision++;}
+  clear(): void {this.entries=[];this.coverage=null;this.ready=false;this.revision++;}
   projectRecords(scope:ReadScope,project:string):IndexEntry[]{
     return projectMembers(this.entries.filter(entry=>readableText(entry.path,scope)),project);
   }

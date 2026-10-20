@@ -34,7 +34,7 @@ export class ChangeReviewModal extends ThreadModal {
         const metadata=readMetadata(op.before,parseYaml);const output=outputProjection(op.before,metadata).output;
         notes.set(op.path,{path:op.path,hash:op.beforeHash,metadata,...(typeof metadata.id==="string"?{id:metadata.id}:{}),...(output?{output}:{})});
       }
-      const graph=new FreshnessGraph([...notes.values()],this.plugin.settings,this.plugin.index.renames);
+      const graph=new FreshnessGraph([...notes.values()],this.plugin.settings,this.plugin.index.renames,this.plugin.index.identityComplete);
       return Object.entries(data.noteHashes).every(([path,hash])=>typeof hash==="string"&&readableText(path,this.plugin.settings)&&graph.scopeAllows(path,hash));}
     catch{return false;}
   }

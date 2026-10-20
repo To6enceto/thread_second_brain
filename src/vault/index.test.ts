@@ -20,7 +20,7 @@ test("recall ranks text, metadata membership and eligible explicit links without
  index.clear();assert.equal(index.recall("speaking",scope,null).length,0);
 });
 test("chunks are bounded and link extraction ignores external URLs",async()=>{
- const entry=await indexNote({path:"P/a.md",text:"x".repeat(60000),metadata:{},modifiedAt:1},()=>null);
+ const entry=await indexNote({path:"P/a.md",text:"x".repeat(300000),metadata:{},modifiedAt:1},()=>null);
  assert(entry.truncated);assert(entry.chunks.every(c=>c.excerpt.length<=1200));
  assert.deepEqual(linkTargets("[[Note#Heading|name]] [web](https://example.com) [local](a.md)"),["Note","a.md"]);
 });
@@ -65,4 +65,9 @@ test("legacy empty and invalid decision references remain explicit without copyi
  assert.deepEqual(empty.decisionSources,{refs:[],invalid:false});assert.equal(empty.metadata.status,"proposed");
  const invalid=await indexNote({path:"P/Bad.md",text:"Human choice",metadata:{type:"decision",thread_sources:'[{"excerpt":"SECRET_EXCERPT"}]'},modifiedAt:1},()=>null);
  assert.deepEqual(invalid.decisionSources,{refs:[],invalid:true});assert.ok(!JSON.stringify(invalid).includes("SECRET_EXCERPT"));
+});
+
+test("indexing later sections preserves full raw identity and never exposes private managed evidence",async()=>{
+ const {questionMarkdown}=await import('./questions.ts'),{contentHash}=await import('./scope.ts');const raw='x'.repeat(90000)+'\n## Later\nNEEDLE29 [[Later note]]',entry=await indexNote({path:'P/Long.md',text:raw,metadata:{type:'source'},modifiedAt:1},target=>target==='Later note'?'P/Later.md':null);assert.ok(entry.chunks.some(c=>c.heading==='Later'&&c.excerpt.includes('NEEDLE29')));assert.ok(entry.links.includes('P/Later.md'));assert.equal(entry.hash,await contentHash(raw));const changed=await indexNote({path:entry.path,text:raw+' invisible raw edit',metadata:{type:'source'},modifiedAt:2},()=>null);assert.notEqual(entry.hash,changed.hash);
+ const q=questionMarkdown('Human question','p',{sources:[],noteHashes:{},truncated:false}).replace('No supporting notes selected.','PRIVATE_MACHINE29 '+"secret ".repeat(12000));const meta={type:'question',thread_question_version:'1'},question=await indexNote({path:'P/Q.md',text:q,metadata:meta,modifiedAt:1},()=>null);assert.ok(question.chunks.some(c=>c.excerpt.includes('Human question')));assert.ok(!JSON.stringify(question).includes('PRIVATE_MACHINE29'));assert.ok(!JSON.stringify(question.chunks).includes('secret'));
 });

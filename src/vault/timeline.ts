@@ -68,7 +68,7 @@ export function projectTimeline(index:LocalIndex,settings:ThreadSettings,today=l
         if(replacement){
           let path="";try{path=decodeURIComponent(replacement);if(vaultPath(path)!==path)path="";}catch{path="";}
           const related=eligible.get(path);
-          if(related&&related.metadata.type==="decision"&&readableText(path,settings)&&(!related.id||(graph.ids.get(related.id)?.length??0)===1))event.related={path,hash:related.hash};else hiddenLinks++;
+          if(related&&related.metadata.type==="decision"&&readableText(path,settings)&&(!related.id||index.idUnambiguous(related.id)))event.related={path,hash:related.hash};else hiddenLinks++;
         }
       }
     }
@@ -77,7 +77,7 @@ export function projectTimeline(index:LocalIndex,settings:ThreadSettings,today=l
   return{events:events.slice(0,200),total:events.length,unknown:events.filter(e=>!e.day).length,records:records.length,examined:examined.length,limits:[
     "This is a chronology of recognized current records, not a complete historical event log. Earlier unsaved contents are never reconstructed. All statuses describe current note contents.",
     "At most 200 events from the 2000 most recently modified project records are shown, ordered by explicit record/event date (newest first), then path/heading. Unknown chronology sorts last; counts include omitted events.",
-    "Only indexed sections are examined (currently the first 50000 body characters per note). Repeated dated headings combine entries; only the first indexed passage of each heading is inspected for a replacement link. Long reasons can hide later links.",
+    "Only indexed sections are examined (section-balanced passages within the selected finite index profile). Repeated dated headings combine entries; only the first indexed passage of each heading is inspected for a replacement link. Long reasons can hide later links.",
     "Replacement navigation opens a current note at the recorded path. Legacy links archive no replacement ID/hash, so they do not prove historical identity. Missing, excluded, ambiguous or stale replacements are hidden.",
     ...(hiddenLinks?[`${hiddenLinks} unavailable recorded replacement links are hidden without their paths.`]:[]),...(repeated?[`${repeated} repeated heading passages were combined; inspect the current source for complete recorded details.`]:[])]};
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 import type ThreadPlugin from "../main.ts";
 import { defaultSettings } from "../settings/settings.ts";
-import { indexNote } from "../vault/index.ts";
+import { indexNote, LocalIndex } from "../vault/index.ts";
 import { questionMarkdown } from "../vault/questions.ts";
 const compiled=await build({entryPoints:[new URL('./questions-modal.ts',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'questions-host',setup(builder){
  builder.onResolve({filter:/^obsidian$/},()=>({path:'host',namespace:'stub'}));builder.onResolve({filter:/intelligence\/ollama\.ts$/},()=>({path:'model',namespace:'stub'}));
@@ -27,7 +27,8 @@ test('actual question forms preserve legacy evidence and revoke stale previews/i
  const empty={sources:[],noteHashes:{},truncated:false},raw=questionMarkdown('Managed original?','project',empty,'2026-10-16'),meta=Object.fromEntries(raw.split('\n').filter(l=>/^\w+: /.test(l)).map(l=>{const at=l.indexOf(': ');return[l.slice(0,at),JSON.parse(l.slice(at+2))];}));
  const entries=await Promise.all([{path:'P/Q.md',text:raw,metadata:meta,modifiedAt:1},{path:'P/Legacy.md',text:'## Open questions\nLEGACY_ORIGINAL_QUESTION',metadata:{type:'questions'},modifiedAt:1}].map(n=>indexNote(n,()=>null)));
  const settings={...defaultSettings(),allowedPaths:['P'],selectedProject:'P'},created:unknown[]=[],proposed:unknown[]=[];let duringCreate=()=>{},started:()=>void=()=>{},release:()=>void=()=>{};const begun=new Promise<void>(r=>started=r),gate=new Promise<void>(r=>release=r);
- const plugin={app:{},active:true,settings,index:{ready:true,revision:1,entries,projectEntries:()=>entries,projectRecords:()=>entries},modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>true,projectIdentity:()=>"project",withDependencies:(v:unknown)=>v,changePathAllowed:()=>true,readReviewedTarget:async()=>raw,changeContext:()=>"snapshot",openChanges:()=>{},
+ const index=new LocalIndex();index.replace(entries,settings);index.revision=1;
+ const plugin={app:{},active:true,settings,index,modals:new Set(),rebuildIndex:async()=>{},evidenceCurrent:async()=>true,projectIdentity:()=>"project",withDependencies:(v:unknown)=>v,changePathAllowed:()=>true,readReviewedTarget:async()=>raw,changeContext:()=>"snapshot",openChanges:()=>{},
   createNotes:async(notes:unknown,validate:()=>Promise<void>,current:()=>boolean)=>{duringCreate();await validate();assert.ok(current());created.push(notes);},
   changes:{propose:async(value:unknown,_context:string,current:()=>boolean)=>{started();await gate;if(!current())throw Error('Canceled inputs');proposed.push(value);}}};
  const button=(label:string)=>{const e=[...form.elements].reverse().find(e=>e.textContent===label);assert.ok(e,label);return e;},input=(label:string,value:string)=>{const e=form.fields.get(label);assert.ok(e,label);e.value=value;if(e.changed)e.changed(value);else (e as unknown as {onchange?:()=>void}).onchange?.();};

@@ -109,6 +109,7 @@ function renderSettings(app: App, plugin: ThreadPlugin, containerEl: HTMLElement
     text.inputEl.setAttribute("aria-label",`${role} folder`);text.setValue(roles[role]).onChange(value=>{roles[role]=value;cancelChecks();});
   });
   new Setting(advanced).setName("Starter project").addButton(button=>button.setButtonText("Preview a new workspace").onClick(()=>plugin.openWorkspace()));
+  new Setting(advanced).setName("Index coverage and budgets").setDesc("Inspect scoped coverage, choose a bounded profile and cancel or resume local indexing without changing notes or read grants.").addButton(button=>button.setButtonText("Inspect index coverage").onClick(()=>plugin.openIndexCoverage()));
   new Setting(advanced).setName("Derived text index").setDesc("Rebuild allowed notes. Durable notes, settings, import/rename metadata and change backups are preserved.")
     .addButton(button=>button.setButtonText("Rebuild text index").onClick(async()=>{
       button.setDisabled(true);feedback.setText("Rebuilding allowed text index...");

@@ -137,16 +137,20 @@ function movedPath(path:string,renames:RenameMap):string|null{
 
 export class FreshnessGraph{
   notes:Map<string,FreshNote>;ids=new Map<string,FreshNote[]>();renames:RenameMap;scope:ReadScope;memo=new Map<string,Freshness>();scopeMemo=new Map<string,boolean>();
-  constructor(entries:FreshNote[],scope:ReadScope,renames:RenameMap={}){
+  identityComplete:boolean;
+  constructor(entries:FreshNote[],scope:ReadScope,renames:RenameMap={},identityComplete=true){
+    this.identityComplete=identityComplete;
     this.scope=scope;this.renames=renames;this.notes=new Map(entries.filter(e=>readableText(e.path,scope)).map(e=>[e.path,e]));
     for(const e of this.notes.values())if(e.id){const group=this.ids.get(e.id)??[];group.push(e);this.ids.set(e.id,group);}
   }
   resolve(ref:SourceReference):ReferenceState{
     let note:FreshNote|undefined;
     if(ref.id){
+      if(!this.identityComplete)return{ref,state:"ambiguous",reason:"Index budgets omitted permitted files; stable-ID uniqueness cannot be established. Restore complete coverage before reuse."};
       const candidates=this.ids.get(ref.id)??[];if(candidates.length>1)return {ref,state:"ambiguous",reason:"Stable source ID is duplicated in allowed notes."};note=candidates[0];
     }else{
       const current=this.notes.get(ref.path);const path=movedPath(ref.path,this.renames);const moved=path?this.notes.get(path):undefined;
+      if(!this.identityComplete&&path&&path!==ref.path&&!moved)return{ref,state:"ambiguous",reason:"Renamed-source coverage is incomplete. Restore index coverage before reuse."};
       if(current&&moved&&current.path!==moved.path&&current.hash===ref.noteHash&&moved.hash===ref.noteHash)return {ref,state:"ambiguous",reason:"Legacy path and renamed note both match; select the intended source explicitly."};
       note=current?.hash===ref.noteHash?current:moved??current;
     }

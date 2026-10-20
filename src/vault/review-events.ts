@@ -41,7 +41,7 @@ export async function reviewSnapshot(index:LocalIndex,settings:ThreadSettings,it
   const visit=async(entry:IndexEntry)=>{
     if(visited.has(entry.path))return;if(visited.size>=200)throw new UnsupportedSnapshot("This review exceeds the 200-note dependency snapshot limit. Review the source manually.");
     if(entry.output?.invalid||entry.decisionSources?.invalid)throw new UnsupportedSnapshot("Invalid source provenance prevents an exact review snapshot. Review manually.");
-    if(entry.id&&(graph.ids.get(entry.id)?.length??0)>1)throw new UnsupportedSnapshot("Ambiguous source identities prevent an exact review snapshot. Resolve the identities manually.");
+    if(entry.id&&!index.idUnambiguous(entry.id))throw new UnsupportedSnapshot("Ambiguous source identities or incomplete index coverage prevent an exact review snapshot. Restore coverage or resolve identities manually.");
     visited.add(entry.path);hashes[entry.path]=entry.hash;
     states.push([entry.path,entry.id??null,entry.hash,entry.metadata.type??null,entry.metadata.status??null,entry.output?.invalid??false,entry.decisionSources?.invalid??false,
       entry.id?(graph.ids.get(entry.id)??[]).map(e=>[e.path,e.hash]).sort():[]]);
@@ -49,7 +49,7 @@ export async function reviewSnapshot(index:LocalIndex,settings:ThreadSettings,it
     const questionRefs=entry.metadata.type==="question"?await readQuestion(entry.path,entry.hash):[];
     for(const ref of [...entry.output?.refs??[],...entry.decisionSources?.refs??[],...questionRefs]){
       if(++references>2000)throw new UnsupportedSnapshot("This review exceeds the 2000-reference snapshot budget. Review manually.");
-      const resolved=graph.resolve(ref);if(resolved.state==="ambiguous")throw new UnsupportedSnapshot("Ambiguous source identities prevent an exact review snapshot. Resolve the identities manually.");states.push([ref.id??null,ref.path,ref.noteHash,ref.noteType??null,ref.noteStatus??null,resolved.state,resolved.path??null,resolved.hash??null]);
+      const resolved=graph.resolve(ref);if(resolved.state==="ambiguous")throw new UnsupportedSnapshot("Ambiguous source identities or incomplete index coverage prevent an exact review snapshot. Restore coverage or resolve identities manually.");states.push([ref.id??null,ref.path,ref.noteHash,ref.noteType??null,ref.noteStatus??null,resolved.state,resolved.path??null,resolved.hash??null]);
       const next=resolved.path?graph.notes.get(resolved.path):undefined;if(next&&readableText(next.path,settings))await visit(next as IndexEntry);
     }
   };
@@ -68,9 +68,8 @@ export function reviewEventMarkdown(project:string,snapshot:ReviewSnapshot,item:
 }
 
 export async function disposedReviewQueue(index:LocalIndex,settings:ThreadSettings,readQuestion:QuestionReferenceReader,day=localDay(),signal?:AbortSignal):Promise<DisposedQueue> {
-  const revision=index.revision,entries=index.entries,queue=projectReviewQueue(index,settings,day,200),graph=index.graph(settings),records=index.projectRecords(settings,settings.selectedProject),ids=new Map<string,number>();
-  for(const entry of index.entries)if(entry.id&&readableText(entry.path,settings))ids.set(entry.id,(ids.get(entry.id)??0)+1);
-  const events=records.flatMap(entry=>{const event=readReviewEvent(entry.metadata);return event&&ids.get(event.id)===1&&graph.assess(entry.path).usable&&event.recordedOn<=day?[{entry,event}]:[];})
+  const revision=index.revision,entries=index.entries,queue=projectReviewQueue(index,settings,day,200),graph=index.graph(settings),records=index.projectRecords(settings,settings.selectedProject);
+  const events=records.flatMap(entry=>{const event=readReviewEvent(entry.metadata);return event&&index.idUnambiguous(event.id)&&graph.assess(entry.path).usable&&event.recordedOn<=day?[{entry,event}]:[];})
     .sort((a,b)=>b.event.recordedOn.localeCompare(a.event.recordedOn)||b.entry.modifiedAt-a.entry.modifiedAt||a.entry.path.localeCompare(b.entry.path));
   const pending:DisposedItem[]=[],handled:DisposedItem[]=[],counts:Record<string,number>={};let incomplete=0;
   for(const item of queue.items){

@@ -9,6 +9,7 @@ export interface SearchFilters { type?: string; status?: string; path?: string; 
 export interface SearchCoverage {
   eligibleNotes: number; filteredNotes: number; matchedNotes: number; matchedPassages: number;
   returnedPassages: number; truncatedNotes: number; limited: boolean; queryTruncated: boolean;
+  indexedSections?: number; representedSections?: number; indexOmittedNotes?: number;
 }
 export interface SearchResult { hits: RecallHit[]; coverage: SearchCoverage; hybrid?: HybridCoverage; }
 const stopWords = new Set("the a an and or is to of in for what how we our was are did does why with has have can which when where from be it on as by".split(" "));
@@ -99,9 +100,11 @@ export function searchEntries(eligible: IndexEntry[], query: string, filters: Se
   const hits = balancedHits(ranked, limit);
   return { hits, coverage: { eligibleNotes: eligible.length, filteredNotes: entries.length, matchedNotes: new Set(ranked.map(hit => hit.entry.path)).size,
     matchedPassages: ranked.length, returnedPassages: hits.length, truncatedNotes: entries.filter(entry => entry.truncated).length,
+    indexedSections: entries.reduce((n,entry)=>n+(entry.sectionCoverage?.sections??0),0),
+    representedSections: entries.reduce((n,entry)=>n+(entry.chunks.length?entry.sectionCoverage?.includedSections??0:0),0),
     limited: hits.length < ranked.length, queryTruncated: parsed.truncated } };
 }
 
 export function searchCoverageText(coverage: SearchCoverage): string {
-  return `${coverage.returnedPassages} selected passages; ${coverage.matchedPassages} matches across ${coverage.matchedNotes} notes. ${coverage.filteredNotes} of ${coverage.eligibleNotes} eligible notes pass filters. At most 3 passages per note and 50 results. Only the first 50000 body characters per note are indexed (${coverage.truncatedNotes} shortened notes). ${coverage.queryTruncated ? "The query was shortened to 1000 characters/40 terms. " : ""}Weighted token matching; quoted phrases are required. Results do not establish complete coverage.`;
+  return `${coverage.returnedPassages} selected passages; ${coverage.matchedPassages} matches across ${coverage.matchedNotes} notes. ${coverage.filteredNotes} of ${coverage.eligibleNotes} eligible notes pass filters. At most 3 passages per note and 50 results. Index passages are section-balanced within the selected finite profile (${coverage.truncatedNotes} shortened notes; ${coverage.representedSections??"unknown"} of ${coverage.indexedSections??"unknown"} nonempty sections represented in filtered indexed notes). ${coverage.indexOmittedNotes===undefined?"Inspect Text index coverage for omitted permitted files.":`${coverage.indexOmittedNotes} permitted files omitted from the index; their text coverage is unknown.`} ${coverage.queryTruncated ? "The query was shortened to 1000 characters/40 terms. " : ""}Weighted token matching; quoted phrases are required. Results do not establish complete coverage.`;
 }

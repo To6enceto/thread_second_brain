@@ -35,3 +35,14 @@ test("scope reset removes all cached bytes before awaits and excluded paths are 
  const privateScope={allowedPaths:["P"],excludedPaths:[entry.path]};let reads=0;
  await updates.flush({scope:privateScope,current:()=>true,paths:()=>[entry.path],read:async()=>{reads++;return entry;},resolve:()=>null,affected:()=>{},persist:async()=>{}});assert.equal(reads,0);assert.equal(index.entries.length,0);
 });
+
+test("bounded publication removes omitted sources and dependent text without endlessly rereading omissions",async()=>{
+ const source=await note('P/S.md','source','s'),derived=output('P/A.md',source,'a'),other=await note('P/Other.md','other'),index=new LocalIndex();index.replace([source,derived,other],scope);const updates=new IndexUpdates(index);updates.full=false;updates.invalidate([source.path],scope);const reads:string[]=[],notifications=new Set<string>();
+ await updates.flush({scope,current:()=>true,paths:()=>[],read:async path=>{reads.push(path);assert.ok(reads.length<6,'Budget omission was requeued indefinitely');return path===source.path?source:path===derived.path?derived:null;},resolve:()=>null,retain:entries=>({entries:entries.filter(e=>e.path!==source.path),invalidate:new Set([other.path])}),affected:paths=>{for(const p of paths)notifications.add(p);},persist:async()=>{}});
+ assert.equal(index.ready,true);assert.equal(updates.pending.size,0);assert.ok(!index.entries.some(e=>e.path===source.path));assert.ok(!JSON.stringify(index.entries).includes('STALE_DERIVED_SECRET'));assert.ok(notifications.has(other.path));assert.equal(reads.filter(p=>p===source.path).length,1);
+});
+test("stopped work with revoked current authority publishes nothing and preserves a restartable full scan",async()=>{
+ const index=new LocalIndex(),updates=new IndexUpdates(index),source=await note('P/S.md','source');let current=true,release:()=>void=()=>{},started:()=>void=()=>{},persisted=0;const begun=new Promise<void>(r=>started=r),port:UpdatePort={scope,current:()=>current,paths:()=>[source.path],read:async()=>{started();await new Promise<void>(r=>release=r);return source;},resolve:()=>null,affected:()=>{},persist:async()=>{persisted++;}};
+ const work=updates.flush(port);await begun;current=false;updates.stop();release();await assert.rejects(work,/abort|changed/i);assert.equal(index.entries.length,0);assert.equal(persisted,0);assert.equal(updates.full,true);assert.equal(index.ready,false);
+ current=true;await updates.flush({...port,read:async()=>source});assert.equal(index.ready,true);assert.equal(index.entries[0]?.hash,source.hash);assert.equal(persisted,1);
+});

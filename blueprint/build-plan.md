@@ -62,7 +62,7 @@ PDF support and project portability split into two features each.
 
 ## Milestone I - Expand local evidence coverage
 
-- [ ] 29. **Section-aware long-note indexing** - Index more than the existing note prefix through bounded section processing, with configurable budgets, progress, cancellation, meaningful coverage and measured synthetic performance while preserving incremental invalidation.
+- [x] 29. **Section-aware long-note indexing** - Index more than the existing note prefix through bounded section processing, with configurable budgets, progress, cancellation, meaningful coverage and measured synthetic performance while preserving incremental invalidation.
 - [ ] 30. **Broader hybrid retrieval** - Extend candidate coverage across eligible sections using explicit bounded search budgets, balanced selection and search-more controls; retain keyword-only operation, local embedding identity checks and immediate exclusions.
 - [ ] 31. **Local PDF extraction** - Explicitly import/select local PDFs, preserve originals, preview bounded page text and save non-overwriting source notes with extraction provenance; package required local assets, with no remote fetch, OCR or silent binary read grants.
 - [ ] 32. **PDF evidence and page citations** - Integrate approved extracted PDF text into retrieval, answers and reviews with verified page references, current original-file hashes and exclusions; changed/missing/excluded PDFs invalidate dependent cached evidence and outputs.
