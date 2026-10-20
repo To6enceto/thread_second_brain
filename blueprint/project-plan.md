@@ -502,9 +502,9 @@ verified private 0.2.0 baseline for the next approved queue.
 
 The user approved all ten additional proposals on 2026-10-16. Build-plan features
 22-34 retain them all. The larger retrieval, PDF and portability proposals are
-each split into two serial features. This approval changes the plans, not the
-completion state: features 22-34 are pending and the current runtime remains
-0.2.0 until implementation and release verification establish its successor.
+each split into two serial features. Features 22-34 are now complete in the
+private local 0.3.0 baseline. Exact verification, schemas, budgets and limitations
+remain in their immutable archives; preserve their bytes.
 
 ### Everyday evidence and follow-up (22-25)
 
@@ -643,3 +643,156 @@ approval before writes. Package and install the final new version only after its
 feature queue passes; record the actual artifact inventory, reproducibility,
 offline behavior, model/runtime versions and platform/scale limits. Previous
 release artifacts/history are evidence, not permission to claim new support.
+
+## Approved improvements - usability and continued research (35-48)
+
+Approved on 2026-10-20. All ten proposals are retained in the serial build plan.
+The reviewed panel redesign is part of the baseline. Features 35-48 are planned,
+not claims of implemented behavior. Preserve features 1-34, their IDs, immutable
+archives, prior reports and all durable user history. No standalone web app,
+hosted service, mandatory subscription or autonomous note changes are introduced.
+
+### Launch, setup and workspace (35-37)
+
+Provide a Fedora-first user-level launcher and generated desktop shortcut for an
+explicitly configured installed Obsidian and vault. Support the installed Flatpak
+path and document verified alternatives. A plugin URI route opens Thread without
+changing read grants or running inference. Validate launcher configuration and
+pass arguments without shell interpolation of vault names or executable paths.
+Detect an existing local Ollama server; optional startup requires explicit setup
+consent and a configured local executable/model directory. Bind only loopback,
+disable cloud features, validate the detected server and report actionable errors.
+Never silently download models, install services or stop unrelated processes.
+The shortcut is an artifact until the user explicitly approves installation.
+
+Improve the existing setup flow rather than replace its permission model. Show
+stage and next action, distinct sample versus existing-note paths, and visible
+inline progress/results for connection checks. Preserve explicit model choice,
+cancelable checks, read-access previews, exclusions and Save semantics. A sample
+preview or model discovery grants no read access. Native first-use acceptance
+must cover unavailable Ollama, missing models and successful local generation.
+
+Add a full-width native Obsidian main-tab view while retaining the sidebar.
+Home, Ask, Research, Actions and Reviews reuse current domain services and action
+surfaces, with later features enhancing Actions and Research. Project switching
+does not expand scope. Do not close or replace the user's existing notes or
+layouts. Restore only validated view state; unavailable projects fail closed.
+Keep keyboard access, theme compatibility, cancellation and unload cleanup.
+
+### Claim classification, corrections and conversations (38-41)
+
+Distinguish a sourced recorded statement, an AI interpretation and a proposed
+action. A recorded postponement is not a newly proposed action merely because
+it mentions future work. Reuse known note metadata and recognized structure;
+do not turn arbitrary quoted prose or a model label into independently verified
+truth. Strengthen structured output validation and reusable quality fixtures for
+postponements, accepted/proposed/superseded decisions, missing support and genuine
+recommendations. Preserve compatibility with existing saved output. Report actual
+local-model evaluation results and limits; citation identity alone proves neither
+semantic support nor factual correctness.
+
+Allow explicit classification/text corrections before saving an answer. Preserve
+original model wording/type, the user's correction, time and evidence provenance
+in a readable versioned record; never silently rewrite sources or earlier saved
+answers. A correction does not waive source freshness or access checks. Any edit
+requires a renewed exact save preview. Unknown or invalid persisted correction
+metadata must not be treated as verified evidence.
+
+Add finite in-memory follow-up conversations to Ask. Freeze conservative turn,
+character and evidence budgets in the spec and show omissions. Each turn has its
+own current question, evidence choices, source hashes and generation provenance.
+Earlier questions/answers may supply clearly labelled conversation context, never
+authoritative evidence or new permissions. Revalidate all reused dependencies
+before generation, display and save. Relevant note/project/scope/settings changes,
+closing and cancellation revoke affected outputs and previews. Do not persist
+conversations automatically; explicit preview/save creates readable Markdown
+without overwrites. Versioned saved conversations retain per-turn evidence and
+corrections; reopening cannot bypass current scope or stale-output protections.
+
+### Research collections and project actions (42-44)
+
+Persist named research collections as readable versioned Markdown with a stable
+ID, project/scope identity, bounded evidence references and include/pin/exclude
+intent. References use current source identity/heading/hash, not an authoritative
+copy of formerly permitted text. Do not persist cached excerpts solely for reuse.
+On reopen, resolve identities within current grants, re-read current content and
+show changed/missing/unavailable status conservatively. Excluded paths and text
+must not leak through collection display or model context. Reconfirm changed
+selections; pins never bypass budgets, exclusions, PDF consent or stale-source
+checks. Creating or editing a collection requires an exact reviewed preview.
+
+Project actions are durable versioned Markdown records with stable ID, project,
+title, explicit status and dated transition history. Internal status values
+represent Planned, In progress, Blocked and Done; freeze exact schema in feature
+43 before consumers. Optional source, managed-question and decision references
+remain subject to scope/freshness checks. New actions and every transition require
+human review and the existing exact-preview/write/recovery boundaries. AI may
+prepare suggestions, never accept them or change status automatically. Retain
+earlier transitions and distinguish recorded dates from independently verified
+events. Legacy chosen-next-action notes remain supported without bulk migration.
+
+Expose a lightweight accessible board using current permitted records, including
+empty and unavailable states. Wrap up may use explicitly selected recorded
+progress and current supporting evidence. A saved session or AI interpretation
+must not itself move a card or establish that work was completed.
+
+### Checkpoints and clipped research (45-46)
+
+Compare an explicitly selected retained project export with current permitted
+project content. Reuse strict package validation, finite budgets and original
+manifest/hash snapshots. Show additions, removals and changed before/after content
+only where current access allows it. A package is not permission to redisplay
+excluded historical content; revalidate transitive dependencies and PDF consent.
+Unknown history, omitted files and differences in selection must remain visible.
+Do not infer earlier contents from mtime, silently restore notes or call a partial
+checkpoint a complete project backup.
+
+Support deliberately saved Obsidian Web Clipper notes through documented/importable
+compatible templates and reviewed local intake. Preserve available source title,
+author and URL; distinguish published/event dates from capture dates. Missing or
+ambiguous metadata stays unknown. Preview associations to existing permitted
+projects and possible duplicates; never automatically merge, overwrite originals
+or infer that similar titles prove duplicate identity. Imported text and URLs
+are untrusted data; Thread does not fetch, crawl, execute or follow them.
+Use authored synthetic clipped notes for offline native acceptance.
+
+### Safe explicit local updates (47-48)
+
+Build a local helper for explicitly chosen Thread installation/package paths.
+Validate package identity/version, exact supported code/asset inventory, sizes,
+hashes and host/data compatibility before a destination preview. Reject traversal,
+links, malformed metadata, corrupt assets, unexpected files and unsupported
+versions. Preserve every note, settings file, cache where appropriate, durable
+proposal/original/import/rename journal and unrelated installation file.
+
+Applying an update requires the exact reviewed package and target snapshots and
+an explicit action; concurrent changes require a new preview. Never replace code
+in a running everyday installation or stop a user's Obsidian/Ollama. Keep owned
+staging and previous code separate from data. Record enough intent to recover
+interruptions conservatively, refusing changed or ambiguous files rather than
+overwriting them. Previous-code rollback is offered only when declared data
+compatibility permits it; it is not a reversal of note changes or data migrations.
+Freeze exact inventory, version ranges, limits and recovery schema in the specs.
+Test only disposable installations, including interrupted writes and later edits.
+
+### Execution, verification and costs
+
+Each feature needs meaningful tests, Verify, required independent review and
+actual synthetic Obsidian acceptance. Use real local text/embedding inference
+where relevant, actual Fedora/Flatpak launch evidence, first-use/keyboard/theme
+checks, exclusions, cancellation, stale sources, collision refusal and recovery.
+Do not replace native acceptance with mocks or weaken checks to continue. Respect
+configured repair limits. Preserve earlier run records and inspect reused helpers.
+
+Routine choices and plan/spec refinements within this scope are approved, as are
+the local feature lifecycle and normal pushes of verified completed main commits
+to the existing origin. No force push or remote change. Actual desktop integration
+in the user's account, modifying their everyday installation, stopping their
+processes, public releases, deployment, paid services, system-wide installation
+and destructive actions on user data require separate approval. Prepare concrete
+reviewable artifacts before seeking any such approval.
+
+There is no mandatory paid runtime. Hardware, downloads, local storage, memory,
+power and optional development assistants remain real costs. Models/runtime stay
+separate downloads. Package the next private version after the queue passes and
+report measured platform, model and scale limits rather than universal support.
