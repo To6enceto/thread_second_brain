@@ -21,6 +21,14 @@
   --thread-ai: #a9b1f4;
 }
 .thread-view { padding: 20px; line-height: 1.5; container-type: inline-size; }
+.thread-workspace { max-width: 1280px; margin-inline: auto; width: 100%; }
+.thread-workspace-nav { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--thread-border); }
+.thread-workspace-nav button[aria-current="page"] { background: var(--thread-surface-2); border-bottom: 2px solid var(--thread-recorded); font-weight: 600; }
+.thread-workspace-nav .thread-workspace-sidebar { margin-inline-start: auto; }
+.thread-workspace .thread-project-selector { max-width: 600px; }
+.thread-workspace-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 18px; }
+.thread-workspace .thread-workspace-area h3 { font: 23px/1.3 var(--thread-serif); }
+.thread-workspace .thread-home { display: block; }
 .thread-view h2 { margin-top: 0; }
 .thread-project { color: var(--text-muted); overflow-wrap: anywhere; }
 .thread-project-selector { position: relative; display: grid; gap: 6px; margin: 20px 0; padding: 16px 44px 16px 16px; border: 1px solid var(--thread-border); border-radius: var(--thread-radius); background: var(--thread-surface); }

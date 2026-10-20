@@ -46,6 +46,7 @@ import { createNewNotes } from "./vault/new-notes.ts";
 import { defaultSettings, loadSettings, type ThreadSettings } from "./settings/settings.ts";
 import { ThreadSettingTab, ThreadSetupModal } from "./ui/settings-tab.ts";
 import { BriefingView, THREAD_VIEW } from "./ui/briefing-view.ts";
+import { ThreadWorkspaceView, THREAD_WORKSPACE_VIEW } from "./ui/thread-workspace-view.ts";
 import { isWithin, readableText, contentHash } from "./vault/scope.ts";
 import { buildEvidence, readMetadata, type SourceNote, type EvidenceBundle } from "./vault/evidence.ts";
 import { OllamaClient } from "./intelligence/ollama.ts";
@@ -68,7 +69,7 @@ export default class ThreadPlugin extends Plugin {
     this.indexCancelEpoch++;this.indexUpdates.stop();if(this.indexTimer){clearTimeout(this.indexTimer);this.indexTimer=null;}
     this.index.ready=false;this.index.revision++;this.setIndexProgress("canceled",0,0,"Index work canceled. Pending work remains; rebuild explicitly when ready.");
     for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Index work canceled. Rebuild or refresh before reuse.");
-    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Index work canceled. Rebuild before Resume.");
+    for(const leaf of this.threadLeaves())if(leaf.view instanceof BriefingView)leaf.view.invalidate("Index work canceled. Rebuild before Resume.");
   }
   semantic=new SemanticSearch();
   indexUpdates=new IndexUpdates(this.index);
@@ -102,6 +103,7 @@ export default class ThreadPlugin extends Plugin {
       try{this.imports.load(JSON.parse(await this.app.vault.adapter.read(this.importsPath())));}catch{this.importsWarning="Import history is unavailable. Rebuild it from allowed source notes before importing.";}
     }
     this.registerView(THREAD_VIEW, (leaf) => new BriefingView(leaf, this));
+    this.registerView(THREAD_WORKSPACE_VIEW, leaf => new ThreadWorkspaceView(leaf, this));
     this.registerObsidianProtocolHandler("thread", params => {
       if (!(this.app.vault.adapter instanceof FileSystemAdapter)
         || params.threadVault !== this.app.vault.adapter.getBasePath()) {
@@ -116,6 +118,7 @@ export default class ThreadPlugin extends Plugin {
     this.addSettingTab(this.settingsTab);
     this.addRibbonIcon("book-open", "Open Thread", () => { void this.openThread(); });
     this.addCommand({ id: "open-thread", name: "Open Thread", callback: () => { void this.openThread(); } });
+    this.addCommand({ id: "open-thread-workspace", name: "Open full workspace", callback: () => { void this.openThreadWorkspace(); } });
     this.addCommand({ id: "create-workspace", name: "Create project workspace", callback: () => this.openWorkspace() });
     this.addCommand({ id:"find-evidence",name:"Find evidence",callback:()=>this.openRecall() });
     this.addCommand({ id:"ask-vault",name:"Ask your vault",callback:()=>this.openAsk() });
@@ -162,7 +165,7 @@ export default class ThreadPlugin extends Plugin {
     this.indexUpdates.stop();if(this.indexTimer)clearTimeout(this.indexTimer);
     for (const modal of this.modals) modal.close();
     this.setupModal?.close(); this.settingsTab?.hide();
-    for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
+    for (const leaf of this.threadLeaves()) {
       if (leaf.view instanceof BriefingView) leaf.view.cancelPending();
     }
   }
@@ -255,7 +258,7 @@ export default class ThreadPlugin extends Plugin {
   changePathAllowed(path:string):boolean {try{this.checkChangePath(path);return true;}catch{return false;}}
   async openChangeTarget(path:string):Promise<void>{
     this.checkChangePath(path);const file=this.app.vault.getAbstractFileByPath(path);if(!(file instanceof TFile))throw new Error("The current target note is missing.");
-    await this.app.workspace.getLeaf(false).openFile(file);
+    await this.sourceLeaf().openFile(file);
   }
   importsPath(): string {return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/imports.json`;}
   renamesPath():string{return `${this.manifest.dir??`${this.app.vault.configDir}/plugins/${this.manifest.id}`}/renames.json`;}
@@ -368,7 +371,7 @@ export default class ThreadPlugin extends Plugin {
   async resetTextIndex():Promise<void>{
     this.scheduleIndex();
     for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Text index rebuilding. Refresh this action afterward.");
-    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Text index rebuilding. Generate a fresh briefing afterward.");
+    for(const leaf of this.threadLeaves())if(leaf.view instanceof BriefingView)leaf.view.invalidate("Text index rebuilding. Generate a fresh briefing afterward.");
     await this.rebuildIndex();
   }
   private resolveIndexLink(path:string,target:string,settings:ThreadSettings):string|null{
@@ -426,7 +429,7 @@ export default class ThreadPlugin extends Plugin {
   private notifySources(paths:Set<string>):void{
     this.semantic.invalidate(paths);
     for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidatePaths(paths);
-    for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.sourcesChanged(paths);
+    for(const leaf of this.threadLeaves())if(leaf.view instanceof BriefingView)leaf.view.sourcesChanged(paths);
   }
 
   async openIndexedSource(path:string,hash:string,heading="",isCurrent:()=>boolean=()=>true): Promise<void> {
@@ -443,10 +446,10 @@ export default class ThreadPlugin extends Plugin {
       if(!Number.isInteger(requested)||pdf&&!pdf.pages.some(p=>p.page===requested))throw Error("The selected PDF page is not in this extraction.");
       const target=this.app.vault.getAbstractFileByPath(pdf?.path??path);
       if(!(target instanceof TFile)||!isCurrent()||revision!==this.index.revision||JSON.stringify(settings)!==JSON.stringify(this.settings)||!mayReadPdf(target.path,this.settings))throw Error("PDF access changed. Search again.");
-      await this.app.workspace.getLeaf(false).openFile(target,{eState:{subpath:`#page=${requested}`}});return;
+      await this.sourceLeaf().openFile(target,{eState:{subpath:`#page=${requested}`}});return;
     }
     await verifyThenOpenSource(hash,()=>this.app.vault.read(file),()=>isCurrent()&&revision===this.index.revision&&file.path===path&&readableText(path,this.settings),
-      ()=>this.app.workspace.getLeaf(false).openFile(file,{eState:{subpath:heading?`#${heading}`:""}}));
+      ()=>this.sourceLeaf().openFile(file,{eState:{subpath:heading?`#${heading}`:""}}));
   }
 
   openWorkspace(): void {
@@ -479,6 +482,24 @@ export default class ThreadPlugin extends Plugin {
     this.setupModal = modal; modal.open();
   }
 
+  private threadLeaves() {
+    return [THREAD_VIEW, THREAD_WORKSPACE_VIEW].flatMap(type => this.app.workspace.getLeavesOfType(type));
+  }
+
+  sourceLeaf() {
+    // Explicit Thread source navigation must not replace an existing note or workspace.
+    return this.app.workspace.getLeaf("tab");
+  }
+
+  async openThreadWorkspace(): Promise<void> {
+    let leaf = this.app.workspace.getLeavesOfType(THREAD_WORKSPACE_VIEW)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getLeaf("tab");
+      await leaf.setViewState({ type: THREAD_WORKSPACE_VIEW, active: true });
+    }
+    await this.app.workspace.revealLeaf(leaf);
+  }
+
   async openThread(): Promise<void> {
     let leaf = this.app.workspace.getLeavesOfType(THREAD_VIEW)[0];
     if (!leaf) {
@@ -493,7 +514,7 @@ export default class ThreadPlugin extends Plugin {
     this.settings = loadSettings(settings);
     this.scheduleIndex();
     for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate("Settings changed. Run this action again.");
-    for (const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW)) {
+    for (const leaf of this.threadLeaves()) {
       if (leaf.view instanceof BriefingView) leaf.view.invalidate("Settings changed. Generate a new briefing.");
     }
     await this.saveData(this.settings);
@@ -507,7 +528,7 @@ export default class ThreadPlugin extends Plugin {
     const allowed=readableText(path,this.settings)||(folder&&this.settings.allowedPaths.some(root=>isWithin(path,root)||isWithin(root,path)||path==="/"));
     if(!allowed)return;
     if(folder){this.scheduleIndex();for(const modal of this.modals)if(modal instanceof ThreadModal)modal.invalidate();
-      for(const leaf of this.app.workspace.getLeavesOfType(THREAD_VIEW))if(leaf.view instanceof BriefingView)leaf.view.invalidate("Project folders changed. Refresh the project.");return;}
+      for(const leaf of this.threadLeaves())if(leaf.view instanceof BriefingView)leaf.view.invalidate("Project folders changed. Refresh the project.");return;}
     if(this.index.coverage?.omittedFiles){
       const paths=new Set([...this.index.entries.map(e=>e.path),path]);this.scheduleIndex();this.notifySources(paths);return;
     }

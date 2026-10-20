@@ -72,6 +72,14 @@ After installation/download, inference works offline while the local server runs
 
 ## Choose folders and start
 
+For a full-width main tab, run **Thread: Open full workspace** from the command
+palette (`Ctrl/Cmd+P`), or click **Open full workspace** in the sidebar. Home
+retains Resume and all tools; Ask opens the evidence workbench. Research, Actions
+and Reviews group the existing tools. **Open sidebar** returns to the compact
+view. Repeated workspace opens reuse its tab. Thread source links open new tabs
+to preserve existing notes. Obsidian restores only the selected area; current
+saved project permissions still apply and restoration never generates AI output.
+
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 

@@ -66,18 +66,11 @@ export class BriefingView extends ItemView {
     refresh.onclick = () => { void this.loadHome(); };
     const settings = headerActions.createEl("button", { cls: "thread-icon-button", attr: { "aria-label": "Settings" } });
     setIcon(settings, "settings"); settings.onclick = () => this.plugin.openSetup();
+    this.renderNavigation(root);
+    if (this.renderArea(root)) return;
     const controls = this.result && !this.controller ? root.createEl("details", { cls: "thread-project-controls" }) : root;
     if (controls !== root) controls.createEl("summary", { text: "Project controls" });
-    const projectLabel = controls.createEl("label", { cls: "thread-project-selector" });
-    projectLabel.createEl("span", { text: "Project", cls: "thread-label" });
-    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject.split("/").pop() || "Choose a permitted project", cls: "thread-project-name" });
-    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject, cls: "thread-project-path" });
-    setIcon(projectLabel.createSpan({ cls: "thread-project-chevron", attr: { "aria-hidden": "true" } }), "chevrons-up-down");
-    const selector = projectLabel.createEl("select", { attr: { "aria-label": "Project" } });
-    selector.add(new Option("Choose a permitted project", ""));
-    for (const path of permittedProjects(this.plugin.index, this.plugin.settings)) selector.add(new Option(path, path));
-    selector.value = this.plugin.settings.selectedProject; selector.disabled = this.homeLoading;
-    selector.onchange = () => { void this.switchProject(selector.value); };
+    this.renderProjectSelector(controls);
     const actions = controls.createDiv({ cls: "thread-primary-actions" });
     const resumeRow = actions.createDiv({ cls: "thread-resume-row" });
     const resumeWrap = resumeRow.createDiv({ cls: "thread-resume-wrap" });
@@ -162,6 +155,25 @@ export class BriefingView extends ItemView {
       const item = details.createDiv(); this.sourceButton(item, source);
       item.createEl("p", { text: source.excerpt, cls: "thread-excerpt" });
     }
+  }
+
+  protected renderNavigation(root: HTMLElement): void {
+    root.createEl("button", { text: "Open full workspace" }).onclick = () => { void this.plugin.openThreadWorkspace(); };
+  }
+
+  protected renderArea(_root: HTMLElement): boolean { return false; }
+
+  protected renderProjectSelector(root: HTMLElement): void {
+    const projectLabel = root.createEl("label", { cls: "thread-project-selector" });
+    projectLabel.createEl("span", { text: "Project", cls: "thread-label" });
+    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject.split("/").pop() || "Choose a permitted project", cls: "thread-project-name" });
+    projectLabel.createEl("span", { text: this.plugin.settings.selectedProject, cls: "thread-project-path" });
+    setIcon(projectLabel.createSpan({ cls: "thread-project-chevron", attr: { "aria-hidden": "true" } }), "chevrons-up-down");
+    const selector = projectLabel.createEl("select", { attr: { "aria-label": "Project" } });
+    selector.add(new Option("Choose a permitted project", ""));
+    for (const path of permittedProjects(this.plugin.index, this.plugin.settings)) selector.add(new Option(path, path));
+    selector.value = this.plugin.settings.selectedProject; selector.disabled = this.homeLoading;
+    selector.onchange = () => { void this.switchProject(selector.value); };
   }
 
   async loadHome(): Promise<void> {
@@ -266,7 +278,7 @@ export class BriefingView extends ItemView {
     if(source.pdf){const revision=this.revision;await this.plugin.openIndexedSource(source.path,bundle.noteHashes[source.path]!,source.heading,()=>!this.closed&&this.bundle===bundle&&revision===this.revision);return;}
     const file = this.app.vault.getAbstractFileByPath(source.path);
     if (!(file instanceof TFile) || !readableText(file.path, this.plugin.settings)) return;
-    await this.app.workspace.getLeaf(false).openFile(file, {
+    await this.plugin.sourceLeaf().openFile(file, {
       eState: { subpath: source.heading ? `#${source.heading}` : "" }
     });
   }
