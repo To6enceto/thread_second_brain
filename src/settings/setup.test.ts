@@ -6,6 +6,10 @@ test("grant preview is exact, explicit, exclusion-first and side-effect free",()
  assert.deepEqual(preview.allowedPaths,["Sources","Research","Projects/A"]);assert.deepEqual(preview.newRoots,["Research","Projects/A"]);assert.deepEqual(current.allowedPaths,["Sources"]);
  assert.equal(pendingScope("Projects/A","","Projects",current).projectReadable,false);assert.match(scopePreviewText(preview),/Merely previewing does not grant/);
  assert.deepEqual(pendingScope("","","",current).allowedPaths,[]);
+ assert.deepEqual(preview.currentRoots,["Sources"]);assert.notEqual(preview.currentRoots,current.allowedPaths);
+ assert.match(scopePreviewText(preview),/Current saved read roots: Sources\.\nRead roots after Save: Sources, Research, Projects\/A/);
+ assert.match(scopePreviewText(pendingScope("","","",current)),/draft grants access to no notes/);
+ assert.match(scopePreviewText(pendingScope("Projects/A","","Projects",current)),/selected project is excluded/);
  for(const input of ["../private","/",".obsidian"])assert.throws(()=>pendingScope("",input,"",current));
  assert.throws(()=>pendingScope("","","../excluded",current));
 });

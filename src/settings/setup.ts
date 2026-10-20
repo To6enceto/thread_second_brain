@@ -6,11 +6,11 @@ export function pendingScope(project: string, allowed: string, excluded: string,
   const selectedProject = project.trim() ? vaultPath(project) : "";
   const parse = (text: string) => [...new Set(text.split(/\r?\n/).filter(line=>line.trim()).map(vaultPath))];
   const allowedPaths = [...new Set([...parse(allowed), ...(selectedProject ? [selectedProject] : [])])], excludedPaths = parse(excluded);
-  return { selectedProject, allowedPaths, excludedPaths, newRoots: allowedPaths.filter(path=>!current.allowedPaths.includes(path)),
+  return { selectedProject, allowedPaths, excludedPaths, currentRoots: [...current.allowedPaths], newRoots: allowedPaths.filter(path=>!current.allowedPaths.includes(path)),
     projectReadable: Boolean(selectedProject && mayRead(selectedProject, {allowedPaths,excludedPaths})) };
 }
 export function scopePreviewText(scope: ReturnType<typeof pendingScope>): string {
-  return `Read roots after Save: ${scope.allowedPaths.join(", ") || "none"}. Newly added roots: ${scope.newRoots.join(", ") || "none"}. Exclusions (take precedence): ${scope.excludedPaths.join(", ") || "none"}. ${scope.selectedProject && !scope.projectReadable ? "The selected project is excluded; change the draft scope to use it." : ""} Merely previewing does not grant access. Saving a selected project explicitly adds that folder to read roots.`;
+  return `Current saved read roots: ${scope.currentRoots.join(", ") || "none"}.\nRead roots after Save: ${scope.allowedPaths.join(", ") || "none"}.\nNewly added roots: ${scope.newRoots.join(", ") || "none"}.\nExclusions after Save (take precedence): ${scope.excludedPaths.join(", ") || "none"}.\n${scope.selectedProject && !scope.projectReadable ? "The selected project is excluded; change the draft scope to use it.\n" : ""}${scope.allowedPaths.length ? "" : "This draft grants access to no notes.\n"}Merely previewing does not grant access. Saving a selected project explicitly adds that folder to read roots.`;
 }
 export function sampleNote(projects: string, exclusions: string[], id: string = crypto.randomUUID()): NewNote {
   if (!projects) throw new Error("Save a Projects folder mapping before previewing a sample.");

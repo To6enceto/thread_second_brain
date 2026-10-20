@@ -76,7 +76,7 @@ verifiable boundaries; no earlier feature is renumbered.
 ## Milestone K - Open Thread and find the next step
 
 - [x] 35. **Fedora desktop launcher** - Generate an explicit user-level Launch Thread shortcut for a configured vault and installed Obsidian, with a plugin launch route, actionable failures and optional consented local Ollama startup. Verify actual isolated Fedora/Flatpak launching, existing-server detection and cloud-disabled loopback checks; never stop unrelated processes or install into the user's account automatically. Depends on 19 and 34.
-- [ ] 36. **Clear setup progress and feedback** - Separate sample and existing-note setup paths, show connection progress/results beside their controls, explain the read-access preview and offer useful next actions. Demonstrate first use, missing/offline models, cancellation and exact grants in native Obsidian without automatic downloads or permission expansion. Depends on 19 and 35.
+- [x] 36. **Clear setup progress and feedback** - Separate sample and existing-note setup paths, show connection progress/results beside their controls, explain the read-access preview and offer useful next actions. Demonstrate first use, missing/offline models, cancellation and exact grants in native Obsidian without automatic downloads or permission expansion. Depends on 19 and 35.
 - [ ] 37. **Full-width Thread workspace** - Add a native main-tab interface for Home, Ask, Research, Actions and Reviews while retaining the compact sidebar and all existing actions. Demonstrate project switching, restoration, keyboard/theme access and preservation of existing open notes/layouts; use existing action surfaces until their later enhancements land. Depends on 36.
 
 ## Milestone L - Understand and continue sourced answers

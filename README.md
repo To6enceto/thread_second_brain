@@ -75,16 +75,27 @@ After installation/download, inference works offline while the local server runs
 Open **Thread: Open Thread** from the command palette (`Ctrl/Cmd+P`), then choose
 **Settings** in the Thread panel.
 
-1. Set the endpoint and exact downloaded model name. Choose **Test local
-   connection**; expect confirmation that the model is available and cloud is
-   disabled.
-2. Select one project folder. Saving explicitly grants read access to that folder.
+1. Choose **Use existing notes** or **Try a synthetic sample** at the top.
+   For a sample, first save a Projects folder mapping under advanced settings.
+   Choose **Preview optional sample**, inspect its destination and explicitly save
+   it. Then choose **Refresh project folders** to find the new sample folder.
+   Creating a sample does not grant read access.
+2. For optional AI, set the endpoint and choose a downloaded model. **Find
+   downloaded models** and **Test local connection** show progress/results beside
+   their controls. Expect confirmation of model capability and disabled cloud
+   features; this does not measure answer quality. **Cancel local checks** stops
+   a pending check. Recorded context and Keyword work without a model.
+3. Select one project folder. Inspect **Read access preview**: current saved roots,
+   roots after Save, newly added roots and exclusions. Saving explicitly grants
+   read access to that folder; changing the dropdown grants nothing.
    Add other folders or notes under **Allowed read paths**, one vault-relative
    path per line. Add **Excluded paths** before generation. Exclusions win.
-3. Map Projects, Inbox, Sources, Knowledge, Reviews and Templates to your existing
+4. Map Projects, Inbox, Sources, Knowledge, Reviews and Templates to your existing
    folders. Mapping a destination does not grant model read access. Knowledge
    edits and refresh saves also need their destination inside allowed paths.
-4. Save settings, close the dialog and choose **Resume project**.
+5. Choose **Save settings**, then **Open project home** and **Resume project**.
+   The setup card shows the next action for the current draft. Editing a draft
+   clears older check results; checks and discovery never save settings for you.
 
 First-use read scope is empty. Text indexing reads permitted `.md` and `.txt` files.
 PDF bytes additionally require explicit exact-file consent as described below.
