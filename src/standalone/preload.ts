@@ -15,6 +15,8 @@ const bridge: DesktopBridge = {
     ipcRenderer.on("thread:index-event", receive);
     return () => { ipcRenderer.removeListener("thread:index-event", receive); };
   },
+  projectHome: (selection, revision) => ipcRenderer.invoke("thread:project-home", selection, revision),
+  resumeProject: (selection, revision) => ipcRenderer.invoke("thread:resume-project", selection, revision),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

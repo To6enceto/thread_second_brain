@@ -13,9 +13,23 @@ export interface DesktopBridge {
   searchNotes(query: string, revision: number): Promise<DesktopResult<SearchSnapshot>>;
   resolveLink(from: string, target: string, revision: number): Promise<DesktopResult<import("./links.ts").LinkResolution>>;
   onIndexEvent(listener: (event: IndexEvent) => void): () => void;
+  projectHome(selection: ProjectRequest, revision: number): Promise<DesktopResult<ProjectSnapshot>>;
+  resumeProject(selection: ProjectRequest, revision: number): Promise<DesktopResult<RecordedSnapshot>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
 export interface IndexSnapshot { revision: number; generation: number; listing: NoteList; coverage: IndexCoverage; invalid: number; reused: number; }
 export interface SearchSnapshot extends IndexSnapshot { hits: { path: string; hash: string; heading: string; excerpt: string }[]; coverageText: string; }
 export interface IndexEvent { revision: number; generation: number; kind: "invalidated" | "progress" | "ready"; message: string; snapshot?: IndexSnapshot; }
+
+export interface ProjectRequest { folder: string; project: string; }
+export interface ProjectSnapshot {
+  revision: number; generation: number; projects: string[];
+  home: import("../vault/project-home.ts").ProjectHome | null;
+  index: IndexSnapshot;
+}
+export interface RecordedSnapshot extends ProjectSnapshot {
+  bundle: import("../vault/evidence.ts").EvidenceBundle;
+  recorded: import("../intelligence/briefing.ts").Briefing;
+  generatedAt: number;
+}

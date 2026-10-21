@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { VaultReader } from "./vault-reader.ts";
+import { DesktopProjects } from "./projects.ts";
 import { EvidenceIndex } from "./evidence-index.ts";
 import { assetAllowed, DesktopError, publicFailure, trustedSender } from "./security.ts";
 import type { DesktopResult } from "./contracts.ts";
@@ -11,6 +12,7 @@ app.enableSandbox();
 const reader = new VaultReader();
 let window: BrowserWindow | null = null;
 const evidence = new EvidenceIndex(reader, event => { if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+const projects = new DesktopProjects(reader, evidence);
 function clearVault(): void { evidence.reset(); reader.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
@@ -68,6 +70,8 @@ async function start(): Promise<void> {
   handle("thread:cancel-index", 1, revision => { evidence.cancel(revision); return null; });
   handle("thread:search-notes", 2, (query, revision) => evidence.search(query, revision));
   handle("thread:resolve-link", 3, (from, target, revision) => evidence.resolve(from, target, revision));
+  handle("thread:project-home", 2, (selection, revision) => projects.home(selection, revision));
+  handle("thread:resume-project", 2, (selection, revision) => projects.resume(selection, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();

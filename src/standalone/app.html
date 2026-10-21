@@ -34,9 +34,20 @@
         </details>
         <button id="close" class="thread-quiet">Close vault and clear access</button>
       </section>
-      <p class="thread-footnote">Read-only milestone. Resume, Ask and reviewed writing are coming in the next planned features.</p>
+      <p class="thread-footnote">Read-only milestone. Recorded Resume is available. AI, Ask and reviewed writing are coming in the next planned features.</p>
     </aside>
     <section class="thread-library" aria-label="Permitted Markdown notes">
+      <section class="thread-project-controls" aria-label="Projects">
+        <h2>Your projects</h2>
+        <details><summary>Project folder mapping</summary>
+          <label for="projects-folder">Projects folder</label><input id="projects-folder" maxlength="512" placeholder="Projects" aria-describedby="project-mapping-help">
+          <p id="project-mapping-help" class="thread-muted">Optional mapping finds Overview.md projects in already permitted folders. It grants no read access. Project-type notes are discovered without a mapping.</p>
+        </details>
+        <button id="load-projects" disabled>Refresh projects</button>
+        <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
+        <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
+        <p class="thread-muted">Recorded context first. Works without AI. Selection and mapping are session-only.</p>
+      </section>
       <div class="thread-section-heading"><h2>Your notes</h2><button id="refresh" disabled>Refresh</button></div>
       <label for="filter">Filter listed paths</label><input id="filter" type="search" placeholder="Find a note in this list" disabled>
       <form id="search-form" class="thread-search-form">
@@ -53,6 +64,8 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="project-panel" tabindex="-1" aria-label="Project home and recorded Resume" hidden></section>
+      <div id="source-pane">
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
       <h2 id="note-title">Open a source</h2>
       <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>
@@ -60,6 +73,7 @@
       <p id="preview-limit" class="thread-muted"></p>
       <article id="note-preview" class="thread-markdown" tabindex="0" aria-label="Formatted Markdown preview"></article>
       <details><summary>Original Markdown source</summary><pre id="note-content" tabindex="0" aria-label="Markdown source"></pre></details>
+      </div>
     </section>
   </main>
   <footer class="thread-status"><p id="status" role="status" aria-live="polite">Thread is ready. No vault access has been granted.</p></footer>

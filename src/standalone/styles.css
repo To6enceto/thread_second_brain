@@ -75,3 +75,19 @@
   .thread-note-list { max-height: 260px; overflow-y: auto; }
   .thread-reader { padding: 24px; }
 }
+
+.thread-project-controls { border-bottom: 1px solid var(--thread-border); padding-bottom: 20px; }
+.thread-project-controls select { width: 100%; }
+.thread-project-controls > button { margin-top: 12px; }
+.thread-project-section { margin: 22px 0; }
+.thread-project-section h3 { font: 20px var(--thread-serif); }
+.thread-project-section .thread-eyebrow { font: 600 11px var(--thread-interface); text-transform: uppercase; }
+.thread-record-card { border: 1px solid var(--thread-border); background: var(--thread-card); border-radius: 10px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.thread-record-card p { margin-bottom: 0; white-space: pre-wrap; }
+.thread-recorded-card { border-top: 2px solid var(--thread-recorded); margin-top: 28px; padding-top: 16px; }
+.thread-recorded-claim { border-left: 2px solid var(--thread-recorded); padding: 0 14px; margin: 14px 0; overflow-wrap: anywhere; }
+.thread-recorded-claim p { white-space: pre-wrap; }
+.thread-objective { font: 23px/1.5 var(--thread-serif); }
+.thread-desktop .thread-source-chip { font: 11px/1.5 var(--thread-mono); color: var(--thread-recorded); min-height: 32px; margin: 4px 4px 4px 0; text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+.thread-recorded-claim details { margin-top: 8px; }
+.thread-desktop section:focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }

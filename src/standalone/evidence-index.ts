@@ -44,6 +44,10 @@ export class EvidenceIndex {
     if (!Number.isSafeInteger(revision) || this.reader.getInfo()?.revision !== revision) throw new DesktopError("Vault or access changed. Refresh before using evidence.");
     return revision as number;
   }
+  assertCurrent(snapshot: IndexSnapshot): void {
+    this.requireRevision(snapshot.revision);
+    if (this.paused || !this.index.ready || snapshot.generation !== this.generation) throw new DesktopError("Evidence changed or was canceled. Refresh and try again.");
+  }
   scope(): ReadScope {
     const info = this.reader.getInfo();
     return { allowedPaths: this.listing?.paths ?? [], excludedPaths: info?.scope.excluded ?? [] };

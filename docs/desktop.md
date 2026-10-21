@@ -1,9 +1,9 @@
 # Thread Desktop preview
 
 Thread has an independent Linux window with scoped vault browsing, keyword
-evidence search and safe Markdown navigation. Obsidian can stay closed. The
-existing plugin still provides Resume, Ask and the other completed workflows;
-remaining desktop features are tracked in items 51-62 of the build plan.
+evidence search, safe Markdown navigation, project home and recorded Resume. Obsidian can stay closed. The
+existing plugin also provides AI Resume, Ask and the other completed workflows;
+remaining desktop features are tracked in items 52-62 of the build plan.
 
 ## Run from this checkout
 
@@ -102,3 +102,28 @@ malformed delimiters without repeated backtracking so cancellation stays usable.
 The shared heading parser also avoids whitespace backtracking in both indexing
 and evidence construction; oversized headings remain explicitly omitted by the
 existing section budget.
+
+## Project home and recorded Resume
+
+After read access is approved, choose **Refresh projects**. Notes with `type:
+project` discover their containing project folder. For existing Overview.md notes
+without that metadata, expand **Project folder mapping**, enter `Projects` (or your
+own named folder), then **Refresh projects**. This only organizes already permitted
+notes; it never grants access. Root-level projects are not supported in this milestone.
+
+Select **Project** to see recent sessions, decision status/date summaries and open
+questions. Choose **Resume project** for deterministic quoted context and source
+chips. Expand **Supporting excerpt** or **Evidence used** to inspect the supporting
+passages. A chip opens the current source inside Thread; **Project home** or
+**Resume project** returns to the project view. No Ollama/model is required here.
+
+Missing records remain explicit. Recorded dates and user-reported progress are not
+independently verified events. Index and 16,000-character context limits remain
+visible; generated records with stale or unavailable dependencies are withheld.
+Plugin pending reviews are not loaded. Project membership follows existing schema:
+folder contents, explicit links from those notes, and matching project IDs.
+
+External edits, access changes and Cancel indexing clear the project output too.
+Refresh projects and select again to rebuild it. Source bytes/dependencies are
+checked before publication and citation navigation. Mapping and selection clear on
+vault change/reload; all setup is still volatile and no notes/history are written.

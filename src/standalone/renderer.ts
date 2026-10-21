@@ -1,4 +1,5 @@
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo } from "./contracts.ts";
+import { renderHome, renderRecorded } from "./project-view.ts";
 import { ReaderRequests } from "./reader-requests.ts";
 import { indexCoverageText } from "../vault/index-coverage.ts";
 import { markdownPreview, sourceHeadingCount, headingMatches } from "./markdown.ts";
@@ -10,6 +11,12 @@ const grant = element<HTMLButtonElement>("grant"), close = element<HTMLButtonEle
 const roots = element<HTMLTextAreaElement>("roots"), exclusions = element<HTMLTextAreaElement>("exclusions");
 const filter = element<HTMLInputElement>("filter"), status = element("status");
 const search = element<HTMLButtonElement>("search"), query = element<HTMLInputElement>("search-query"), cancel = element<HTMLButtonElement>("cancel-index");
+const projectFolder = element<HTMLInputElement>("projects-folder"), projectSelect = element<HTMLSelectElement>("project-select");
+const loadProjects = element<HTMLButtonElement>("load-projects"), homeButton = element<HTMLButtonElement>("project-home"), resumeButton = element<HTMLButtonElement>("resume-project");
+function clearProjects(): void {
+  element("project-panel").replaceChildren(); projectSelect.replaceChildren(new Option("Choose a permitted project", ""));
+  projectSelect.disabled = true; homeButton.disabled = true; resumeButton.disabled = true; loadProjects.disabled = true;
+}
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
@@ -28,7 +35,7 @@ function clearReader(): void {
 }
 function clearContent(invalidate = true): void {
   if (invalidate) requests.invalidate();
-  listing = null; clearReader(); element("notes").replaceChildren();
+  listing = null; clearProjects(); clearReader(); element("notes").replaceChildren();
   element("search-results").replaceChildren(); element("search-coverage").textContent = "";
   element("coverage-summary").textContent = "No current index."; element("search-summary").textContent = ""; element("search-details").hidden = true;
   search.disabled = true; query.disabled = true;
@@ -84,6 +91,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
+  element("project-panel").hidden = true; element("source-pane").hidden = false;
   clearReader(); announce("Reading the selected source...");
   try {
     const note = value(await bridge.readNote(path, vault.revision, expectedHash));
@@ -111,7 +119,7 @@ function renderNotes(): void {
 }
 function applyIndex(result: IndexSnapshot): void {
   if (!vault || result.revision !== vault.revision || result.generation < generation) return;
-  generation = result.generation; listing = result.listing; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes();
+  generation = result.generation; listing = result.listing; loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes();
   element("coverage-summary").textContent = `${result.coverage.indexedFiles} indexed notes · ${result.coverage.omittedFiles} known omissions · ${result.coverage.shortenedNotes} shortened.${result.listing.identityIncomplete ? " Incomplete Markdown enumeration." : ""}`;
   element("coverage").textContent = `${result.listing.identityIncomplete ? "Markdown enumeration is incomplete: counts below cover known files only. Uninspected paths may contain additional notes; stable-ID uniqueness is unproven and identity-dependent outputs cannot be reused. " : ""}${indexCoverageText(result.coverage)} ${result.invalid} unreadable or invalid-metadata notes omitted. ${result.listing.omitted} encountered entries unavailable/unsupported. ${result.listing.limited ? "Traversal limit reached; additional files may be unlisted." : "Within the bounded listed scope."} ${result.reused} unchanged entries reused. Filter applies to paths; Search evidence searches indexed content.`;
 }
@@ -170,7 +178,7 @@ choose.addEventListener("click", () => { void (async () => {
     const selected = value(await bridge.selectVault());
     if (!selected) { announce("Folder selection canceled. Existing access is unchanged."); return; }
     clearContent(); vault = selected; generation = 0;
-    roots.value = ""; exclusions.value = ""; scopePreview();
+    roots.value = ""; exclusions.value = ""; projectFolder.value = ""; scopePreview();
     element("vault-details").hidden = false;
     element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
     refresh.disabled = false;
@@ -182,7 +190,7 @@ grant.addEventListener("click", () => { void (async () => {
   if (!vault) return;
   const ticket = requests.beginScope();
   if (ticket === null) return;
-  clearContent(false); scoping = true; grant.disabled = true; refresh.disabled = true; cancel.disabled = true;
+  clearContent(false); scoping = true; projectFolder.disabled = true; grant.disabled = true; refresh.disabled = true; cancel.disabled = true;
   announce("Applying the approved read access...");
   let approved = false;
   try {
@@ -190,12 +198,12 @@ grant.addEventListener("click", () => { void (async () => {
     if (!requests.current(ticket)) return;
     vault = selected; generation = 0; approved = true;
   } catch (error) { if (requests.current(ticket)) report(error); }
-  finally { requests.finishScope(ticket); scoping = false; grant.disabled = false; refresh.disabled = !vault; }
+  finally { requests.finishScope(ticket); scoping = false; projectFolder.disabled = false; grant.disabled = false; refresh.disabled = !vault; }
   if (approved && requests.current(ticket)) await loadNotes();
 })(); });
 close.addEventListener("click", () => { void (async () => {
   clearContent(); vault = null; generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
-  roots.value = ""; exclusions.value = ""; element("vault-name").textContent = ""; element("vault-path").textContent = "";
+  roots.value = ""; exclusions.value = ""; projectFolder.value = ""; element("vault-name").textContent = ""; element("vault-path").textContent = "";
   try { value(await bridge.closeVault()); announce("Vault closed. All session read access is cleared."); choose.focus(); }
   catch (error) { report(error); }
 })(); });
@@ -206,3 +214,40 @@ refresh.addEventListener("click", () => { void loadNotes(); });
 element<HTMLSelectElement>("theme").addEventListener("change", event => {
   document.body.dataset.theme = (event.target as HTMLSelectElement).value;
 });
+
+async function loadProject(resume = false, discover = false): Promise<void> {
+  if (!vault || !listing || scoping || paused) return;
+  const ticket = requests.beginRead(); if (ticket === null) return;
+  const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };
+  const panel = element("project-panel"); panel.replaceChildren(); panel.hidden = false; element("source-pane").hidden = true;
+  homeButton.disabled = true; resumeButton.disabled = true; loadProjects.disabled = true;
+  announce(resume ? "Preparing recorded context from current permitted sources..." : "Loading permitted projects...");
+  try {
+    const recorded = resume ? value(await bridge.resumeProject(selection, revision)) : null;
+    const result = recorded ?? value(await bridge.projectHome(selection, revision));
+    if (!requests.current(ticket) || vault?.revision !== revision || result.generation < generation) return;
+    applyIndex(result.index);
+    projectSelect.replaceChildren(new Option("Choose a permitted project", ""), ...result.projects.map(path => new Option(path, path)));
+    projectSelect.value = selection.project; projectSelect.disabled = !result.projects.length;
+    const open = (path: string, heading: string, hash: string): void => { void openNote(path, heading, hash); };
+    if (result.home && !recorded) renderHome(panel, result.home, open);
+    if (recorded) renderRecorded(panel, recorded, open);
+    if (!result.home) {
+      const empty = document.createElement("p"); empty.className = "thread-empty";
+      empty.textContent = result.projects.length ? "Choose a permitted project above." : "No projects found. Map a Projects folder with Overview.md notes, or use type: project metadata. Review read access separately."; panel.append(empty);
+    }
+    announce(resume ? "Recorded context ready. No AI or note changes were needed." : result.home ? "Project home ready. Dates describe records, not verified events." : "Project list ready. Mapping does not grant access.");
+    if (!discover) panel.focus();
+  } catch (error) { if (requests.current(ticket)) report(error); }
+  finally {
+    if (requests.current(ticket)) {
+      loadProjects.disabled = !vault || !listing || scoping || paused;
+      homeButton.disabled = resumeButton.disabled = loadProjects.disabled || !projectSelect.value;
+    }
+  }
+}
+projectFolder.addEventListener("input", () => { if (requests.beginRead() === null) return; clearProjects(); loadProjects.disabled = !vault || !listing || scoping || paused; announce("Project mapping changed. Refresh projects; read permissions are unchanged."); });
+loadProjects.addEventListener("click", () => { void loadProject(false, true); });
+projectSelect.addEventListener("change", () => { requests.invalidate(); element("project-panel").replaceChildren(); void loadProject(); });
+homeButton.addEventListener("click", () => { void loadProject(); });
+resumeButton.addEventListener("click", () => { void loadProject(true); });
