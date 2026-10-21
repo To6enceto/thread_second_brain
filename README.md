@@ -11,7 +11,7 @@ recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No
 account, API key, backend or paid model service is required.
 
-This is a **private local 0.4.0 build**, not a published Community plugin. It is
+This is a **private local 0.4.1 build**, not a published Community plugin. It is
 tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
 `qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
 use. Windows, macOS, other models and later versions need their own validation.
@@ -27,7 +27,7 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.4.0.zip` and version-specific staging `dist/thread-0.4.0/`. The ZIP contains
+then creates `dist/thread-0.4.1.zip` and version-specific staging `dist/thread-0.4.1/`. The ZIP contains
 `thread/main.js`, `thread/manifest.json`, `thread/styles.css`, the local PDF
 worker, `pdf-assets.json` and its explicitly listed CMap/font/license resources.
 The inventory is verified by path, byte size and SHA-256 before packaging. No vault, model,
@@ -42,10 +42,13 @@ plugins**, allow Community plugins, reload Obsidian and enable **Thread**.
 [Obsidian's plugin settings guide](https://obsidian.md/help/community-plugins)
 explains where to find the plugins folder. Thread is not in the Browse directory.
 
-For an update, disable Thread, preserve its existing `data.json`, `changes.json`,
-`imports.json`, `project-imports.json` and `renames.json`, replace the package code/styles/manifest and inventoried PDF assets, reload Obsidian and enable
-Thread again. Reloading also refreshes the installed manifest version. Keep an independent vault backup; the bounded change journal is not a
-complete backup system.
+For an update, use the [explicit local update helper](docs/local-updates.md):
+preview the verified package, close Obsidian, and apply the exact approved
+preview. It preserves settings, caches, journals and notes, retains previous code
+and supports interruption recovery and compatible code rollback. The Linux helper
+supports the standard `.obsidian/plugins/thread` location; do not point it at a
+custom config directory. Keep an independent vault backup; the bounded change
+journal and retained code are not complete vault backups.
 
 ## Set up the local model
 
@@ -441,7 +444,7 @@ remain listed: review is explicit and there is no automatic dismissal or history
 rewrite. The queue works with Ollama stopped; optional AI review flows still need
 your downloaded local text model.
 
-The private 0.4.0 package has no hosted runtime charge, subscription or API key.
+The private 0.4.1 package has no hosted runtime charge, subscription or API key.
 Obsidian, local Ollama and the tested Qwen models can run without a paid service.
 You supply storage, memory, hardware and electricity; initial downloads need
 internet. Synthetic Linux acceptance covers the documented runtime/model pair;
@@ -757,8 +760,8 @@ created just before a journal failure may require this conservative path. Restor
 invalid journals only from your own known good backup; never reset history to
 force a retry. This is a new-copy import, not a destructive vault restore.
 
-Release0.4.0 includes192 explicitly inventoried files and preserves earlier build
-artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.0.zip` checks exact paths, ZIP records/CRC, production bytes,
+Release0.4.1 includes192 explicitly inventoried files and preserves earlier build
+artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.1.zip` checks exact paths, ZIP records/CRC, production bytes,
 PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
 from the installed plugin. This private build has no API/hosting subscription;
 local storage, compute and electricity still apply.
@@ -791,6 +794,6 @@ Use **Review web clip** in Research (or **Thread: Review saved web clip**) to re
 
 Importable article/selection templates and detailed steps are in [the Web Clipper guide](integrations/clipper/README.md). Intake accepts original permitted local text up to2 MiB including saved provenance. The picker covers up to200 indexed notes; duplicate hints cover up to100 current permitted imported sources and do not establish complete coverage or duplicate identity. Browser-extension use remains a separate explicit user action.
 
-## Local update previews
+## Local updates and recovery
 
-The Linux helper validates a locally selected private Thread package and produces an exact code/asset replacement preview while preserving the installation and vault. It checks fixed inventory/hashes, paths/links, versions, host compatibility and known data schemas. See [local update instructions](docs/local-updates.md). Apply and recovery are not yet available in the preview-only helper. Packages are local artifacts, not a published release; checksums are not publisher signatures.
+The Linux helper validates a locally selected private Thread package and produces an exact code/asset replacement preview while preserving the installation and vault. It checks fixed inventory/hashes, paths/links, versions, host compatibility and known data schemas. See [local update instructions](docs/local-updates.md). Explicit application, durable interruption recovery and freshly previewed compatible code rollback require closed Obsidian and exact approval hashes. Notes and data stay in place; code rollback does not undo note changes or migrations. Packages are local artifacts, not a published release; checksums are not publisher signatures.

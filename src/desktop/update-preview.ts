@@ -35,20 +35,27 @@ export function readOrdinary(path: string, limit: number): Buffer {
 export function maybeRead(path: string, limit: number): Buffer | null {
   try { lstatSync(path); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; } return readOrdinary(path, limit);
 }
-export function targetSnapshot(installPath: string, hostVersion: string): { snapshot: TargetSnapshot; release: Release } {
-  absolutePath(installPath); compatibleHost(hostVersion);
-  check(basename(installPath) === "thread" && basename(dirname(installPath)) === "plugins" && basename(dirname(dirname(installPath))) === ".obsidian", "Choose the exact .obsidian/plugins/thread installation directory.");
-  const parents = directories(installPath), files = new Map<string, Buffer>(); let runtimeBytes = 0;
-  for (const path of releaseFiles) { const bytes = readOrdinary(join(installPath, path), Math.min(releaseLimits.file, releaseLimits.total - runtimeBytes)); runtimeBytes += bytes.length; files.set(path, bytes); }
-  const metadata = maybeRead(join(installPath, updateFile), Math.min(releaseLimits.metadata, releaseLimits.total - runtimeBytes)); if (metadata) files.set(updateFile, metadata);
-  const release = validateRuntime(files, true), runtime: TargetSnapshot["runtime"] = {};
-  for (const path of [...releaseFiles, updateFile]) runtime[path] = files.has(path) ? digest(files.get(path)!) : null;
+export function snapshotData(installPath: string): TargetSnapshot["data"] {
   const data: TargetSnapshot["data"] = {}; let total = 0;
   for (const [path, schema] of Object.entries(dataSchemas)) {
     const bytes = maybeRead(join(installPath, path), Math.min(32 * 1048576, 64 * 1048576 - total)); if (!bytes) { data[path] = null; continue; }
     total += bytes.length; check(total <= 64 * 1048576, "Plugin data exceeds the compatibility inspection budget. Preserve it; no update was applied.");
     const value = json(bytes, 32 * 1048576); check(value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).schemaVersion === schema, "Unsupported plugin data schema. Preserve data and use compatible code; no migration is attempted."); data[path] = digest(bytes);
   }
+  return data;
+}
+export function validateInstallationPath(installPath: string, hostVersion: string): void {
+  absolutePath(installPath); compatibleHost(hostVersion);
+  check(basename(installPath) === "thread" && basename(dirname(installPath)) === "plugins" && basename(dirname(dirname(installPath))) === ".obsidian", "Choose the exact .obsidian/plugins/thread installation directory.");
+}
+export function targetSnapshot(installPath: string, hostVersion: string): { snapshot: TargetSnapshot; release: Release } {
+  validateInstallationPath(installPath, hostVersion);
+  const parents = directories(installPath), files = new Map<string, Buffer>(); let runtimeBytes = 0;
+  for (const path of releaseFiles) { const bytes = readOrdinary(join(installPath, path), Math.min(releaseLimits.file, releaseLimits.total - runtimeBytes)); runtimeBytes += bytes.length; files.set(path, bytes); }
+  const metadata = maybeRead(join(installPath, updateFile), Math.min(releaseLimits.metadata, releaseLimits.total - runtimeBytes)); if (metadata) files.set(updateFile, metadata);
+  const release = validateRuntime(files, true), runtime: TargetSnapshot["runtime"] = {};
+  for (const path of [...releaseFiles, updateFile]) runtime[path] = files.has(path) ? digest(files.get(path)!) : null;
+  const data = snapshotData(installPath);
   check(JSON.stringify(parents) === JSON.stringify(directories(installPath)), "Installation directory changed during preview.");
   return { release, snapshot: { directories: parents, version: release.version, dataFormat: release.metadata?.dataFormat ?? null, runtime, data } };
 }

@@ -97,7 +97,7 @@ verifiable boundaries; no earlier feature is renumbered.
 ## Milestone N - Update the local installation safely
 
 - [x] 47. **Validated local update previews** - Validate an explicitly selected local Thread package, exact inventory/hashes, supported versions and host/data compatibility, then preview code/assets to replace without touching notes, settings or journals. Demonstrate malformed/corrupt/unexpected-file/version rejection on disposable installations. Depends on 34.
-- [ ] 48. **Recoverable local updates** - Apply an exact approved update to a disposable installation with durable interruption recovery and compatible previous-code rollback, preserving settings, caches where appropriate and all journals. Detect changed targets and unsupported data compatibility; never imply code rollback undoes migrations. Demonstrate interrupted updates, refusal paths, final native offline workflow and verified local package. Depends on 35-47.
+- [x] 48. **Recoverable local updates** - Apply an exact approved update to a disposable installation with durable interruption recovery and compatible previous-code rollback, preserving settings, caches where appropriate and all journals. Detect changed targets and unsupported data compatibility; never imply code rollback undoes migrations. Demonstrate interrupted updates, refusal paths, final native offline workflow and verified local package. Depends on 35-47.
 
 ## Build discipline
 

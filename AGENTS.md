@@ -330,8 +330,9 @@ checks do not make the Blueprint unusable.
 - Test: `npm test` (Node's built-in test runner with TypeScript type stripping).
 - Verify: `npm run verify` (typecheck, tests, then production build).
 - Quality evaluation: `npm run evaluate` (offline harness self-check; opt-in live mode in evaluation/README.md).
-- Package: `npm run package` (Verify, then reproducible192-file ZIP in `dist/`).
-- Run the plugin: extract `dist/thread-0.4.0.zip` into a separate test vault's
+- Local updates: `npm run updater -- preview` (usage in `docs/local-updates.md`); apply/recover require exact approval and closed Obsidian.
+- Package: `npm run package` (Verify, then reproducible 192-file ZIP in `dist/`).
+- Run the plugin: extract `dist/thread-0.4.1.zip` into a separate test vault's
   `.obsidian/plugins/` directory and enable Thread in Obsidian. See README.md for
   local model setup and explicit read grants. All192 inventoried package files, including PDF worker/resources/licenses, are required.
 
