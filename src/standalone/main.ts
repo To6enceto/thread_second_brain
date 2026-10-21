@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { VaultReader } from "./vault-reader.ts";
+import { EvidenceIndex } from "./evidence-index.ts";
 import { assetAllowed, DesktopError, publicFailure, trustedSender } from "./security.ts";
 import type { DesktopResult } from "./contracts.ts";
 
@@ -9,6 +10,8 @@ app.setName("Thread Desktop");
 app.enableSandbox();
 const reader = new VaultReader();
 let window: BrowserWindow | null = null;
+const evidence = new EvidenceIndex(reader, event => { if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+function clearVault(): void { evidence.reset(); reader.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -42,9 +45,9 @@ async function start(): Promise<void> {
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
   contents.on("will-navigate", event => event.preventDefault());
   contents.on("will-attach-webview", event => event.preventDefault());
-  contents.on("did-start-navigation", (_event, _url, _inPlace, mainFrame) => { if (mainFrame) reader.close(); });
-  contents.on("render-process-gone", () => reader.close());
-  window.on("closed", () => { reader.close(); window = null; });
+  contents.on("did-start-navigation", (_event, _url, _inPlace, mainFrame) => { if (mainFrame) clearVault(); });
+  contents.on("render-process-gone", clearVault);
+  window.on("closed", () => { clearVault(); window = null; });
   window.once("ready-to-show", () => window?.show());
 
   handle("thread:select-vault", 0, async () => {
@@ -55,13 +58,22 @@ async function start(): Promise<void> {
       const choice = await dialog.showOpenDialog(window, { title: "Choose your Obsidian vault folder", properties: ["openDirectory"] });
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
-      return await reader.select(choice.filePaths[0]);
+      const selected = await reader.select(choice.filePaths[0]); evidence.reset(); return selected;
     } finally { choosing = false; }
   });
-  handle("thread:grant-scope", 2, (scope, revision) => reader.grant(scope, revision));
+  handle("thread:grant-scope", 2, (scope, revision) => { const info = reader.grant(scope, revision); evidence.reset(); return info; });
   handle("thread:list-notes", 1, revision => reader.list(revision));
-  handle("thread:read-note", 2, (path, revision) => reader.read(path, revision));
-  handle("thread:close-vault", 0, () => { reader.close(); return null; });
+  handle("thread:read-note", 3, (path, revision, hash) => evidence.source(path, revision, hash));
+  handle("thread:refresh-index", 1, revision => evidence.refresh(revision, true));
+  handle("thread:cancel-index", 1, revision => { evidence.cancel(revision); return null; });
+  handle("thread:search-notes", 2, (query, revision) => evidence.search(query, revision));
+  handle("thread:resolve-link", 3, (from, target, revision) => evidence.resolve(from, target, revision));
+  handle("thread:close-vault", 0, () => { clearVault(); return null; });
+  const monitor = setInterval(() => {
+    const selected = reader.getInfo();
+    if (selected?.scope.roots.length) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
+  }, 2500);
+  window.on("closed", () => clearInterval(monitor));
   await window.loadFile(entry);
 }
 
@@ -69,7 +81,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on("second-instance", () => { if (window?.isMinimized()) window.restore(); window?.focus(); });
   app.on("window-all-closed", () => app.quit());
-  app.on("before-quit", () => reader.close());
+  app.on("before-quit", clearVault);
   void app.whenReady().then(start).catch(() => {
     dialog.showErrorBox("Thread could not start", "The independent reader requires Linux and its complete desktop build. Run npm run desktop:build, then try again.");
     app.quit();

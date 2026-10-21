@@ -4,6 +4,7 @@ import type { SearchCoverage } from "../retrieval/search.ts";
 import { tokenSpans } from "../retrieval/tokens.ts";
 import type { PdfRecord } from "../pdf/record.ts";
 import type { PdfCitation } from "./freshness.ts";
+import { sectionHeading } from "./sections.ts";
 
 export interface SourceNote {
   /** Selected/indexed text whose original statement boundaries are not known. */
@@ -85,8 +86,8 @@ export function noteSections(text: string): { heading: string; excerpt: string }
     if (marker && (!fence || marker[0] === fence[0] && marker.length >= fence.length)) {
       fence = fence ? "" : marker;
     }
-    const match = !fence && /^#{1,6}\s+(.+?)(?:\s+#+)?$/.exec(line);
-    if (match) { flush(); heading = match[1] ?? ""; } else lines.push(line);
+    const title = !fence ? sectionHeading(line) : undefined;
+    if (title !== undefined) { flush(); heading = title; } else lines.push(line);
   }
   flush();
   return sections;

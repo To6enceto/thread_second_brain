@@ -39,7 +39,16 @@
     <section class="thread-library" aria-label="Permitted Markdown notes">
       <div class="thread-section-heading"><h2>Your notes</h2><button id="refresh" disabled>Refresh</button></div>
       <label for="filter">Filter listed paths</label><input id="filter" type="search" placeholder="Find a note in this list" disabled>
-      <p id="coverage" class="thread-muted">Select a vault and approve read access to begin.</p>
+      <form id="search-form" class="thread-search-form">
+        <label for="search-query">Search note contents</label>
+        <input id="search-query" type="search" maxlength="1000" placeholder="Keywords or &quot;quoted phrase&quot;" disabled>
+        <div class="thread-controls"><button id="search" type="submit" disabled>Search evidence</button><button id="cancel-index" type="button" disabled>Cancel indexing</button></div>
+      </form>
+      <p id="coverage-summary" class="thread-muted">No index yet.</p>
+      <details><summary>Index coverage and limits</summary><p id="coverage" class="thread-muted">Select a vault and approve read access to begin.</p></details>
+      <p id="search-summary" class="thread-muted"></p>
+      <details id="search-details" hidden><summary>Search coverage and limits</summary><p id="search-coverage" class="thread-muted"></p></details>
+      <ul id="search-results" class="thread-note-list" aria-label="Evidence search results"></ul>
       <ul id="notes" class="thread-note-list"></ul>
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
@@ -47,7 +56,10 @@
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
       <h2 id="note-title">Open a source</h2>
       <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>
-      <pre id="note-content" tabindex="0" aria-label="Markdown source"></pre>
+      <div id="link-choices" class="thread-link-choices" aria-label="Internal link choices"></div>
+      <p id="preview-limit" class="thread-muted"></p>
+      <article id="note-preview" class="thread-markdown" tabindex="0" aria-label="Formatted Markdown preview"></article>
+      <details><summary>Original Markdown source</summary><pre id="note-content" tabindex="0" aria-label="Markdown source"></pre></details>
     </section>
   </main>
   <footer class="thread-status"><p id="status" role="status" aria-live="polite">Thread is ready. No vault access has been granted.</p></footer>

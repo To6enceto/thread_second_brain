@@ -27,12 +27,31 @@ export function identityFromIndex(entries:IndexEntry[],project:string,ready:bool
   return [...ids][0]??project;
 }
 export function linkTargets(text: string): string[] {
-  return [...new Set([...text.matchAll(/\[\[([^\]|#]+)(?:[^\]]*)\]\]|\[[^\]]*\]\(([^\s)]+)\)/g)]
-    .flatMap(match=>{
-      if(match[1])return [match[1].trim()];
-      const target=(match[2]??"").replace(/^<|>$/g,"").split("#")[0]??"";
-      try{return [decodeURIComponent(target).trim()];}catch{return [];}
-    }).filter(link=>link && !/^[a-z]+:|^#|^\//i.test(link)))];
+  const targets = new Set<string>();
+  // Advance past every inspected run, including failed delimiters. A regex with
+  // overlapping label/body repetitions could monopolize indexing on plain '['.
+  for (let cursor = 0; cursor < text.length; cursor++) {
+    if (text[cursor] !== "[") continue;
+    const wiki = text[cursor + 1] === "[", start = cursor + (wiki ? 2 : 1);
+    let end = start;
+    while (end < text.length && text[end] !== "[" && text[end] !== "]") end++;
+    if (text[end] !== "]") { cursor = end - 1; continue; }
+    let target = "";
+    if (wiki && text[end + 1] === "]") {
+      target = (text.slice(start, end).split(/[|#]/, 1)[0] ?? "").trim();
+      cursor = end + 1;
+    } else if (!wiki && text[end + 1] === "(") {
+      const targetStart = end + 2; end = targetStart;
+      while (end < text.length && !/[\s()[\]]/.test(text[end]!)) end++;
+      if (text[end] === ")") {
+        try { target = decodeURIComponent((text.slice(targetStart, end).replace(/^<|>$/g, "").split("#")[0] ?? "")).trim(); }
+        catch { /* Malformed percent encoding is not a link target. */ }
+        cursor = end;
+      } else cursor = end - 1;
+    } else cursor = end;
+    if (target && !/^[a-z]+:|^#|^\//i.test(target)) targets.add(target);
+  }
+  return [...targets];
 }
 export async function indexNote(note: SourceNote, resolve: (link: string) => string | null, options:{budget?:IndexBudget;signal?:AbortSignal}={}): Promise<IndexEntry> {
   options.signal?.throwIfAborted();const budget=options.budget??indexBudget("standard");

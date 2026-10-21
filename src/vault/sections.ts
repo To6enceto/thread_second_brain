@@ -3,6 +3,13 @@ import type { IndexBudget } from "../settings/index-budget.ts";
 export interface SectionCoverage {availableChars:number;retainedChars:number;sections:number;includedSections:number;omittedSections:number;chunks:number;limited:boolean;}
 export interface SectionChunk {heading:string;excerpt:string;}
 function safeSlice(text:string,start:number,end:number):string{return text.slice(start,end).replace(/^[\uDC00-\uDFFF]/,"").replace(/[\uD800-\uDBFF]$/,"");}
+/** Preserve ATX heading syntax without a lazy body/optional-space backtrack. */
+export function sectionHeading(line:string):string|undefined {
+  const title=/^#{1,6}\s+(.+)$/.exec(line)?.[1];
+  if(title===undefined)return undefined;
+  let end=title.length;while(title[end-1]==="#")end--;
+  return end<title.length&&end>0&&/\s/.test(title[end-1]!)?title.slice(0,end).trimEnd():title;
+}
 /** Keep section boundaries before choosing bounded passages; a long introduction cannot consume every slot. */
 export async function sectionChunks(text:string,budget:IndexBudget,signal?:AbortSignal):Promise<{chunks:SectionChunk[];coverage:SectionCoverage}> {
   signal?.throwIfAborted();
@@ -12,7 +19,7 @@ export async function sectionChunks(text:string,budget:IndexBudget,signal?:Abort
   for(const match of body.matchAll(/[^\n]*(?:\n|$)/g)){
     if(!match[0])continue;if(++lines%512===0){await new Promise(resolve=>setTimeout(resolve,0));signal?.throwIfAborted();}
     const line=match[0].replace(/\r?\n$/,""),marker=/^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];if(marker&&(!fence||marker[0]===fence[0]&&marker.length>=fence.length))fence=fence?"":marker;
-    const title=!fence?/^#{1,6}\s+(.+?)(?:\s+#+)?$/.exec(line)?.[1]:undefined;
+    const title=!fence?sectionHeading(line):undefined;
     if(title!==undefined){flush();heading=title;prefix="";length=0;nonempty=false;continue;}
     nonempty||=Boolean(line.trim());
     const value=(length?"\n":"")+line;length+=value.length;availableChars+=value.length;

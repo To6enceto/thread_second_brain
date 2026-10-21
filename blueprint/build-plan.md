@@ -102,7 +102,7 @@ verifiable boundaries; no earlier feature is renumbered.
 ## Milestone O - Open a vault independently of Obsidian
 
 - [x] 49. **Independent desktop vault reader** - Launch a Fedora-first Electron app with no running Obsidian dependency; select a vault, preview and explicitly grant read roots/exclusions, browse a bounded Markdown list and read source text. Keep all vault/plugin files unchanged, isolate renderer privileges, refuse unsafe paths and revoke old views on scope/vault changes. Prove the actual desktop window using synthetic notes.
-- [ ] 50. **Desktop indexed evidence and source navigation** - Reuse the bounded index, keyword ranking and section logic through a desktop file adapter; add safe Markdown/link navigation, explicit refresh and incremental invalidation for external edits, renames and exclusions. Report coverage and ambiguous links. Preserve keyword-only use without AI. Depends on 49.
+- [x] 50. **Desktop indexed evidence and source navigation** - Reuse the bounded index, keyword ranking and section logic through a desktop file adapter; add safe Markdown/link navigation, explicit refresh and incremental invalidation for external edits, renames and exclusions. Report coverage and ambiguous links. Preserve keyword-only use without AI. Depends on 49.
 
 ## Milestone P - Resume and research in Thread Desktop
 

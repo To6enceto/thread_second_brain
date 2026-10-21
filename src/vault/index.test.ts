@@ -24,6 +24,13 @@ test("chunks are bounded and link extraction ignores external URLs",async()=>{
  assert(entry.truncated);assert(entry.chunks.every(c=>c.excerpt.length<=1200));
  assert.deepEqual(linkTargets("[[Note#Heading|name]] [web](https://example.com) [local](a.md)"),["Note","a.md"]);
 });
+test("link extraction handles unmatched delimiters linearly and preserves ordinary internal targets",()=>{
+ const started=performance.now();
+ assert.deepEqual(linkTargets("[".repeat(120000)),[]);
+ assert.ok(performance.now()-started<1000,"malformed link parsing must not block indexing for seconds");
+ assert.deepEqual(linkTargets("[[Note#Heading|name]] [[Other|label]] ![[Embed]] [local](<Sources/A%20source.md#Heading>) [bad](%zz) [remote](https://example.com) [[Note]]"),["Note","Other","Embed","Sources/A source.md"]);
+ assert.deepEqual(linkTargets("[unfinished\n[local](A.md)\n[[B]]"),["A.md","B"]);
+});
 test("missing project metadata cannot match a project whose ID is the string undefined",async()=>{
  const index=new LocalIndex();for(const [path,metadata] of [["P/Overview.md",{type:"project",id:"undefined"}],["Other/a.md",{}]] as [string,Record<string,unknown>][])
   index.entries.push(await indexNote({path,text:"shared term",metadata,modifiedAt:1},()=>null));

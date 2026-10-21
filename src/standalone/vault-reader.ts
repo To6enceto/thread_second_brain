@@ -1,4 +1,5 @@
 import { constants } from "node:fs";
+import type { Stats } from "node:fs";
 import { open, opendir, type FileHandle } from "node:fs/promises";
 import { basename, isAbsolute, normalize } from "node:path";
 import { DesktopError, permitted, relativePath, scopeInput } from "./security.ts";
@@ -7,6 +8,7 @@ import type { NoteList, NoteSnapshot, ReadScope, VaultInfo } from "./contracts.t
 export const READ_LIMITS = { notes: 500, entries: 5000, depth: 16, bytes: 2 * 1024 * 1024, milliseconds: 10000 } as const;
 const directoryFlags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
 const fdPath = (handle: FileHandle, part?: string): string => `/proc/self/fd/${handle.fd}${part ? `/${part}` : ""}`;
+const stamp = (stat: Stats): string => [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(":");
 interface Selection { path: string; dev: number; ino: number; revision: number; scope: ReadScope; }
 
 // Directory-relative descriptors prevent a parent rename/symlink swap from
@@ -77,18 +79,18 @@ export class VaultReader {
   }
   async list(revision: unknown): Promise<NoteList> {
     const selected = this.current(revision);
-    const result: NoteList = { revision: selected.revision, paths: [], omitted: 0, limited: false };
+    const result: NoteList = { revision: selected.revision, paths: [], files: {}, omitted: 0, omittedMarkdown: 0, identityIncomplete: false, limited: false };
     const seen = new Set<string>(); let visited = 0;
     const deadline = performance.now() + READ_LIMITS.milliseconds;
     const bounded = (): boolean => {
       this.current(selected.revision);
-      if (visited >= READ_LIMITS.entries || result.paths.length >= READ_LIMITS.notes || performance.now() > deadline) { result.limited = true; return true; }
+      if (visited >= READ_LIMITS.entries || result.paths.length >= READ_LIMITS.notes || performance.now() > deadline) { result.limited = true; result.identityIncomplete = true; return true; }
       return false;
     };
     const walk = async (path: string, depth: number): Promise<void> => {
       if (seen.has(path) || !permitted(path, selected.scope) || bounded()) return;
       seen.add(path);
-      if (depth > READ_LIMITS.depth) { result.limited = true; return; }
+      if (depth > READ_LIMITS.depth) { result.limited = true; result.identityIncomplete = true; return; }
       let handle: FileHandle | undefined;
       try {
         handle = await this.openPath(selected, path);
@@ -100,19 +102,26 @@ export class VaultReader {
             visited++;
             if (entry.name.startsWith(".")) continue;
             const child = path === "." ? entry.name : `${path}/${entry.name}`;
-            try { relativePath(child); } catch { result.omitted++; continue; }
+            try { relativePath(child); } catch { result.omitted++; result.identityIncomplete = true; continue; }
             if (!permitted(child, selected.scope)) continue;
-            if (entry.isSymbolicLink()) { result.omitted++; continue; }
+            if (entry.isSymbolicLink()) { result.omitted++; result.identityIncomplete = true; continue; }
             if (entry.isDirectory() || entry.isFile() && child.toLowerCase().endsWith(".md")) await walk(child, depth + 1);
-            else result.omitted++;
+            else { result.omitted++; if (child.toLowerCase().endsWith(".md")) { result.omittedMarkdown++; result.identityIncomplete = true; } }
           }
         } else if (stat.isFile() && stat.nlink === 1 && path.toLowerCase().endsWith(".md") && stat.size <= READ_LIMITS.bytes) {
           result.paths.push(path);
-        } else result.omitted++;
+          result.files[path] = { stamp: stamp(stat), bytes: stat.size };
+        } else {
+          result.omitted++;
+          if (path.toLowerCase().endsWith(".md")) { result.omittedMarkdown++; result.identityIncomplete = true; }
+        }
       } catch (error) {
         this.current(selected.revision);
         if (error instanceof DesktopError) throw error;
         result.omitted++;
+        // Failed directory traversal may conceal any number of Markdown IDs.
+        // Do not turn that unknown count into a fabricated file total.
+        result.identityIncomplete = true;
       } finally { await handle?.close(); }
     };
     // Eliminate nested roots to avoid duplicate traversal and inconsistent budgets.
@@ -123,14 +132,15 @@ export class VaultReader {
     result.paths.sort((a, b) => a.localeCompare(b));
     return result;
   }
-  async read(input: unknown, revision: unknown): Promise<NoteSnapshot> {
+  async read(input: unknown, revision: unknown, byteLimit: number = READ_LIMITS.bytes): Promise<NoteSnapshot> {
+    if (!Number.isSafeInteger(byteLimit) || byteLimit < 0 || byteLimit > READ_LIMITS.bytes) throw new DesktopError("Invalid read budget.");
     const path = relativePath(input), selected = this.current(revision);
     if (!path.toLowerCase().endsWith(".md") || !permitted(path, selected.scope)) throw new DesktopError("This Markdown note is outside the approved read scope.");
     const handle = await this.openPath(selected, path);
     try {
       const before = await handle.stat();
-      if (!before.isFile() || before.nlink !== 1 || before.size > READ_LIMITS.bytes) throw new DesktopError("Only ordinary single-link Markdown files up to 2 MiB can be read.");
-      const buffer = Buffer.alloc(READ_LIMITS.bytes + 1);
+      if (!before.isFile() || before.nlink !== 1 || before.size > byteLimit) throw new DesktopError("Only ordinary single-link Markdown files within the read budget (at most 2 MiB) can be read.");
+      const buffer = Buffer.alloc(byteLimit + 1);
       let count = 0;
       while (count < buffer.length) {
         this.current(selected.revision);
@@ -142,14 +152,14 @@ export class VaultReader {
       const current = await this.openPath(selected, path);
       let actual;
       try { actual = await current.stat(); } finally { await current.close(); }
-      if (count > READ_LIMITS.bytes || count !== before.size || [after, actual].some(stat => stat.dev !== before.dev || stat.ino !== before.ino || stat.nlink !== 1 || stat.size !== before.size || stat.mtimeMs !== before.mtimeMs || stat.ctimeMs !== before.ctimeMs)) {
+      if (count > byteLimit || count !== before.size || [after, actual].some(stat => stat.dev !== before.dev || stat.ino !== before.ino || stat.nlink !== 1 || stat.size !== before.size || stat.mtimeMs !== before.mtimeMs || stat.ctimeMs !== before.ctimeMs)) {
         throw new DesktopError("The source changed while reading. Refresh and open it again.");
       }
       this.current(selected.revision);
       let text: string;
       try { text = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, count)); }
       catch { throw new DesktopError("This note is not valid UTF-8 text."); }
-      return { revision: selected.revision, path, text, modifiedAt: after.mtimeMs };
+      return { revision: selected.revision, path, text, modifiedAt: after.mtimeMs, stamp: stamp(after) };
     } finally { await handle.close(); }
   }
 }

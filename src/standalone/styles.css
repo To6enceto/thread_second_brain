@@ -55,6 +55,19 @@
 .thread-empty { color: var(--thread-muted); font-family: var(--thread-serif); font-size: 20px; padding: 30px 0; }
 .thread-status { border-top: 1px solid var(--thread-border); padding: 8px 28px; background: var(--thread-surface); flex-shrink: 0; }
 .thread-status p { margin: 4px 0; }
+.thread-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.thread-search-form { border-top: 1px solid var(--thread-border); margin-top: 18px; }
+.thread-result-excerpt { font: 13px/1.6 var(--thread-interface); white-space: pre-wrap; }
+.thread-markdown { overflow-wrap: anywhere; }
+.thread-markdown :is(p, ul, blockquote, pre) { margin: 10px 0; }
+.thread-markdown blockquote { border-left: 2px solid var(--thread-recorded); padding-left: 14px; color: var(--thread-muted); }
+.thread-markdown :is(code, pre) { font-family: var(--thread-mono); background: var(--thread-surface); }
+.thread-markdown pre { padding: 14px; border-radius: 8px; }
+.thread-markdown .thread-internal-link { color: var(--thread-recorded); background: transparent; border: none; padding: 2px 5px; text-decoration: underline; }
+.thread-markdown :is(h1, h2, h3, h4, h5, h6) { scroll-margin-top: 15px; }
+.thread-markdown .thread-heading-target { border-left: 2px solid var(--thread-recorded); padding-left: 10px; }
+.thread-link-choices button { display: block; margin: 8px 0; }
+.thread-desktop :is(article, h1, h2, h3, h4, h5, h6):focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }
 @media (max-width: 1050px) {
   .thread-layout { grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(180px, 35%) minmax(0, 1fr); }
   .thread-sidebar { grid-row: span 2; }

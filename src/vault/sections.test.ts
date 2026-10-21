@@ -1,9 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sectionChunks } from "./sections.ts";
+import { sectionChunks, sectionHeading } from "./sections.ts";
 import { indexBudget, indexProfile, indexProfiles } from "../settings/index-budget.ts";
 import { defaultSettings, loadSettings } from "../settings/settings.ts";
-import { MAX_CONTEXT } from "./evidence.ts";
+import { MAX_CONTEXT, noteSections } from "./evidence.ts";
+
+test("heading extraction preserves titles and handles long whitespace without backtracking",async()=>{
+ for(const [line,title]of [["## Title ###","Title"],["# Title  ","Title  "],["# Title#","Title#"],["# Title #  ","Title #  "],["### A\t##","A"]])assert.equal(sectionHeading(line!),title);
+ assert.equal(sectionHeading("####### Not a heading"),undefined);
+ const source="# Title"+" ".repeat(120000)+"\nbody\n## Visible\nlocal evidence",start=performance.now();
+ const chunks=await sectionChunks(source,indexBudget("conservative"));
+ assert.equal(chunks.coverage.omittedSections,1);assert.equal(chunks.chunks[0]!.heading,"Visible");
+ assert.ok(performance.now()-start<1000,"heading whitespace must not block indexing");
+ const brief="# Title"+" ".repeat(40000)+"\nbody";
+ assert.equal(noteSections(brief)[0]!.heading,"Title"+" ".repeat(40000));
+});
 
 test("bounded section selection reaches later headings without a long introduction consuming every passage",async()=>{
  const budget=indexBudget("standard"),text="x".repeat(180000)+"\n## Later evidence\nNEEDLE29 measured the later section.\n## Last section\nAnother finding.",result=await sectionChunks(text,budget);

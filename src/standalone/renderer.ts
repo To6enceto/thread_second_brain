@@ -1,5 +1,7 @@
-import type { DesktopBridge, DesktopResult, NoteList, VaultInfo } from "./contracts.ts";
+import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo } from "./contracts.ts";
 import { ReaderRequests } from "./reader-requests.ts";
+import { indexCoverageText } from "../vault/index-coverage.ts";
+import { markdownPreview, sourceHeadingCount, headingMatches } from "./markdown.ts";
 declare global { interface Window { threadDesktop: DesktopBridge; } }
 const bridge = window.threadDesktop;
 function element<T extends HTMLElement>(id: string): T { return document.getElementById(id) as T; }
@@ -7,7 +9,9 @@ const choose = element<HTMLButtonElement>("choose"), refresh = element<HTMLButto
 const grant = element<HTMLButtonElement>("grant"), close = element<HTMLButtonElement>("close");
 const roots = element<HTMLTextAreaElement>("roots"), exclusions = element<HTMLTextAreaElement>("exclusions");
 const filter = element<HTMLInputElement>("filter"), status = element("status");
+const search = element<HTMLButtonElement>("search"), query = element<HTMLInputElement>("search-query"), cancel = element<HTMLButtonElement>("cancel-index");
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
+let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
@@ -20,10 +24,14 @@ function clearReader(): void {
   element("note-title").textContent = "Open a source";
   element("note-meta").textContent = "Select a permitted note to read its original Markdown. Thread makes no changes to it.";
   element("note-content").textContent = "";
+  element("note-preview").replaceChildren(); element("link-choices").replaceChildren(); element("preview-limit").textContent = "";
 }
 function clearContent(invalidate = true): void {
   if (invalidate) requests.invalidate();
   listing = null; clearReader(); element("notes").replaceChildren();
+  element("search-results").replaceChildren(); element("search-coverage").textContent = "";
+  element("coverage-summary").textContent = "No current index."; element("search-summary").textContent = ""; element("search-details").hidden = true;
+  search.disabled = true; query.disabled = true;
   filter.value = ""; filter.disabled = true;
   element("coverage").textContent = "No source content is loaded.";
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
@@ -32,19 +40,58 @@ function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
   element("scope-preview").textContent = `Read roots: ${allowed.length ? allowed.join(", ") : "none (no notes)"}. Exclusions: ${excluded.length ? excluded.join(", ") : "none"}. This preview grants nothing.`;
 }
-async function openNote(path: string): Promise<void> {
+async function followLink(from: string, target: string): Promise<void> {
+  if (!vault) return;
+  const revision = vault.revision, ticket = requests.beginRead(); if (ticket === null) return;
+  try {
+    const result = value(await bridge.resolveLink(from, target, revision));
+    if (!requests.current(ticket) || vault?.revision !== revision) return;
+    if (result.paths.length === 1) { await openNote(result.paths[0]!, result.heading); return; }
+    const choices = element("link-choices"); choices.replaceChildren(); announce(result.message);
+    for (const path of result.paths) {
+      const button = document.createElement("button"); button.textContent = path;
+      button.addEventListener("click", () => { void openNote(path, result.heading); }); choices.append(button);
+    }
+    choices.querySelector("button")?.focus();
+  } catch (error) { if (requests.current(ticket)) report(error); }
+}
+function renderMarkdown(path: string, text: string, heading: string): string {
+  const preview = markdownPreview(text), container = element("note-preview"); container.replaceChildren();
+  const headings: HTMLElement[] = [];
+  for (const block of preview.blocks) {
+    const node = document.createElement(block.kind === "heading" ? `h${block.level}` : block.kind === "code" ? "pre" : block.kind === "quote" ? "blockquote" : block.kind === "list" ? "ul" : "p");
+    if (block.kind === "code") node.textContent = block.text;
+    const body = block.kind === "list" ? document.createElement("li") : node;
+    if (body !== node) node.append(body);
+    for (const part of block.inline) {
+      const item = document.createElement(part.kind === "link" ? "button" : part.kind === "text" ? "span" : part.kind);
+      item.textContent = part.text;
+      if (part.kind === "link") { item.className = "thread-internal-link"; item.addEventListener("click", () => { void followLink(path, part.target!); }); }
+      body.append(item);
+    }
+    if (block.kind === "heading") { node.dataset.heading = block.text; headings.push(node); }
+    container.append(node);
+  }
+  element("preview-limit").textContent = preview.limited ? "Formatted preview reached its display limit. Original Markdown source remains available below." : "Safe Markdown subset; HTML, embeds and external links never execute or load.";
+  if (heading) {
+    const count = sourceHeadingCount(text, heading), matches = headings.filter(node => headingMatches(node.dataset.heading ?? "", heading));
+    if (count !== 1 || matches.length !== 1) { container.focus(); return count > 1 ? "Repeated heading; inspect the original source to choose the passage." : "Heading not present in this preview; inspect the original source."; }
+    const target = matches[0]!; target.classList.add("thread-heading-target"); target.tabIndex = -1; target.focus(); target.scrollIntoView({ block: "start" });
+  } else container.focus();
+  return "Source loaded. No files were changed.";
+}
+async function openNote(path: string, heading = "", expectedHash?: string): Promise<void> {
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
   clearReader(); announce("Reading the selected source...");
   try {
-    const note = value(await bridge.readNote(path, vault.revision));
-    if (!requests.current(ticket) || !vault || note.revision !== vault.revision) return;
+    const note = value(await bridge.readNote(path, vault.revision, expectedHash));
+    if (!requests.current(ticket) || !vault || note.revision !== vault.revision || note.generation < generation) return;
     element("note-title").textContent = path.split("/").at(-1) ?? path;
-    element("note-meta").textContent = `${path} · Snapshot of source text. Reopen or Refresh to see external edits. Modified ${new Date(note.modifiedAt).toLocaleString()}; not an event date.`;
+    element("note-meta").textContent = `${path} · Snapshot; external changes checked every 2.5 seconds and before navigation/search. Modified ${new Date(note.modifiedAt).toLocaleString()}; not an event date.`;
     element("note-content").textContent = note.text;
-    announce("Source loaded. No files were changed.");
-    element("note-content").focus();
+    announce(renderMarkdown(path, note.text, heading));
   } catch (error) { if (requests.current(ticket)) report(error); }
 }
 function renderNotes(): void {
@@ -62,27 +109,67 @@ function renderNotes(): void {
   }
   element("list-empty").textContent = paths.length ? "" : query ? "No listed paths match this filter." : "No Markdown notes in the current read scope.";
 }
+function applyIndex(result: IndexSnapshot): void {
+  if (!vault || result.revision !== vault.revision || result.generation < generation) return;
+  generation = result.generation; listing = result.listing; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes();
+  element("coverage-summary").textContent = `${result.coverage.indexedFiles} indexed notes · ${result.coverage.omittedFiles} known omissions · ${result.coverage.shortenedNotes} shortened.${result.listing.identityIncomplete ? " Incomplete Markdown enumeration." : ""}`;
+  element("coverage").textContent = `${result.listing.identityIncomplete ? "Markdown enumeration is incomplete: counts below cover known files only. Uninspected paths may contain additional notes; stable-ID uniqueness is unproven and identity-dependent outputs cannot be reused. " : ""}${indexCoverageText(result.coverage)} ${result.invalid} unreadable or invalid-metadata notes omitted. ${result.listing.omitted} encountered entries unavailable/unsupported. ${result.listing.limited ? "Traversal limit reached; additional files may be unlisted." : "Within the bounded listed scope."} ${result.reused} unchanged entries reused. Filter applies to paths; Search evidence searches indexed content.`;
+}
 async function loadNotes(): Promise<void> {
   const ticket = requests.beginRead();
   if (ticket === null) return;
+  paused = false;
   clearContent(false);
   if (!vault) return;
-  refresh.disabled = true; announce("Listing permitted Markdown notes...");
+  refresh.disabled = true; cancel.disabled = false; announce("Indexing permitted Markdown notes...");
   try {
-    const result = value(await bridge.listNotes(vault.revision));
+    const result = value(await bridge.refreshIndex(vault.revision));
     if (!requests.current(ticket) || !vault || result.revision !== vault.revision) return;
-    listing = result; filter.disabled = false; renderNotes();
-    element("coverage").textContent = `${result.paths.length} notes listed. ${result.omitted} encountered entries unavailable or unsupported. ${result.limited ? "A traversal or result limit was reached; this list is incomplete." : "Within the approved roots and scan limits."} Hidden/excluded entries are not shown. This filter searches listed paths only.`;
-    announce(result.limited ? "Note list ready with coverage limits. Narrow the read roots to inspect other notes." : "Note list ready. Choose a source to read.");
+    applyIndex(result); announce("Index ready. Search evidence or choose a source.");
   } catch (error) { if (requests.current(ticket)) report(error); }
-  finally { if (requests.current(ticket)) refresh.disabled = !vault; }
+  finally { refresh.disabled = !vault || scoping; cancel.disabled = !vault || scoping; }
 }
+element<HTMLFormElement>("search-form").addEventListener("submit", event => {
+  event.preventDefault(); void (async () => {
+    if (!vault || search.disabled) return;
+    const ticket = requests.beginRead(); if (ticket === null) return;
+    const revision = vault.revision; search.disabled = true; element("search-results").replaceChildren(); announce("Searching permitted evidence...");
+    try {
+      const result = value(await bridge.searchNotes(query.value, revision));
+      if (!requests.current(ticket) || vault?.revision !== revision || result.generation < generation) return;
+      applyIndex(result); element("search-coverage").textContent = result.coverageText;
+      element("search-summary").textContent = `${result.hits.length} evidence passages. Keyword search; no AI required.`; element("search-details").hidden = false;
+      const list = element("search-results");
+      for (const hit of result.hits) {
+        const row = document.createElement("li"), button = document.createElement("button"), excerpt = document.createElement("span");
+        button.className = "thread-note"; button.textContent = `${hit.path} > ${hit.heading || "Note"}`;
+        excerpt.className = "thread-result-excerpt"; excerpt.textContent = hit.excerpt; button.append(excerpt);
+        button.addEventListener("click", () => { void openNote(hit.path, hit.heading, hit.hash); }); row.append(button); list.append(row);
+      }
+      announce(result.hits.length ? "Evidence ready. Open a passage to inspect its current source." : "No indexed passages match. Inspect coverage or try other keywords.");
+    } catch (error) { if (requests.current(ticket)) report(error); }
+    finally { search.disabled = !vault || !listing || scoping; }
+  })();
+});
+bridge.onIndexEvent(event => {
+  if (!vault || event.revision !== vault.revision || event.generation < generation || paused) return;
+  if (event.kind === "invalidated") { generation = event.generation; clearContent(false); }
+  announce(event.message);
+  if (event.kind === "ready" && event.snapshot) applyIndex(event.snapshot);
+});
+cancel.addEventListener("click", () => { void (async () => {
+  if (!vault || cancel.disabled || scoping) return;
+  requests.invalidate(); paused = true; clearContent(false);
+  try { value(await bridge.cancelIndex(vault.revision)); announce("Indexing canceled. Refresh to resume monitoring."); }
+  catch (error) { report(error); }
+  refresh.disabled = !vault || scoping;
+})(); });
 choose.addEventListener("click", () => { void (async () => {
   choose.disabled = true;
   try {
     const selected = value(await bridge.selectVault());
     if (!selected) { announce("Folder selection canceled. Existing access is unchanged."); return; }
-    clearContent(); vault = selected;
+    clearContent(); vault = selected; generation = 0;
     roots.value = ""; exclusions.value = ""; scopePreview();
     element("vault-details").hidden = false;
     element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
@@ -95,19 +182,19 @@ grant.addEventListener("click", () => { void (async () => {
   if (!vault) return;
   const ticket = requests.beginScope();
   if (ticket === null) return;
-  clearContent(false); grant.disabled = true; refresh.disabled = true;
+  clearContent(false); scoping = true; grant.disabled = true; refresh.disabled = true; cancel.disabled = true;
   announce("Applying the approved read access...");
   let approved = false;
   try {
     const selected = value(await bridge.grantScope({ roots: lines(roots.value), excluded: lines(exclusions.value) }, vault.revision));
     if (!requests.current(ticket)) return;
-    vault = selected; approved = true;
+    vault = selected; generation = 0; approved = true;
   } catch (error) { if (requests.current(ticket)) report(error); }
-  finally { requests.finishScope(ticket); grant.disabled = false; refresh.disabled = !vault; }
+  finally { requests.finishScope(ticket); scoping = false; grant.disabled = false; refresh.disabled = !vault; }
   if (approved && requests.current(ticket)) await loadNotes();
 })(); });
 close.addEventListener("click", () => { void (async () => {
-  clearContent(); vault = null; refresh.disabled = true; element("vault-details").hidden = true;
+  clearContent(); vault = null; generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
   roots.value = ""; exclusions.value = ""; element("vault-name").textContent = ""; element("vault-path").textContent = "";
   try { value(await bridge.closeVault()); announce("Vault closed. All session read access is cleared."); choose.focus(); }
   catch (error) { report(error); }
