@@ -40,10 +40,12 @@
         <label for="ai-endpoint">Local Ollama endpoint</label><input id="ai-endpoint" value="http://127.0.0.1:11434" maxlength="200" spellcheck="false">
         <button id="ai-discover">Find downloaded models</button>
         <label for="ai-model">Available text models</label><select id="ai-model" aria-label="Available text models" disabled><option value="">Discover models first</option></select>
+        <label for="ai-embedding">Optional embedding model</label><select id="ai-embedding" aria-label="Available embedding models" disabled><option value="">Discover models first</option></select>
+        <p class="thread-muted">Embeddings are optional for hybrid Ask. Keyword search needs no model.</p>
         <div class="thread-controls"><button id="ai-apply">Apply AI settings</button><button id="ai-check" disabled>Test local connection</button><button id="ai-cancel-checks" disabled>Cancel local checks</button></div>
         <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Recorded context works without an AI model.</p>
       </details>
-      <p class="thread-footnote">Read-only milestone. Recorded Resume is available. Ask and reviewed writing are coming in the next planned features.</p>
+      <p class="thread-footnote">Read-only milestone. Resume and Ask are available. Reviewed writing follows in the next planned features.</p>
     </aside>
     <section class="thread-library" aria-label="Permitted Markdown notes">
       <section class="thread-project-controls" aria-label="Projects">
@@ -55,6 +57,7 @@
         <button id="load-projects" disabled>Refresh projects</button>
         <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
+        <button id="open-ask" disabled>Ask your vault</button>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
         <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
         <p class="thread-muted">Recorded context first. Works without AI. Selection and mapping are session-only.</p>
@@ -75,9 +78,29 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="ask-panel" tabindex="-1" aria-label="Ask evidence workbench" hidden>
+        <h2>Ask your vault</h2>
+        <p class="thread-muted">Choose evidence before generating. Answers never change your notes.</p>
+        <label for="ask-question">Question</label><textarea id="ask-question" maxlength="1000" rows="3" placeholder="What do these notes establish?"></textarea>
+        <div class="thread-ask-controls">
+          <label>Answer scope<select id="ask-scope" aria-label="Answer scope"><option value="project">Selected project</option><option value="vault">All permitted notes</option></select></label>
+          <label>Search method<select id="ask-method" aria-label="Search method"><option value="keyword">Keyword</option><option value="hybrid">Hybrid (local embeddings)</option></select></label>
+          <label>Search budget<select id="ask-level" aria-label="Search budget"><option value="standard">Standard (20 results)</option><option value="broader">Broader (35 results)</option><option value="maximum">Maximum (50 results)</option></select></label>
+        </div>
+        <details id="ask-filters"><summary>Search filters</summary><div class="thread-ask-controls">
+          <label>Note type<input id="ask-type" maxlength="100" placeholder="decision"></label>
+          <label>Status<input id="ask-status-filter" maxlength="100" placeholder="proposed"></label>
+          <label>Path<input id="ask-path" maxlength="512" placeholder="Projects/Demo"></label>
+          <label>From record date<input id="ask-from" type="date"></label>
+          <label>Through record date<input id="ask-through" type="date"></label>
+        </div><p class="thread-muted">Dates use recorded fields, falling back to file modification dates; they do not verify events.</p></details>
+        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button></div>
+        <p id="ask-status" role="status" aria-live="polite" class="thread-muted">Enter a question and retrieve current permitted evidence.</p>
+        <div id="ask-results"></div>
+      </section>
       <section id="project-panel" tabindex="-1" aria-label="Project home and recorded Resume" hidden></section>
       <div id="source-pane">
-      <button id="back-project" disabled>Back to project</button>
+      <div class="thread-controls"><button id="back-project" disabled>Back to project</button><button id="back-ask" disabled>Back to Ask</button></div>
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
       <h2 id="note-title">Open a source</h2>
       <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>

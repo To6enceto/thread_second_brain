@@ -1,4 +1,5 @@
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
+import { AskView } from "./ask-view.ts";
 import { ModelSetup } from "./model-setup.ts";
 import { renderHome, renderRecorded, renderInterpretation } from "./project-view.ts";
 import { ReaderRequests } from "./reader-requests.ts";
@@ -14,15 +15,17 @@ const filter = element<HTMLInputElement>("filter"), status = element("status");
 const search = element<HTMLButtonElement>("search"), query = element<HTMLInputElement>("search-query"), cancel = element<HTMLButtonElement>("cancel-index");
 const projectFolder = element<HTMLInputElement>("projects-folder"), projectSelect = element<HTMLSelectElement>("project-select");
 const loadProjects = element<HTMLButtonElement>("load-projects"), homeButton = element<HTMLButtonElement>("project-home"), resumeButton = element<HTMLButtonElement>("resume-project");
+let askView: AskView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
 function clearAI(): void {
-  aiEpoch++; document.querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
+  aiEpoch++; element("project-panel").querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
 }
-const modelSetup = new ModelSetup(bridge, clearAI);
+const modelSetup = new ModelSetup(bridge, () => { clearAI(); askView?.invalidate("Local model setup changed. Retrieve evidence again."); });
 function cancelAI(): void { clearAI(); void bridge.cancelAI(); }
 function clearProjects(): void {
+  askView?.invalidate(); askView?.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   element("project-panel").replaceChildren(); projectSelect.replaceChildren(new Option("Choose a permitted project", ""));
   projectSelect.disabled = true; homeButton.disabled = true; resumeButton.disabled = true; loadProjects.disabled = true;
@@ -48,11 +51,13 @@ function clearContent(invalidate = true): void {
   listing = null; clearProjects(); clearReader(); element("notes").replaceChildren();
   element("search-results").replaceChildren(); element("search-coverage").textContent = "";
   element("coverage-summary").textContent = "No current index."; element("search-summary").textContent = ""; element("search-details").hidden = true;
-  search.disabled = true; query.disabled = true;
+  search.disabled = true; query.disabled = true; askView?.update();
   filter.value = ""; filter.disabled = true;
   element("coverage").textContent = "No source content is loaded.";
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
 }
+askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); });
+element("open-ask").addEventListener("click", () => { cancelAI(); askView.open(); });
 function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
   element("scope-preview").textContent = `Read roots: ${allowed.length ? allowed.join(", ") : "none (no notes)"}. Exclusions: ${excluded.length ? excluded.join(", ") : "none"}. This preview grants nothing.`;
@@ -101,7 +106,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
-  element("project-panel").hidden = true; element("source-pane").hidden = false;
+  askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
   clearReader(); announce("Reading the selected source...");
   try {
     const note = value(await bridge.readNote(path, vault.revision, expectedHash));
@@ -129,7 +134,7 @@ function renderNotes(): void {
 }
 function applyIndex(result: IndexSnapshot): void {
   if (!vault || result.revision !== vault.revision || result.generation < generation) return;
-  generation = result.generation; listing = result.listing; loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes();
+  generation = result.generation; listing = result.listing; askView.update(); loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes();
   element("coverage-summary").textContent = `${result.coverage.indexedFiles} indexed notes · ${result.coverage.omittedFiles} known omissions · ${result.coverage.shortenedNotes} shortened.${result.listing.identityIncomplete ? " Incomplete Markdown enumeration." : ""}`;
   element("coverage").textContent = `${result.listing.identityIncomplete ? "Markdown enumeration is incomplete: counts below cover known files only. Uninspected paths may contain additional notes; stable-ID uniqueness is unproven and identity-dependent outputs cannot be reused. " : ""}${indexCoverageText(result.coverage)} ${result.invalid} unreadable or invalid-metadata notes omitted. ${result.listing.omitted} encountered entries unavailable/unsupported. ${result.listing.limited ? "Traversal limit reached; additional files may be unlisted." : "Within the bounded listed scope."} ${result.reused} unchanged entries reused. Filter applies to paths; Search evidence searches indexed content.`;
 }
@@ -228,6 +233,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
+  askView.invalidate("Project changed. Retrieve evidence again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };
   const panel = element("project-panel"); panel.replaceChildren(); panel.hidden = false; element("source-pane").hidden = true;
@@ -283,5 +289,5 @@ aiCancel.addEventListener("click", () => { cancelAI(); aiFeedback.textContent = 
 
 element("back-project").addEventListener("click", () => {
   if (!element("project-panel").childElementCount) return;
-  element("source-pane").hidden = true; element("project-panel").hidden = false; element("project-panel").focus();
+  askView.hide(); element("source-pane").hidden = true; element("project-panel").hidden = false; element("project-panel").focus();
 });

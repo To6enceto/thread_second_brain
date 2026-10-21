@@ -20,6 +20,10 @@ export interface DesktopBridge {
   checkAI(): Promise<DesktopResult<string>>;
   cancelAI(): Promise<DesktopResult<null>>;
   interpretResume(briefingId: string, revision: number): Promise<DesktopResult<AIInterpretation>>;
+  retrieveAsk(request: AskRequest, revision: number): Promise<DesktopResult<AskSnapshot>>;
+  chooseAsk(identity: string, choices: Record<string, import("../vault/workbench.ts").EvidenceChoice>, revision: number): Promise<DesktopResult<AskContext>>;
+  generateAsk(identity: string, revision: number): Promise<DesktopResult<AskAnswer>>;
+  resetAsk(): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
@@ -47,3 +51,14 @@ export interface AIInterpretation {
   nextActions: import("../intelligence/briefing.ts").Claim[];
   modelGaps: string[];
 }
+
+export interface AskRequest {
+  question: string; selection: ProjectRequest; scope: "project" | "vault";
+  filters: import("../retrieval/search.ts").SearchFilters;
+  method: "keyword" | "hybrid"; embeddingModel: string; level: import("../retrieval/budget.ts").SearchLevel;
+}
+export interface AskSnapshot {
+  id: string; request: AskRequest; index: IndexSnapshot; bundle: import("../vault/evidence.ts").EvidenceBundle;
+}
+export interface AskContext { id: string; retrievalId: string; bundle: import("../vault/evidence.ts").EvidenceBundle; }
+export interface AskAnswer { contextId: string; answer: import("../intelligence/answer.ts").Answer; model: string; generatedAt: number; }

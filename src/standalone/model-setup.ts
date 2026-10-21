@@ -9,6 +9,7 @@ export class ModelSetup {
   private saved: AIConfig = { endpoint: "http://127.0.0.1:11434", model: "" };
   private endpoint = document.getElementById("ai-endpoint") as HTMLInputElement;
   private choices = document.getElementById("ai-model") as HTMLSelectElement;
+  private embeddings = document.getElementById("ai-embedding") as HTMLSelectElement;
   private discover = document.getElementById("ai-discover") as HTMLButtonElement;
   private apply = document.getElementById("ai-apply") as HTMLButtonElement;
   private check = document.getElementById("ai-check") as HTMLButtonElement;
@@ -16,7 +17,8 @@ export class ModelSetup {
   private feedback = document.getElementById("ai-setup-status")!;
   constructor(bridge: DesktopBridge, changed: () => void) {
     this.bridge = bridge; this.changed = changed;
-    this.endpoint.addEventListener("input", () => { this.edit(); this.choices.replaceChildren(new Option("Discover models first", "")); this.choices.disabled = true; });
+    this.endpoint.addEventListener("input", () => { this.edit(); this.choices.replaceChildren(new Option("Discover models first", "")); this.choices.disabled = true; this.embeddings.replaceChildren(new Option("Discover models first", "")); this.embeddings.disabled = true; });
+    this.embeddings.addEventListener("change", () => this.edit());
     this.choices.addEventListener("change", () => this.edit());
     this.cancelButton.addEventListener("click", () => { this.epoch++; this.changed(); void this.bridge.cancelAI(); this.busy(false); this.feedback.textContent = "Local checks canceled."; });
     this.discover.addEventListener("click", () => { void this.run(async current => {
@@ -25,6 +27,8 @@ export class ModelSetup {
       const textModels = result.models.filter(model => model.completion);
       this.choices.replaceChildren(new Option("Recorded only (no model)", ""), ...textModels.map(model => new Option(model.name, model.name)));
       this.choices.disabled = false;
+      this.embeddings.replaceChildren(new Option("Keyword only (no embedding model)", ""), ...result.models.filter(model => model.embedding).map(model => new Option(model.name, model.name)));
+      this.embeddings.disabled = false;
       this.feedback.textContent = `${textModels.length} downloaded text models from ${result.total} listed; ${result.omitted} remote, incompatible, uninspectable or over-limit entries omitted. Choose one explicitly, then Apply AI settings. Capability is not answer quality.`;
     }, "Checking cloud-disabled local model metadata..."); });
     this.apply.addEventListener("click", () => { void this.run(async current => {
@@ -36,10 +40,12 @@ export class ModelSetup {
       const result = this.value(await this.bridge.checkAI()); if (current()) this.feedback.textContent = result;
     }, "Testing local completion capability and cloud-disabled status..."); });
   }
+  embeddingModel(): string { return this.dirty ? "" : this.embeddings.value; }
   model(): string { return this.dirty ? "" : this.saved.model; }
   reset(): void {
     this.epoch++; this.saved = { endpoint: "http://127.0.0.1:11434", model: "" }; this.dirty = true;
     this.endpoint.value = this.saved.endpoint; this.choices.replaceChildren(new Option("Discover models first", "")); this.choices.disabled = true;
+    this.embeddings.replaceChildren(new Option("Discover models first", "")); this.embeddings.disabled = true;
     this.busy(false); this.feedback.textContent = "Optional. Recorded context works without an AI model.";
   }
   private value<T>(result: DesktopResult<T>): T { if (!result.ok) throw new Error(result.message); return result.value; }

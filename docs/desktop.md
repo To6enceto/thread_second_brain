@@ -1,9 +1,10 @@
 # Thread Desktop preview
 
 Thread has an independent Linux window with scoped vault browsing, keyword
-evidence search, safe Markdown navigation, project home, recorded Resume and optional local AI interpretation. Obsidian can stay closed. The
-existing plugin also provides Ask and the other completed workflows;
-remaining desktop features are tracked in items 53-62 of the build plan.
+evidence search, safe Markdown navigation, project home, recorded Resume, optional
+local AI interpretation and an Ask evidence workbench. Obsidian can stay closed.
+Reviewed saves and remaining desktop workflows are tracked in items 54-62 of the
+build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -64,7 +65,8 @@ source text can receive keyboard focus for scrolling and selection.
   to inspect other notes; the path filter searches only the returned list.
 - The index uses the conservative profile: at most 1 MiB per admitted note, 8 MiB
   admitted raw text, 60,000 characters and 60 chunks per note, and 2 MiB serialized
-  entries. Search returns at most 20 balanced passages. Coverage reports omitted
+  entries. Basic Search evidence returns at most 20 balanced passages; Ask offers explicit
+  larger finite budgets described below. Coverage reports omitted
   notes and shortened sections; it does not establish exhaustive vault coverage.
 - YAML 1.2 metadata uses the bundled ISC-licensed yaml parser. Invalid, duplicate,
   unknown-tag, aliased or over-64-KiB headers omit the note from evidence; its
@@ -160,3 +162,43 @@ grants note access. Cloud status must be explicitly disabled and a fully local
 completion capability confirmed; remote aliases and enabled/unknown cloud status
 are refused. The downloaded runtime/model work offline once installed, with no
 account, subscription or hosted API cost.
+
+## Ask evidence workbench
+
+1. Choose **Ask your vault**, enter a question (up to 1000 characters) and choose
+   **Selected project** or **All permitted notes**. All permitted notes still
+   respects the explicit read roots and exclusions; it grants no additional access.
+2. Optionally expand **Search filters** for type, status, relative path and date
+   range. Dates use recorded fields with a file-modification fallback, not verified
+   events. **Search budget** explicitly chooses 20, 35 or 50 result passages.
+3. Choose **Retrieve evidence**. Keyword works without any model or running Ollama.
+   Read the coverage limits and inspect source chips. Include, Pin first or Exclude
+   passages; each change renews the exact context and discards the old answer.
+4. Expand **Exact source context sent to the model**. It shows the exact chosen
+   evidence JSON used in the answer prompt, bounded to 16,000 characters. Pins
+   go first inside that bound; excluded passages are not sent for answer generation.
+5. With an applied local text model, choose **Generate from chosen evidence**.
+   The separate AI card gives model/time, classified claims, supporting excerpts
+   and gaps. Classification and valid citations do not establish semantic truth.
+   Open citations inside Thread and use **Back to Ask** without regenerating.
+6. **Cancel Ask** suppresses obsolete replies; current chosen context remains
+   usable when available. Question/filter/project/model/scope changes and external
+   edits invalidate old results. Source/dependency bytes are rechecked after model
+   metadata calls immediately before transmission, and after generation.
+
+For optional hybrid search, use **Find downloaded models**, explicitly select an
+**Optional embedding model**, then **Apply AI settings**. Choose **Hybrid (local
+embeddings)** in Ask. Text and embedding models are separate choices; the tested
+local embedding model is `qwen3-embedding:0.6b`. Model discovery never selects or
+downloads one automatically. Hybrid sends a bounded set of current permitted
+candidate passages to the local embedding model before you choose answer context.
+The standard/broader/maximum budgets consider at most 128/384/768 candidate windows
+of 350 characters, with balanced note/heading selection. Coverage discloses the
+actual pool and heuristic matches; it does not promise exhaustive recall.
+
+Missing/incompatible/unavailable embeddings produce an explicit keyword fallback.
+Canceled or stale requests cannot become a fallback success. A missing text model
+disables generation while retrieval remains useful. Invalid answers/connection
+failures retain current evidence with safe feedback. Embedding vectors and all
+workbench state remain session-only; invalidation clears the cache. No answer
+saves, conversations, plugin history imports or note changes ship in this milestone.

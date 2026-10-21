@@ -22,6 +22,10 @@ const bridge: DesktopBridge = {
   checkAI: () => ipcRenderer.invoke("thread:check-ai"),
   cancelAI: () => ipcRenderer.invoke("thread:cancel-ai"),
   interpretResume: (identity, revision) => ipcRenderer.invoke("thread:interpret-resume", identity, revision),
+  retrieveAsk: (request, revision) => ipcRenderer.invoke("thread:retrieve-ask", request, revision),
+  chooseAsk: (identity, choices, revision) => ipcRenderer.invoke("thread:choose-ask", identity, choices, revision),
+  generateAsk: (identity, revision) => ipcRenderer.invoke("thread:generate-ask", identity, revision),
+  resetAsk: () => ipcRenderer.invoke("thread:reset-ask"),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

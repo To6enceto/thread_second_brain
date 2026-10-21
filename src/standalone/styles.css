@@ -98,3 +98,16 @@
 .thread-ai-card .thread-source-chip { color: var(--thread-ai); }
 .thread-ai-claim { border-top: 1px dashed var(--thread-ai); padding: 6px 0; }
 .thread-ai-claim p { font: 18px/1.6 var(--thread-serif); white-space: pre-wrap; }
+
+.thread-desktop .thread-ask-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.thread-ask-controls select { width: 100%; }
+.thread-desktop #ask-question { font: 20px/1.5 var(--thread-serif); }
+.thread-ask-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; align-items: start; }
+.thread-ask-grid > section { min-width: 0; }
+.thread-evidence-card { border-left: 2px solid var(--thread-recorded); }
+.thread-evidence-card[data-choice="pin"] { border: 2px solid var(--thread-recorded); background: color-mix(in srgb, var(--thread-recorded) 8%, var(--thread-card)); }
+.thread-evidence-card[data-choice="exclude"] { border: 1px dashed var(--thread-border); color: var(--thread-muted); }
+.thread-evidence-card .thread-controls { align-items: center; }
+.thread-evidence-card select { margin-left: auto; }
+.thread-ask-grid .thread-primary { margin-top: 18px; }
+.thread-ask-grid blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid var(--thread-border); font-size: 12px; white-space: pre-wrap; }

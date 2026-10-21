@@ -30,14 +30,21 @@ export class DesktopAI {
   private configuration: AIConfig = { endpoint: defaultSettings().endpoint, model: "" };
   private controller: AbortController | null = null;
   private epoch = 0;
+  private configurationVersion = 0;
+  get version(): number { return this.configurationVersion; }
   private prepared: PreparedResume | null = null;
   constructor(projects: DesktopProjects, evidence: EvidenceIndex, fetcher: typeof fetch = fetch, timeoutMs = defaultSettings().timeoutMs) {
     this.projects = projects; this.evidence = evidence; this.fetcher = fetcher; this.timeoutMs = timeoutMs;
   }
   cancel(): void { this.epoch++; this.controller?.abort(); this.controller = null; }
   forget(): void { this.cancel(); this.prepared = null; }
-  reset(): void { this.forget(); this.configuration = { endpoint: defaultSettings().endpoint, model: "" }; }
-  configure(input: unknown): AIConfig { const next = config(input); this.cancel(); this.configuration = next; return { ...next }; }
+  reset(): void { this.forget(); this.configurationVersion++; this.configuration = { endpoint: defaultSettings().endpoint, model: "" }; }
+  configure(input: unknown): AIConfig { const next = config(input); this.cancel(); this.configurationVersion++; this.configuration = next; return { ...next }; }
+  /** Main-process workflows share the bounded, cancelable local transport. Never exposed over IPC. */
+  async run<T>(work: (settings: AIConfig, signal: AbortSignal, current: () => void, client: (verify: () => Promise<void>) => OllamaClient) => Promise<T>): Promise<T> {
+    const settings = { ...this.configuration };
+    return this.operation((signal, current) => work(settings, signal, current, verify => this.client(settings.endpoint, signal, current, verify)));
+  }
   private async operation<T>(work: (signal: AbortSignal, current: () => void) => Promise<T>): Promise<T> {
     this.cancel(); const epoch = this.epoch, controller = new AbortController(); this.controller = controller;
     const timeout = AbortSignal.timeout(this.timeoutMs), signal = AbortSignal.any([controller.signal, timeout]);
@@ -53,7 +60,7 @@ export class DesktopAI {
   private client(url: string, signal: AbortSignal, current: () => void, beforeContext?: () => Promise<void>): OllamaClient {
     return new OllamaClient(url, this.timeoutMs, async (input, options) => {
       current();
-      if (String(input).endsWith("/api/chat")) { await beforeContext?.(); current(); }
+      if (/\/api\/(chat|embed)$/.test(String(input))) { await beforeContext?.(); current(); }
       const response = await this.fetcher(input, { ...options, signal: AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])]) });
       current();
       if (!response.ok) { await response.body?.cancel(); return new Response(null, { status: response.status }); }
