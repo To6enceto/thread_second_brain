@@ -22,7 +22,7 @@ function fixture(t: TestContext) {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, "document");
   Object.defineProperty(globalThis, "document", { configurable: true, value: { getElementById: el, createElement: () => new Element() } });
   t.after(() => { if (descriptor) Object.defineProperty(globalThis, "document", descriptor); else Reflect.deleteProperty(globalThis, "document"); });
-  const state: StorageStatus = { preferences: freshProfile().preferences, warning: "", writing: false, saves: [], importedCopies: 0 };
+  const state: StorageStatus = { preferences: freshProfile().preferences, warning: "", writing: false, saves: [], importedCopies: 0, changesPending: false, changesRecovery: false };
   const preview: CompatibilityPreview = { id: "old-preview", folder: ".old-config", installed: false, version: "", compatible: true, reasons: [], preferences: { ...freshProfile().preferences, model: "distinct:local", roles: { ...freshProfile().preferences.roles, knowledge: "DistinctKnowledge" } }, history: '{"history":"exact"}', hash: "a".repeat(64) };
   const calls = { enabled: [] as string[], copied: [] as string[], released: 0 };
   const inspection = deferred<DesktopResult<CompatibilityPreview>>(), enabled = deferred<DesktopResult<StorageStatus>>(), copied = deferred<DesktopResult<StorageStatus>>();

@@ -3,8 +3,9 @@
 **Independent desktop preview:** `npm run desktop:setup` downloads the local
 Electron runtime once; `npm run desktop:start` builds and opens Thread without
 Obsidian. It includes scoped browsing, project home, recorded/local-AI Resume,
-keyword/hybrid Ask, bounded follow-ups and reviewed new-note saves. Explicit desktop
-writer setup, exact previews and durable recovery protect existing notes. Further
+keyword/hybrid Ask, bounded follow-ups, reviewed new-note saves and existing-note
+change review with guarded undo. Explicit writer setup, renewed exact previews and
+durable originals govern every change. Further
 desktop workflows remain in the build plan; the existing plugin is preserved.
 See [desktop setup and limits](docs/desktop.md).
 
@@ -19,7 +20,7 @@ recording decisions and turning research into reviewed Markdown knowledge. A
 local Ollama model supplies suggestions; your notes remain authoritative. No
 account, API key, backend or paid model service is required.
 
-This is a **private local 0.4.1 build**, not a published Community plugin. It is
+This is a **private local 0.4.2 build**, not a published Community plugin. It is
 tested on Linux with **Obsidian 1.14.4, Ollama 0.40.4 and
 `qwen3:4b-instruct`**. The manifest requires Obsidian 1.14.4 or newer and desktop
 use. Windows, macOS, other models and later versions need their own validation.
@@ -35,7 +36,7 @@ npm run package
 ```
 
 `package` runs the same typecheck, tests and production build as `npm run verify`,
-then creates `dist/thread-0.4.1.zip` and version-specific staging `dist/thread-0.4.1/`. The ZIP contains
+then creates `dist/thread-0.4.2.zip` and version-specific staging `dist/thread-0.4.2/`. The ZIP contains
 `thread/main.js`, `thread/manifest.json`, `thread/styles.css`, the local PDF
 worker, `pdf-assets.json` and its explicitly listed CMap/font/license resources.
 The inventory is verified by path, byte size and SHA-256 before packaging. No vault, model,
@@ -769,7 +770,7 @@ invalid journals only from your own known good backup; never reset history to
 force a retry. This is a new-copy import, not a destructive vault restore.
 
 Release0.4.1 includes192 explicitly inventoried files and preserves earlier build
-artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.1.zip` checks exact paths, ZIP records/CRC, production bytes,
+artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.2.zip` checks exact paths, ZIP records/CRC, production bytes,
 PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
 from the installed plugin. This private build has no API/hosting subscription;
 local storage, compute and electricity still apply.

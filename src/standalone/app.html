@@ -65,7 +65,7 @@
         <div class="thread-controls"><button id="ai-apply">Apply AI settings</button><button id="ai-check" disabled>Test local connection</button><button id="ai-cancel-checks" disabled>Cancel local checks</button></div>
         <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Recorded context works without an AI model.</p>
       </details>
-      <p class="thread-footnote">Resume and Ask run locally. New-note saves require explicit writer setup and exact approval; existing notes stay unchanged.</p>
+      <p class="thread-footnote">Resume and Ask run locally. Note saves and changes require explicit writer setup and exact approval.</p>
     </aside>
     <section class="thread-library" aria-label="Permitted Markdown notes">
       <section class="thread-project-controls" aria-label="Projects">
@@ -78,6 +78,7 @@
         <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
         <button id="open-ask" disabled>Ask your vault</button>
+        <button id="open-changes">Review changes</button>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
         <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
         <p class="thread-muted">Recorded context first. Works without AI. Selection and mapping are session-only.</p>
@@ -98,6 +99,13 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="changes-panel" tabindex="-1" aria-label="Change review and recovery" hidden>
+        <h2>Review changes</h2>
+        <p class="thread-muted">Inspect exact changes and retained originals. Nothing applies automatically. Close other editors and enable writing in Desktop storage before confirming.</p>
+        <div class="thread-controls"><button id="changes-refresh">Refresh changes</button><button id="changes-close">Close change review</button></div>
+        <p id="changes-status" role="status" aria-live="polite"></p>
+        <div id="changes-work"></div><div id="changes-list"></div>
+      </section>
       <section id="ask-panel" tabindex="-1" aria-label="Ask evidence workbench" hidden>
         <h2>Ask your vault</h2>
         <p class="thread-muted">Choose evidence before generating. Answers never change your notes.</p>
@@ -122,7 +130,8 @@
       <div id="source-pane">
       <div class="thread-controls"><button id="back-project" disabled>Back to project</button><button id="back-ask" disabled>Back to Ask</button></div>
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
-      <h2 id="note-title">Open a source</h2>
+      <button id="propose-note" disabled>Propose body change</button>
+        <h2 id="note-title">Open a source</h2>
       <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>
       <div id="link-choices" class="thread-link-choices" aria-label="Internal link choices"></div>
       <p id="preview-limit" class="thread-muted"></p>

@@ -21,7 +21,7 @@ export class DesktopSaves {
   async prepare(identity: unknown, kind: unknown, title: unknown, selected: unknown, revision: unknown): Promise<SavePreview> {
     if (this.applying) throw new DesktopError("A save is running. Wait for its receipt.");
     this.revoke(); const epoch = this.epoch, state = this.storage.status(revision);
-    if (!state.writing || state.warning || state.saves.some(s => s.status === "pending")) throw new DesktopError("Enable desktop writing and resolve pending saves in Desktop storage before saving another note.");
+    if (!state.writing || state.warning || state.saves.some(s => s.status === "pending") || state.changesPending || state.changesRecovery) throw new DesktopError("Enable desktop writing and resolve pending saves or Review changes before saving another note.");
     if (state.saves.length >= 20) throw new DesktopError("Twenty save receipts are retained. History is full; preserve it. No receipt was removed.");
     let artifact: ReturnType<DesktopAsk["artifact"]>;
     try { artifact = this.ask.artifact(identity, kind, title, selected, revision); }

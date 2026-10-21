@@ -3,8 +3,9 @@
 Thread has an independent Linux window with scoped vault browsing, keyword
 evidence search, safe Markdown navigation, project home, recorded Resume, optional
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
-new-note saves. Obsidian can stay closed. Remaining desktop workflows are tracked
-in items 55-62 of the build plan; the existing plugin remains available.
+new-note saves, exact existing-note change review, guarded undo and interruption
+recovery. Obsidian can stay closed. Remaining desktop workflows are tracked
+in items 56-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -86,8 +87,8 @@ source text can receive keyboard focus for scrolling and selection.
   window. `npm run verify` typechecks/tests both targets and builds both.
 
 The standalone UI cannot load Obsidian community plugins/themes. It currently
-leaves plugin settings, journals and existing sources unchanged. New-note saves
-require the explicit desktop storage setup below.
+leaves plugin settings and journals unchanged. New-note saves and existing-note
+updates require the explicit desktop storage setup below.
 
 A failed or bounded Markdown enumeration leaves stable-ID uniqueness unproven.
 Known omitted Markdown files are counted separately from unsupported attachments;
@@ -281,4 +282,52 @@ its receipt. Both actions recheck the target and modify only the receipt; neithe
 removes, rewrites or rolls back vault files. Inspect any partial note or empty
 folders yourself before deciding what to keep. Unsupported/oversized targets require
 manual inspection. No whole-filesystem transaction or lock against unrelated editors
-is claimed. Existing-note changes and guarded undo are planned in feature 55.
+is claimed. Existing-note changes use the separate reviewed flow below.
+
+
+## Review existing-note changes and recovery
+
+1. Enable desktop writing as above. In **Folder preference drafts**, map the
+   existing Projects or another writable role, then **Save desktop preferences**.
+   This mapping never grants reads; the target must also be inside current allowed
+   paths and outside exclusions.
+2. Open a current note and choose **Propose body change**. Edit the body and choose
+   **Preview proposed change**. Frontmatter and Thread provenance markers stay
+   protected. This creates a durable pending proposal, without changing the note.
+3. Inspect **Exact before**, **Exact after** and the numbered diff. The diff displays
+   at most 500 lines; the complete bounded text remains in the exact sections.
+   **Edit proposed body** disables Apply until **Renew exact preview** succeeds.
+4. **Apply exact change** explicitly commits the shown bytes. Changed targets,
+   supporting sources, permissions, roles, folder/file identities or ownership
+   refuse old approval. **Reject proposal** discards pending review only, without
+   changing notes. A stale proposal must be rejected and regenerated.
+5. **Review changes** shows the last twenty applied batches. **Preview undo** shows
+   the exact restore before **Undo exact change**. Later edits block Undo; no
+   force-overwrite option exists. Undo of a reviewed newly created note removes
+   only that unchanged creation, after explicit approval.
+
+A separate `thread-v1/changes-<vault identity>.json` in the desktop profile stores
+schema-1 proposals, original content and recovery. Existing preferences/receipts
+remain in `vault-<vault identity>.json`. Plugin `changes.json` is never migrated or
+shared. The change journal is bounded to 24 MiB, ten notes and 1 MiB combined
+before/after text per batch, with the last twenty applied batches retained. It is
+recovery history, not a complete vault backup. Unknown, corrupt or oversized state
+blocks writing without resetting files. Pending changes/recovery block ordinary
+new-note saves; pending new-note receipts block note updates.
+
+After interruption, select the vault again, explicitly approve read access, inspect
+plugin compatibility and enable writing. **Review changes > Inspect recovery**
+shows the exact intended restore and current content. **Restore reviewed recovery**
+rechecks every target and preserves conflicting later edits. If the current note
+matches neither known version, automatic restore is unavailable: compare the retained
+originals with your files and resolve the conflict manually. Keep the journal until
+resolved. A recovered apply leaves its proposal stale; reject it explicitly before
+making another. Without current grants, history paths and content are redacted.
+
+Compatible Thread processes still use exclusive ownership. Close unrelated editors:
+ordinary Linux files do not provide an atomic compare-and-write syscall. Descriptor,
+identity and exact-byte checks detect observed changes, but cannot exclude a separate
+editor writing during the final write syscall interval. Multi-note writes are not
+atomic. Completed operations are rolled back on failure where safe; uncertain writes
+retain durable originals for explicit recovery. Process-interruption acceptance was
+performed in an isolated synthetic vault; power-loss recovery is not claimed.

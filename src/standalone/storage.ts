@@ -4,9 +4,10 @@ import { DesktopProfile, hashText, preferences, type ProfileState } from "./prof
 import { inspectCompatibility, type PluginCompatibility } from "./compatibility.ts";
 import type { VaultReader } from "./vault-reader.ts";
 import { DesktopError, permitted } from "./security.ts";
+import { ChangeJournal } from "./change-journal.ts";
 export interface StorageStatus {
   preferences: ProfileState["preferences"]; warning: string; writing: boolean;
-  saves: { id: string; path: string; status: string }[]; importedCopies: number;
+  saves: { id: string; path: string; status: string }[]; importedCopies: number; changesPending: boolean; changesRecovery: boolean;
 }
 export interface CompatibilityPreview extends PluginCompatibility { id: string; folder: string; }
 
@@ -14,6 +15,7 @@ export class DesktopStorage {
   private reader: VaultReader;
   private profileDirectory: string;
   private profile: DesktopProfile | null = null;
+  private journal: ChangeJournal | null = null;
   private identity = "";
   private warning = "";
   private owner: WriterOwnership | null = null;
@@ -25,21 +27,23 @@ export class DesktopStorage {
     this.epoch++; this.preview = null;
     const owner = this.owner; this.owner = null;
     await this.active?.catch(() => {}); await owner?.release();
-    this.profile = null; this.identity = ""; this.warning = "";
+    this.profile = null; this.journal = null; this.identity = ""; this.warning = "";
   }
   async initialize(revision: unknown): Promise<StorageStatus> {
     await this.close(); const epoch = this.epoch;
     const identity = await this.reader.identity(revision);
     if (epoch !== this.epoch) throw new DesktopError("Vault changed during profile loading.");
     const profile = new DesktopProfile(this.profileDirectory, identity);
-    try { await profile.load(); } catch (error) { this.warning = error instanceof Error ? error.message : "Desktop history unavailable. Preserve the profile."; }
+    const journal = new ChangeJournal(this.profileDirectory, identity);
+    try { await profile.load(); await journal.load(); } catch (error) { this.warning = error instanceof Error ? error.message : "Desktop history unavailable. Preserve the profile."; }
     if (epoch !== this.epoch || identity !== await this.reader.identity(revision)) throw new DesktopError("Vault changed during profile loading.");
-    this.identity = identity; this.profile = profile; return this.status(revision);
+    this.identity = identity; this.profile = profile; this.journal = journal; return this.status(revision);
   }
   status(revision: unknown): StorageStatus {
     if (!this.profile || revision !== this.reader.getInfo()?.revision) throw new DesktopError("Select a vault before opening desktop storage.");
     return { preferences: structuredClone(this.profile.state.preferences), warning: this.warning, writing: !!this.owner,
-      saves: this.profile.state.saves.map(({ id, path, status }) => ({ id, path: permitted(path, this.reader.getInfo()!.scope) ? path : "Unavailable path (outside read scope)", status })), importedCopies: this.profile.state.imports.length };
+      saves: this.profile.state.saves.map(({ id, path, status }) => ({ id, path: permitted(path, this.reader.getInfo()!.scope) ? path : "Unavailable path (outside read scope)", status })), importedCopies: this.profile.state.imports.length,
+      changesPending: !!this.journal?.state.pending, changesRecovery: !!this.journal?.state.recovery };
   }
   async inspect(folder: unknown, revision: unknown): Promise<CompatibilityPreview> {
     this.status(revision); this.preview = null; const epoch = ++this.epoch;
@@ -78,17 +82,30 @@ export class DesktopStorage {
     this.epoch++; this.preview = null; const owner = this.owner; this.owner = null;
     await this.active?.catch(() => {}); await owner?.release();
   }
-  async owned<T>(revision: unknown, work: (profile: DesktopProfile, current: () => void) => Promise<T>): Promise<T> {
+  async owned<T>(revision: unknown, work: (profile: DesktopProfile, current: () => void) => Promise<T>, changes = false): Promise<T> {
     if (this.active || !this.owner || !this.profile || this.warning) throw new DesktopError(this.warning || "Enable writing after compatibility review; wait for any current save to finish.");
     const owner = this.owner, profile = this.profile, epoch = this.epoch;
     const current = (): void => { owner.assert(); if (this.owner !== owner || epoch !== this.epoch || revision !== this.reader.getInfo()?.revision) throw new DesktopError("Write access or vault changed. Review a new preview."); };
     const run = async (): Promise<T> => {
       current(); await this.compatible(revision); current();
+      if (!changes && (this.journal?.state.pending || this.journal?.state.recovery)) throw new DesktopError("Resolve pending changes and recovery in Review changes before other saves.");
       if (await this.reader.identity(revision) !== this.identity) throw new DesktopError("Vault identity changed.");
       current(); return work(profile, current);
     };
     const promise = run(); this.active = promise;
     try { return await promise; } finally { if (this.active === promise) this.active = null; }
+  }
+  changeState(revision: unknown): ChangeJournal["state"] {
+    this.status(revision);
+    if (this.warning || !this.journal) throw new DesktopError(this.warning || "Change journal unavailable. Preserve the profile.");
+    return structuredClone(this.journal.state);
+  }
+  async changeWork<T>(revision: unknown, work: (journal: ChangeJournal, current: () => void) => Promise<T>): Promise<T> {
+    return this.owned(revision, async (profile, current) => {
+      if (profile.state.saves.some(s => s.status === "pending")) throw new DesktopError("Resolve pending new-note saves in Desktop storage before changing notes.");
+      if (!this.journal) throw new DesktopError("Change journal unavailable.");
+      return work(this.journal, current);
+    }, true);
   }
   async savePreferences(input: unknown, revision: unknown): Promise<StorageStatus> {
     const next = preferences(input);

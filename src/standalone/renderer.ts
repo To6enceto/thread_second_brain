@@ -1,5 +1,6 @@
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
 import { StorageView } from "./storage-view.ts";
+import { ChangesView } from "./changes-view.ts";
 import { AskView } from "./ask-view.ts";
 import { ModelSetup } from "./model-setup.ts";
 import { renderHome, renderRecorded, renderInterpretation } from "./project-view.ts";
@@ -17,6 +18,7 @@ const search = element<HTMLButtonElement>("search"), query = element<HTMLInputEl
 const projectFolder = element<HTMLInputElement>("projects-folder"), projectSelect = element<HTMLSelectElement>("project-select");
 const loadProjects = element<HTMLButtonElement>("load-projects"), homeButton = element<HTMLButtonElement>("project-home"), resumeButton = element<HTMLButtonElement>("resume-project");
 let askView: AskView;
+let changesView: ChangesView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
@@ -34,7 +36,8 @@ function clearProjects(): void {
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
-const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup);
+const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => changesView?.invalidate("Writer setup changed. Refresh and inspect the exact change again."));
+changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
 function value<T>(result: DesktopResult<T>): T {
@@ -43,12 +46,14 @@ function value<T>(result: DesktopResult<T>): T {
 }
 function report(error: unknown): void { announce(error instanceof Error ? error.message : "Thread could not finish. Try again."); }
 function clearReader(): void {
+  changesView?.setNote(null);
   element("note-title").textContent = "Open a source";
   element("note-meta").textContent = "Select a permitted note to read its original Markdown. Thread makes no changes to it.";
   element("note-content").textContent = "";
   element("note-preview").replaceChildren(); element("link-choices").replaceChildren(); element("preview-limit").textContent = "";
 }
 function clearContent(invalidate = true): void {
+  changesView?.invalidate("Sources or access changed. Refresh changes; durable history is preserved.");
   if (invalidate) requests.invalidate();
   listing = null; clearProjects(); clearReader(); element("notes").replaceChildren();
   element("search-results").replaceChildren(); element("search-coverage").textContent = "";
@@ -59,7 +64,7 @@ function clearContent(invalidate = true): void {
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
 }
 askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); });
-element("open-ask").addEventListener("click", () => { cancelAI(); askView.open(); });
+element("open-ask").addEventListener("click", () => { changesView.hide(); cancelAI(); askView.open(); });
 function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
   element("scope-preview").textContent = `Read roots: ${allowed.length ? allowed.join(", ") : "none (no notes)"}. Exclusions: ${excluded.length ? excluded.join(", ") : "none"}. This preview grants nothing.`;
@@ -108,7 +113,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
-  askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
+  changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
   clearReader(); announce("Reading the selected source...");
   try {
     const note = value(await bridge.readNote(path, vault.revision, expectedHash));
@@ -116,6 +121,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
     element("note-title").textContent = path.split("/").at(-1) ?? path;
     element("note-meta").textContent = `${path} · Snapshot; external changes checked every 2.5 seconds and before navigation/search. Modified ${new Date(note.modifiedAt).toLocaleString()}; not an event date.`;
     element("note-content").textContent = note.text;
+    changesView.setNote(note);
     announce(renderMarkdown(path, note.text, heading));
   } catch (error) { if (requests.current(ticket)) report(error); }
 }
@@ -235,6 +241,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
+  changesView.hide();
   askView.invalidate("Project changed. Retrieve evidence again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };

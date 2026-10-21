@@ -1,6 +1,7 @@
 .thread-desktop {
   --thread-background: #f8f6f2; --thread-surface: #efede8; --thread-card: #fffdfa;
   --thread-text: #292724; --thread-muted: #625d55; --thread-border: #cbc6bd;
+  --thread-added: #246244; --thread-removed: #963c3c;
   --thread-ai: #505ba6; --thread-recorded: #a65e20; --thread-button: #e9a867; --thread-button-text: #241b12;
   --thread-serif: "Iowan Old Style", "Charter", Georgia, serif;
   --thread-interface: system-ui, sans-serif; --thread-mono: ui-monospace, monospace;
@@ -11,13 +12,13 @@
   .thread-desktop:not([data-theme="light"]) {
     --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
     --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
-    --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
+    --thread-added: #89cfa6; --thread-removed: #eeaaaa; --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
   }
 }
 .thread-desktop[data-theme="dark"] {
   --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
   --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
-  --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
+  --thread-added: #89cfa6; --thread-removed: #eeaaaa; --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
 }
 .thread-desktop :is(button, input, textarea, select) { font: inherit; color: inherit; border: 1px solid var(--thread-border); border-radius: 7px; background: var(--thread-card); padding: 8px 12px; box-sizing: border-box; min-height: 36px; }
 .thread-desktop button { cursor: pointer; }
@@ -116,3 +117,12 @@
 .thread-desktop fieldset { border: 1px solid var(--thread-border); border-radius: 7px; margin-top: 12px; }
 .thread-desktop fieldset label { min-height: 32px; display: flex; align-items: center; gap: 8px; }
 .thread-sidebar pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 var(--thread-mono); max-height: 320px; overflow: auto; }
+
+.thread-change-diff { max-height: 420px; overflow: auto; font: 12px/1.7 var(--thread-mono); border: 1px solid var(--thread-border); border-radius: 6px; }
+.thread-diff-line { display: grid; grid-template-columns: 3em 3em 1.4em minmax(0, 1fr); gap: 5px; white-space: pre-wrap; overflow-wrap: anywhere; padding: 0 8px; }
+.thread-diff-line .thread-line-number { color: var(--thread-muted); text-align: right; user-select: none; }
+.thread-diff-added { border-left: 2px solid var(--thread-added); background: color-mix(in srgb, var(--thread-added) 12%, var(--thread-background)); }
+.thread-diff-removed { border-left: 2px dashed var(--thread-removed); background: color-mix(in srgb, var(--thread-removed) 12%, var(--thread-background)); }
+.thread-diff-same { color: var(--thread-muted); }
+.thread-exact-change { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 var(--thread-mono); background: var(--thread-surface); padding: 12px; }
+.thread-desktop :is(.thread-change-diff, .thread-exact-change):focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }

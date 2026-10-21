@@ -39,6 +39,15 @@ const bridge: DesktopBridge = {
   revokeSavePreview: () => ipcRenderer.invoke("thread:revoke-save-preview"),
   inspectSaveRecovery: (id, revision) => ipcRenderer.invoke("thread:inspect-save-recovery", id, revision),
   resolveSaveRecovery: (id, action, revision) => ipcRenderer.invoke("thread:resolve-save-recovery", id, action, revision),
+  changesSnapshot: revision => ipcRenderer.invoke("thread:changes-snapshot", revision),
+  beginNoteEdit: (path, stamp, revision) => ipcRenderer.invoke("thread:begin-note-edit", path, stamp, revision),
+  proposeNoteEdit: (id, body, revision) => ipcRenderer.invoke("thread:propose-note-edit", id, body, revision),
+  previewChange: (action, id, revision) => ipcRenderer.invoke("thread:preview-change", action, id, revision),
+  confirmChange: (id, revision) => ipcRenderer.invoke("thread:confirm-change", id, revision),
+  reviseChange: (id, bodies, revision) => ipcRenderer.invoke("thread:revise-change", id, bodies, revision),
+  rejectChange: (id, revision) => ipcRenderer.invoke("thread:reject-change", id, revision),
+  changeDraftEdited: id => ipcRenderer.invoke("thread:change-draft-edited", id),
+  invalidateChangeView: () => ipcRenderer.invoke("thread:invalidate-change-view"),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

@@ -3,6 +3,7 @@ import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { DesktopSaves } from "./saves.ts";
 import { DesktopStorage } from "./storage.ts";
+import { DesktopChanges } from "./changes.ts";
 import { VaultReader } from "./vault-reader.ts";
 import { DesktopAsk } from "./ask.ts";
 import { DesktopAI } from "./local-ai.ts";
@@ -19,11 +20,12 @@ let ai: DesktopAI;
 let ask: DesktopAsk;
 let storage: DesktopStorage;
 let saves: DesktopSaves;
-const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+let changes: DesktopChanges;
+const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
 ai = new DesktopAI(projects, evidence);
 ask = new DesktopAsk(reader, evidence, projects, ai);
-function clearVault(): void { saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
+function clearVault(): void { changes?.invalidate(); saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -44,6 +46,7 @@ async function start(): Promise<void> {
   if (process.platform !== "linux") throw new Error("This desktop milestone requires Linux.");
   storage = new DesktopStorage(reader, app.getPath("userData"));
   saves = new DesktopSaves(reader, storage, ask);
+  changes = new DesktopChanges(reader, storage);
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -99,18 +102,27 @@ async function start(): Promise<void> {
   handle("thread:storage-status", 1, revision => storage.status(revision));
   handle("thread:inspect-compatibility", 2, (folder, revision) => storage.inspect(folder, revision));
   handle("thread:enable-writing", 2, (id, revision) => storage.enable(id, revision));
-  handle("thread:release-writing", 0, async () => { await storage.release(); return null; });
-  handle("thread:save-preferences", 2, (preferences, revision) => storage.savePreferences(preferences, revision));
-  handle("thread:import-plugin-copy", 2, (id, revision) => storage.importCopy(id, revision));
+  handle("thread:release-writing", 0, async () => { changes.invalidate(); await storage.release(); return null; });
+  handle("thread:save-preferences", 2, (preferences, revision) => { changes.invalidate(); return storage.savePreferences(preferences, revision); });
+  handle("thread:import-plugin-copy", 2, (id, revision) => { changes.invalidate(); return storage.importCopy(id, revision); });
   handle("thread:preview-ask-save", 5, (id, kind, title, selected, revision) => saves.prepare(id, kind, title, selected, revision));
   handle("thread:save-ask-preview", 2, (id, revision) => saves.save(id, revision));
   handle("thread:revoke-save-preview", 0, () => { saves.revoke(); return null; });
   handle("thread:inspect-save-recovery", 2, (id, revision) => saves.inspectRecovery(id, revision));
   handle("thread:resolve-save-recovery", 3, async (id, action, revision) => { await saves.resolveRecovery(id, action, revision); return null; });
+  handle("thread:changes-snapshot", 1, revision => changes.snapshot(revision));
+  handle("thread:begin-note-edit", 3, (path, stamp, revision) => changes.beginEdit(path, stamp, revision));
+  handle("thread:propose-note-edit", 3, (id, body, revision) => changes.proposeEdit(id, body, revision));
+  handle("thread:preview-change", 3, (action, id, revision) => changes.preview(action, id, revision));
+  handle("thread:confirm-change", 2, (id, revision) => changes.confirm(id, revision));
+  handle("thread:revise-change", 3, (id, bodies, revision) => changes.revise(id, bodies, revision));
+  handle("thread:reject-change", 2, (id, revision) => changes.reject(id, revision));
+  handle("thread:change-draft-edited", 1, id => { changes.draftChanged(id); return null; });
+  handle("thread:invalidate-change-view", 0, () => { changes.invalidate(); return null; });
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();
-    if (selected?.scope.roots.length && !saves.applying) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
+    if (selected?.scope.roots.length && !saves.applying && !changes.applying) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
   }, 2500);
   window.on("closed", () => clearInterval(monitor));
   await window.loadFile(entry);

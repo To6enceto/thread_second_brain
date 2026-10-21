@@ -37,6 +37,15 @@ export interface DesktopBridge {
   revokeSavePreview(): Promise<DesktopResult<null>>;
   inspectSaveRecovery(id: string, revision: number): Promise<DesktopResult<import("./saves.ts").RecoveryPreview>>;
   resolveSaveRecovery(id: string, action: "confirm" | "leave", revision: number): Promise<DesktopResult<null>>;
+  changesSnapshot(revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  beginNoteEdit(path: string, stamp: string, revision: number): Promise<DesktopResult<import("./changes.ts").EditDraft>>;
+  proposeNoteEdit(id: string, body: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  previewChange(action: import("./changes.ts").ChangeAction, id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangePreview>>;
+  confirmChange(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  reviseChange(id: string, bodies: string[], revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  rejectChange(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  changeDraftEdited(id: string): Promise<DesktopResult<null>>;
+  invalidateChangeView(): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";

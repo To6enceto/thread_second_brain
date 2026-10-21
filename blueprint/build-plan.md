@@ -113,7 +113,7 @@ verifiable boundaries; no earlier feature is renumbered.
 
 ## Milestone Q - Preserve reviewed workflows outside Obsidian
 
-- [ ] 55. **Desktop change review and recovery** - Adapt shared proposals, editable diffs, before-hash checks, durable originals, guarded undo and interruption recovery to direct file access. Define a safe policy for simultaneous plugin/desktop writers and existing pending plugin recovery; no silent journal migration. Prove interruption/concurrent-editor behavior. Depends on 54.
+- [x] 55. **Desktop change review and recovery** - Adapt shared proposals, editable diffs, before-hash checks, durable originals, guarded undo and interruption recovery to direct file access. Define a safe policy for simultaneous plugin/desktop writers and existing pending plugin recovery; no silent journal migration. Prove interruption/concurrent-editor behavior. Depends on 54.
 - [ ] 56. **Desktop decisions and managed questions** - Port explicit decision creation/review and managed question states, preserving prior reasoning, status, answer and reopening history through reviewed writes. Depends on 55.
 - [ ] 57. **Desktop actions and session wrap-up** - Port durable action transitions, accessible board and explicitly selected recorded progress into reviewed session notes; AI never changes status. Depends on 56.
 - [ ] 58. **Desktop freshness and project reviews** - Port dependency-aware stale output, review queue/acknowledgements, weekly review, timeline, multi-project overview and bounded health diagnostics with individual reviewed repairs. Depends on 57.

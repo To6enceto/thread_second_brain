@@ -12,7 +12,7 @@ export class StorageView {
   private epoch = 0;
   private state: StorageStatus | null = null;
   private preview: CompatibilityPreview | null = null;
-  constructor(bridge: DesktopBridge, revision: () => number | null, models: ModelSetup) {
+  constructor(bridge: DesktopBridge, revision: () => number | null, models: ModelSetup, changed: () => void = () => {}) {
     this.bridge = bridge; this.revision = revision; this.models = models;
     for (const role of roleNames) {
       const label = document.createElement("label"); label.textContent = role; const input = document.createElement("input"); input.id = `storage-role-${role}`; input.maxLength = 512;
@@ -26,6 +26,7 @@ export class StorageView {
       this.message("Preference drafts restored. Apply local AI settings and refresh projects explicitly. Read access is unchanged.");
     });
     el("plugin-config").addEventListener("input", () => {
+      changed();
       const epoch = ++this.epoch; this.clearInspection();
       if (this.state) this.state = { ...this.state, writing: false };
       this.buttons(); this.message("Configuration folder changed. Read its plugin files and enable writing again.");
@@ -46,13 +47,16 @@ export class StorageView {
       if (current()) { this.show(result); this.message("Desktop owns writing. Every note still requires an exact preview and explicit Save. Keep other editors closed."); }
     }); });
     el("storage-release").addEventListener("click", () => { void this.run(async (revision, current) => {
+      changed();
       value(await bridge.releaseWriting()); if (current()) { this.clearInspection(); this.show(value(await bridge.storageStatus(revision))); this.message("Writing released. Inspect compatibility again before enabling it."); }
     }); });
     el("storage-save").addEventListener("click", () => { void this.run(async (revision, current) => {
+      changed();
       const roles = Object.fromEntries(roleNames.map(role => [role, el<HTMLInputElement>(`storage-role-${role}`).value.trim()])) as DesktopPreferences["roles"];
       const result = value(await bridge.savePreferences({ ...models.draft(), roles }, revision)); if (current()) { this.show(result); this.message("Desktop preferences saved. Read access and PDF consent were not saved."); }
     }); });
     el("storage-import").addEventListener("click", () => { void this.run(async (revision, current) => {
+      changed();
       const preview = this.chosenInspection(); const result = value(await bridge.importPluginCopy(preview.id, revision));
       if (current()) { this.show(result); this.message("Copied compatible preference drafts and an immutable history snapshot. Plugin files and read access remain unchanged."); }
     }); });
