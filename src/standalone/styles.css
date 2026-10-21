@@ -111,3 +111,8 @@
 .thread-evidence-card select { margin-left: auto; }
 .thread-ask-grid .thread-primary { margin-top: 18px; }
 .thread-ask-grid blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid var(--thread-border); font-size: 12px; white-space: pre-wrap; }
+
+.thread-desktop input[type="checkbox"] { width: auto; min-height: 0; accent-color: var(--thread-recorded); margin-right: 8px; }
+.thread-desktop fieldset { border: 1px solid var(--thread-border); border-radius: 7px; margin-top: 12px; }
+.thread-desktop fieldset label { min-height: 32px; display: flex; align-items: center; gap: 8px; }
+.thread-sidebar pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 var(--thread-mono); max-height: 320px; overflow: auto; }

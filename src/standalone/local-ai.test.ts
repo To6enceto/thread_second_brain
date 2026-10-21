@@ -103,15 +103,21 @@ test("desktop model failures and malformed output preserve recorded context and 
 });
 
 test("desktop operation timeout and cancel abort pending local transport", async t => {
-  let started!: () => void; const begun = new Promise<void>(resolve => { started = resolve; });
-  const fetcher: typeof fetch = async (_url, options) => { started(); return new Promise((_resolve, reject) => {
-    const signal = options!.signal!; signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  // Prepare real source fixtures outside the deliberately tiny transport deadline.
+  const f = await fixture(t, provider().fetcher);
+  let started: () => void = () => {}, requests = 0, aborted = 0;
+  const fetcher: typeof fetch = async (_url, options) => { requests++; started(); return new Promise((_resolve, reject) => {
+    const signal = options!.signal!; signal.addEventListener("abort", () => { aborted++; reject(signal.reason); }, { once: true });
   }); };
-  const f = await fixture(t, fetcher, 60);
+  const ai = new DesktopAI(f.projects, f.evidence, fetcher, 60);
+  ai.configure({ endpoint: "http://127.0.0.1:11434", model: "text:local" });
   // Keep the test process alive because AbortSignal.timeout deliberately unrefs its timer.
   const alive = setTimeout(() => {}, 1000);
-  try { await assert.rejects(f.ai.check(), /took too long/); } finally { clearTimeout(alive); }
-  const run = f.ai.check(), rejected = assert.rejects(run, /canceled/); await begun; f.ai.cancel(); await rejected;
+  try { await assert.rejects(ai.check(), /took too long/); } finally { clearTimeout(alive); }
+  assert.equal(requests, 1); assert.equal(aborted, 1);
+  const begun = new Promise<void>(resolve => { started = resolve; });
+  const run = ai.check(), rejected = assert.rejects(run, /canceled/); await begun; ai.cancel(); await rejected;
+  assert.equal(requests, 2); assert.equal(aborted, 2);
 });
 
 test("desktop unavailable transport and invalid provider JSON give safe diagnostics with recorded facts intact", async t => {

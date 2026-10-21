@@ -1,4 +1,5 @@
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
+import { StorageView } from "./storage-view.ts";
 import { AskView } from "./ask-view.ts";
 import { ModelSetup } from "./model-setup.ts";
 import { renderHome, renderRecorded, renderInterpretation } from "./project-view.ts";
@@ -33,6 +34,7 @@ function clearProjects(): void {
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
+const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup);
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
 function value<T>(result: DesktopResult<T>): T {
@@ -198,7 +200,7 @@ choose.addEventListener("click", () => { void (async () => {
     element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
     refresh.disabled = false;
     announce("Vault selected. No read access granted. Review the allowed paths and exclusions, then approve.");
-    roots.focus();
+    roots.focus(); await storageView.refresh();
   } catch (error) { report(error); } finally { choose.disabled = false; }
 })(); });
 grant.addEventListener("click", () => { void (async () => {
@@ -214,10 +216,10 @@ grant.addEventListener("click", () => { void (async () => {
     vault = selected; generation = 0; approved = true;
   } catch (error) { if (requests.current(ticket)) report(error); }
   finally { requests.finishScope(ticket); scoping = false; projectFolder.disabled = false; grant.disabled = false; refresh.disabled = !vault; }
-  if (approved && requests.current(ticket)) await loadNotes();
+  if (approved && requests.current(ticket)) { await storageView.refresh(); await loadNotes(); }
 })(); });
 close.addEventListener("click", () => { void (async () => {
-  clearContent(); vault = null; generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
+  clearContent(); vault = null; storageView.reset(); generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
   roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); element("vault-name").textContent = ""; element("vault-path").textContent = "";
   try { value(await bridge.closeVault()); announce("Vault closed. All session read access is cleared."); choose.focus(); }
   catch (error) { report(error); }

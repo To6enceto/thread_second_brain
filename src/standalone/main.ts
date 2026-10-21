@@ -1,6 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
+import { DesktopSaves } from "./saves.ts";
+import { DesktopStorage } from "./storage.ts";
 import { VaultReader } from "./vault-reader.ts";
 import { DesktopAsk } from "./ask.ts";
 import { DesktopAI } from "./local-ai.ts";
@@ -15,11 +17,13 @@ const reader = new VaultReader();
 let window: BrowserWindow | null = null;
 let ai: DesktopAI;
 let ask: DesktopAsk;
-const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+let storage: DesktopStorage;
+let saves: DesktopSaves;
+const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
 ai = new DesktopAI(projects, evidence);
 ask = new DesktopAsk(reader, evidence, projects, ai);
-function clearVault(): void { ask.forget(); ai.reset(); evidence.reset(); reader.close(); }
+function clearVault(): void { saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -38,6 +42,8 @@ function handle<T>(channel: string, count: number, run: (...args: unknown[]) => 
 
 async function start(): Promise<void> {
   if (process.platform !== "linux") throw new Error("This desktop milestone requires Linux.");
+  storage = new DesktopStorage(reader, app.getPath("userData"));
+  saves = new DesktopSaves(reader, storage, ask);
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -66,10 +72,11 @@ async function start(): Promise<void> {
       const choice = await dialog.showOpenDialog(window, { title: "Choose your Obsidian vault folder", properties: ["openDirectory"] });
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
-      const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); return selected;
+      await storage.close();
+      const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); await storage.initialize(selected.revision); return selected;
     } finally { choosing = false; }
   });
-  handle("thread:grant-scope", 2, (scope, revision) => { const info = reader.grant(scope, revision); ask.forget(); ai.forget(); evidence.reset(); return info; });
+  handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
   handle("thread:list-notes", 1, revision => reader.list(revision));
   handle("thread:read-note", 3, (path, revision, hash) => evidence.source(path, revision, hash));
   handle("thread:refresh-index", 1, revision => evidence.refresh(revision, true));
@@ -81,16 +88,29 @@ async function start(): Promise<void> {
   handle("thread:discover-models", 1, endpoint => ai.discover(endpoint));
   handle("thread:configure-ai", 1, settings => { const result = ai.configure(settings); ask.forget(); return result; });
   handle("thread:check-ai", 0, () => ai.check());
-  handle("thread:cancel-ai", 0, () => { ai.cancel(); return null; });
+  handle("thread:cancel-ai", 0, () => { saves.revoke(); ai.cancel(); return null; });
   handle("thread:interpret-resume", 2, (identity, revision) => ai.interpret(identity, revision));
   handle("thread:retrieve-ask", 2, (request, revision) => { ai.forget(); return ask.retrieve(request, revision); });
-  handle("thread:choose-ask", 3, (identity, choices, revision) => ask.choose(identity, choices, revision));
-  handle("thread:generate-ask", 2, (identity, revision) => ask.generate(identity, revision));
-  handle("thread:reset-ask", 0, () => { ask.forget(); return null; });
+  handle("thread:choose-ask", 3, (identity, choices, revision) => { saves.revoke(); return ask.choose(identity, choices, revision); });
+  handle("thread:generate-ask", 2, (identity, revision) => { saves.revoke(); return ask.generate(identity, revision); });
+  handle("thread:correct-ask", 5, (identity, index, text, kind, revision) => { saves.revoke(); return ask.correct(identity, index, text, kind, revision); });
+  handle("thread:continue-ask", 3, (identity, question, revision) => { saves.revoke(); return ask.continue(identity, question, revision); });
+  handle("thread:reset-ask", 0, () => { saves.revoke(); ask.forget(); return null; });
+  handle("thread:storage-status", 1, revision => storage.status(revision));
+  handle("thread:inspect-compatibility", 2, (folder, revision) => storage.inspect(folder, revision));
+  handle("thread:enable-writing", 2, (id, revision) => storage.enable(id, revision));
+  handle("thread:release-writing", 0, async () => { await storage.release(); return null; });
+  handle("thread:save-preferences", 2, (preferences, revision) => storage.savePreferences(preferences, revision));
+  handle("thread:import-plugin-copy", 2, (id, revision) => storage.importCopy(id, revision));
+  handle("thread:preview-ask-save", 5, (id, kind, title, selected, revision) => saves.prepare(id, kind, title, selected, revision));
+  handle("thread:save-ask-preview", 2, (id, revision) => saves.save(id, revision));
+  handle("thread:revoke-save-preview", 0, () => { saves.revoke(); return null; });
+  handle("thread:inspect-save-recovery", 2, (id, revision) => saves.inspectRecovery(id, revision));
+  handle("thread:resolve-save-recovery", 3, async (id, action, revision) => { await saves.resolveRecovery(id, action, revision); return null; });
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();
-    if (selected?.scope.roots.length) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
+    if (selected?.scope.roots.length && !saves.applying) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
   }, 2500);
   window.on("closed", () => clearInterval(monitor));
   await window.loadFile(entry);

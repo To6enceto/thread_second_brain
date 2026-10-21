@@ -1,10 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { answerPrompt, ANSWER_SCHEMA, validateAnswer } from "../intelligence/answer.ts";
+import { conversationContext, conversationPrompt, snapshotTurn, MAX_CONVERSATION_TURNS, type ConversationTurn } from "../intelligence/conversation.ts";
+import { createAnswerRecord, reviewedAnswerMarkdown, validateCorrection } from "../vault/answer-record.ts";
+import { createConversationRecord, conversationMarkdown } from "../vault/conversation-record.ts";
+import { noteName } from "../vault/workspace.ts";
+import { defaultSettings } from "../settings/settings.ts";
+import { ANSWER_SCHEMA, validateAnswer } from "../intelligence/answer.ts";
 import { searchBudget, searchLevels } from "../retrieval/budget.ts";
 import { filterEntries, normalizeFilters, searchEntries, type SearchResult } from "../retrieval/search.ts";
 import { SemanticSearch, semanticCandidates } from "../retrieval/semantic.ts";
 import { buildEvidence } from "../vault/evidence.ts";
-import { hitsToNotes, type IndexEntry } from "../vault/index.ts";
+import { hitsToNotes, identityFromIndex, type IndexEntry } from "../vault/index.ts";
 import { contentHash } from "../vault/scope.ts";
 import { selectContext, type EvidenceChoice } from "../vault/workbench.ts";
 import type { AskAnswer, AskContext, AskRequest, AskSnapshot, IndexSnapshot } from "./contracts.ts";
@@ -42,10 +47,13 @@ export class DesktopAsk {
   private prepared: { value: AskSnapshot; version: number; hashes: Record<string, string> } | null = null;
   private context: AskContext | null = null;
   private epoch = 0;
+  private answer: AskAnswer | null = null;
+  private turns: ConversationTurn[] = [];
+  private choices: Record<string, EvidenceChoice> = {};
   constructor(reader: VaultReader, evidence: EvidenceIndex, projects: DesktopProjects, ai: DesktopAI) {
     this.reader = reader; this.evidence = evidence; this.projects = projects; this.ai = ai;
   }
-  forget(): void { this.epoch++; this.prepared = null; this.context = null; this.semantic.clear(); this.ai.cancel(); }
+  forget(): void { this.epoch++; this.prepared = null; this.context = null; this.answer = null; this.turns = []; this.choices = {}; this.semantic.clear(); this.ai.cancel(); }
   private hashes(entries: IndexEntry[]): Record<string, string> {
     const graph = this.evidence.index.graph(this.evidence.scope()), hashes: Record<string, string> = {};
     for (const entry of entries) Object.assign(hashes, graph.assess(entry.path).dependencies, { [entry.path]: entry.hash });
@@ -89,7 +97,7 @@ export class DesktopAsk {
       await this.verify(snapshot, hashes, guard);
       const bundle = { ...await buildEvidence(hitsToNotes(search.hits)), searchCoverage: search.coverage, ...(search.hybrid ? { hybridCoverage: search.hybrid } : {}) };
       guard(); this.evidence.assertCurrent(snapshot);
-      const result = { id: randomUUID(), request: options, index: snapshot, bundle };
+      const result: AskSnapshot = { id: randomUUID(), request: options, index: snapshot, bundle, history: [] };
       this.prepared = { value: result, version, hashes }; return structuredClone(result);
     });
   }
@@ -102,27 +110,86 @@ export class DesktopAsk {
     const prepared = this.active(identity, revision), choices = record(input);
     if (Object.keys(choices).length > prepared.value.bundle.sources.length || Object.entries(choices).some(([id, choice]) =>
       !prepared.value.bundle.sources.some(s => s.id === id) || typeof choice !== "string" || !["include", "exclude", "pin"].includes(choice))) throw new DesktopError("Invalid evidence choices. Use current passage IDs and Include, Pin first or Exclude.");
-    this.context = null; const epoch = ++this.epoch;
+    this.context = null; this.answer = null; const epoch = ++this.epoch;
     return this.ai.run(async (_settings, _signal, current) => {
       const guard = (): void => { current(); if (epoch !== this.epoch || this.active(identity, revision) !== prepared) throw new DesktopError("Ask choices changed. Preview again."); };
       await this.verify(prepared.value.index, prepared.hashes, guard);
-      const result = { id: randomUUID(), retrievalId: prepared.value.id, bundle: selectContext(prepared.value.bundle, choices as Record<string, EvidenceChoice>) };
-      guard(); this.context = result; return structuredClone(result);
+      const bundle = selectContext(prepared.value.bundle, choices as Record<string, EvidenceChoice>);
+      const result = { id: randomUUID(), retrievalId: prepared.value.id, bundle, conversation: conversationContext(this.turns, bundle) };
+      guard(); this.choices = { ...choices } as Record<string, EvidenceChoice>; this.context = result; return structuredClone(result);
     });
   }
   async generate(identity: unknown, revision: unknown): Promise<AskAnswer> {
     const context = this.context;
     if (!context || typeof identity !== "string" || identity !== context.id) throw new DesktopError("Exact context changed. Review the renewed source context before generating.");
-    const prepared = this.active(context.retrievalId, revision), epoch = this.epoch;
+    const prepared = this.active(context.retrievalId, revision), epoch = this.epoch; this.answer = null;
     return this.ai.run(async (settings, signal, current, client) => {
       const guard = (): void => { current(); if (epoch !== this.epoch || this.context !== context || this.active(context.retrievalId, revision) !== prepared) throw new DesktopError("Ask context changed. Retrieve again."); };
       if (!settings.model) throw new DesktopError("Apply a downloaded text model in Optional local AI to generate an answer. Keyword retrieval remains available.");
       if (!context.bundle.sources.length) throw new DesktopError("Include at least one passage before generating.");
       const verify = () => this.verify(prepared.value.index, prepared.hashes, guard);
       await verify();
-      const raw = await client(verify).generate(settings.model, answerPrompt(prepared.value.request.question, context.bundle), signal, ANSWER_SCHEMA);
+      const raw = await client(verify).generate(settings.model, conversationPrompt(prepared.value.request.question, context.bundle, this.turns).prompt, signal, ANSWER_SCHEMA);
       guard(); const answer = validateAnswer(raw, context.bundle); await verify();
-      return { contextId: context.id, answer, model: settings.model, generatedAt: Date.now() };
+      const result = { id: randomUUID(), turnNumber: this.turns.length + 1, corrections: {}, contextId: context.id, answer, model: settings.model, generatedAt: Date.now() };
+      this.answer = result; return structuredClone(result);
     });
   }
+  private answered(identity: unknown, revision: unknown): { answer: AskAnswer; context: AskContext; prepared: NonNullable<DesktopAsk["prepared"]> } {
+    const answer = this.answer, context = this.context;
+    if (!answer || typeof identity !== "string" || answer.id !== identity || !context || answer.contextId !== context.id) throw new DesktopError("Answer or correction changed. Review the current answer again.");
+    return { answer, context, prepared: this.active(context.retrievalId, revision) };
+  }
+  private turn(answer: AskAnswer, context: AskContext, prepared: NonNullable<DesktopAsk["prepared"]>): ConversationTurn {
+    const input = prepared.value.request, settings = defaultSettings(); settings.model = answer.model; settings.selectedProject = input.selection.project;
+    const scope = this.reader.getInfo()!.scope; settings.allowedPaths = [...scope.roots]; settings.excludedPaths = [...scope.excluded];
+    settings.roles.projects = input.selection.folder; settings.embeddingModel = input.embeddingModel;
+    const projectIdentity = input.scope === "vault" ? "" : identityFromIndex(this.evidence.index.entries, input.selection.project, this.evidence.index.ready, this.evidence.index.identityComplete);
+    return snapshotTurn({ question: input.question, answer: answer.answer, corrections: answer.corrections, bundle: context.bundle, choices: this.choices,
+      generatedAt: new Date(answer.generatedAt).toISOString(), settings, vault: input.scope === "vault", projectIdentity }, this.turns.length);
+  }
+  async correct(identity: unknown, index: unknown, text: unknown, kind: unknown, revision: unknown): Promise<AskAnswer> {
+    const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
+    if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= answer.answer.answer.length || !answer.answer.supported) throw new DesktopError("Choose a current supported claim to correct.");
+    let correction;
+    try { correction = validateCorrection({ text, kind, correctedAt: new Date().toISOString() }); }
+    catch { throw new DesktopError("Use a nonempty correction of up to 1200 characters and a known classification. Sources remain unchanged."); }
+    const corrections = { ...answer.corrections, [index as number]: correction };
+    return this.ai.run(async (_settings, _signal, current) => {
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer changed. Review again."); };
+      await this.verify(prepared.value.index, prepared.hashes, guard);
+      createAnswerRecord(prepared.value.request.question, answer.answer, context.bundle, answer.model, new Date(answer.generatedAt).toISOString(), corrections);
+      guard(); this.answer = { ...answer, id: randomUUID(), corrections }; return structuredClone(this.answer);
+    });
+  }
+  async continue(identity: unknown, question: unknown, revision: unknown): Promise<AskSnapshot> {
+    const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
+    if (typeof question !== "string" || !question.trim() || question.length > 1000) throw new DesktopError("Enter a follow-up question of 1-1000 characters.");
+    if (this.turns.length >= MAX_CONVERSATION_TURNS - 1) throw new DesktopError("Six-turn conversation limit reached. Start a new conversation.");
+    return this.ai.run(async (_settings, _signal, current) => {
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer changed. Start again."); };
+      await this.verify(prepared.value.index, prepared.hashes, guard);
+      const turn = this.turn(answer, context, prepared); guard(); this.turns.push(turn);
+      const value: AskSnapshot = { ...prepared.value, id: randomUUID(), request: { ...prepared.value.request, question: question.trim() },
+        history: this.turns.map(({ question, answer, corrections }) => structuredClone({ question, answer, corrections })) };
+      this.prepared = { ...prepared, value }; this.context = null; this.answer = null; this.epoch++; return structuredClone(value);
+    });
+  }
+
+  artifact(identity: unknown, kind: unknown, title: unknown, selected: unknown, revision: unknown): { content: string; project: string; assert: () => void; validate: () => Promise<void> } {
+    const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
+    if (kind !== "answer" && kind !== "conversation" || typeof title !== "string" || title !== noteName(title) || !Array.isArray(selected)
+      || selected.length > 6 || selected.some(n => typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > answer.turnNumber) || new Set(selected).size !== selected.length) throw new DesktopError("Choose a valid new note name and current completed turns.");
+    const turn = this.turn(answer, context, prepared), turns = [...this.turns, turn];
+    const content = kind === "answer"
+      ? reviewedAnswerMarkdown(createAnswerRecord(turn.question, turn.answer, turn.bundle, answer.model, turn.generatedAt, answer.corrections), turn.bundle, turn.projectIdentity)
+      : conversationMarkdown(createConversationRecord(title, turns, selected as number[]));
+    const hashes = { ...prepared.hashes };
+    // A saved transcript may contain earlier evidence omitted from the latest prompt.
+    if (kind === "conversation") for (const n of selected as number[]) Object.assign(hashes, turns[n - 1]!.bundle.noteHashes);
+    const assert = (): void => { if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer or evidence changed. Renew the exact save preview."); };
+    return { content, project: turn.vault ? "" : turn.settings.selectedProject, assert,
+      validate: () => this.verify(prepared.value.index, hashes, assert) };
+  }
+
 }

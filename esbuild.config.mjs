@@ -10,7 +10,7 @@ const buildContext = await context({
   entryPoints: ["src/main.ts"],
   outfile: "main.js",
   bundle: true,
-  external: ["obsidian", "electron", "@codemirror/*", "@lezer/*"],
+  external: ["node:crypto", "node:fs/promises", "node:net", "obsidian", "electron", "@codemirror/*", "@lezer/*"],
   platform: "browser",
   format: "cjs",
   target: "es2022",

@@ -40,6 +40,14 @@ export class ModelSetup {
       const result = this.value(await this.bridge.checkAI()); if (current()) this.feedback.textContent = result;
     }, "Testing local completion capability and cloud-disabled status..."); });
   }
+  draft(): { endpoint: string; model: string; embeddingModel: string } { return { endpoint: this.endpoint.value, model: this.choices.value, embeddingModel: this.embeddings.value }; }
+  restoreDraft(input: { endpoint: string; model: string; embeddingModel: string }): void {
+    this.reset(); this.changed(); this.endpoint.value = input.endpoint;
+    this.choices.replaceChildren(new Option("Recorded only (no model)", ""), ...(input.model ? [new Option(input.model, input.model)] : []));
+    this.embeddings.replaceChildren(new Option("Keyword only", ""), ...(input.embeddingModel ? [new Option(input.embeddingModel, input.embeddingModel)] : []));
+    this.choices.value = input.model; this.embeddings.value = input.embeddingModel; this.choices.disabled = false; this.embeddings.disabled = false;
+    this.feedback.textContent = "Restored preference drafts only. Find downloaded models to check availability, then explicitly choose and Apply AI settings. No inference or read grant started.";
+  }
   embeddingModel(): string { return this.dirty ? "" : this.embeddings.value; }
   model(): string { return this.dirty ? "" : this.saved.model; }
   reset(): void {

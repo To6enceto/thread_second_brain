@@ -23,7 +23,20 @@ export interface DesktopBridge {
   retrieveAsk(request: AskRequest, revision: number): Promise<DesktopResult<AskSnapshot>>;
   chooseAsk(identity: string, choices: Record<string, import("../vault/workbench.ts").EvidenceChoice>, revision: number): Promise<DesktopResult<AskContext>>;
   generateAsk(identity: string, revision: number): Promise<DesktopResult<AskAnswer>>;
+  correctAsk(identity: string, index: number, text: string, kind: import("../intelligence/briefing.ts").Claim["kind"], revision: number): Promise<DesktopResult<AskAnswer>>;
+  continueAsk(identity: string, question: string, revision: number): Promise<DesktopResult<AskSnapshot>>;
   resetAsk(): Promise<DesktopResult<null>>;
+  storageStatus(revision: number): Promise<DesktopResult<import("./storage.ts").StorageStatus>>;
+  inspectCompatibility(folder: string, revision: number): Promise<DesktopResult<import("./storage.ts").CompatibilityPreview>>;
+  enableWriting(id: string, revision: number): Promise<DesktopResult<import("./storage.ts").StorageStatus>>;
+  releaseWriting(): Promise<DesktopResult<null>>;
+  savePreferences(preferences: import("./profile.ts").DesktopPreferences, revision: number): Promise<DesktopResult<import("./storage.ts").StorageStatus>>;
+  importPluginCopy(id: string, revision: number): Promise<DesktopResult<import("./storage.ts").StorageStatus>>;
+  previewAskSave(identity: string, kind: "answer" | "conversation", title: string, selected: number[], revision: number): Promise<DesktopResult<import("./saves.ts").SavePreview>>;
+  saveAskPreview(id: string, revision: number): Promise<DesktopResult<{ path: string }>>;
+  revokeSavePreview(): Promise<DesktopResult<null>>;
+  inspectSaveRecovery(id: string, revision: number): Promise<DesktopResult<import("./saves.ts").RecoveryPreview>>;
+  resolveSaveRecovery(id: string, action: "confirm" | "leave", revision: number): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
@@ -58,7 +71,7 @@ export interface AskRequest {
   method: "keyword" | "hybrid"; embeddingModel: string; level: import("../retrieval/budget.ts").SearchLevel;
 }
 export interface AskSnapshot {
-  id: string; request: AskRequest; index: IndexSnapshot; bundle: import("../vault/evidence.ts").EvidenceBundle;
+  id: string; request: AskRequest; index: IndexSnapshot; bundle: import("../vault/evidence.ts").EvidenceBundle; history: { question: string; answer: import("../intelligence/answer.ts").Answer; corrections: import("../vault/answer-record.ts").ClaimCorrections }[];
 }
-export interface AskContext { id: string; retrievalId: string; bundle: import("../vault/evidence.ts").EvidenceBundle; }
-export interface AskAnswer { contextId: string; answer: import("../intelligence/answer.ts").Answer; model: string; generatedAt: number; }
+export interface AskContext { id: string; retrievalId: string; bundle: import("../vault/evidence.ts").EvidenceBundle; conversation: import("../intelligence/conversation.ts").ConversationContext; }
+export interface AskAnswer { id: string; turnNumber: number; corrections: import("../vault/answer-record.ts").ClaimCorrections; contextId: string; answer: import("../intelligence/answer.ts").Answer; model: string; generatedAt: number; }

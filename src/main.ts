@@ -1,3 +1,4 @@
+import { pluginWriterOwnership } from "./local/writer-ownership.ts";
 import {PdfModal} from "./ui/pdf-modal.ts";
 import {ExportModal} from "./ui/export-modal.ts";
 import {ProjectComparisonModal} from "./ui/compare-modal.ts";
@@ -93,6 +94,11 @@ export default class ThreadPlugin extends Plugin {
   changeTicket={context:"",revision:-1,settings:""};
 
   async onload(): Promise<void> {
+    this.active=false;
+    if (this.app.vault.adapter instanceof FileSystemAdapter) {
+      try { await pluginWriterOwnership(this.app.vault.adapter.getBasePath()); }
+      catch { new Notice("Thread Desktop owns writing for this vault. Release desktop writing, then reload the Thread plugin. No plugin notes or history were changed."); return; }
+    }
     this.active=true;
     this.settings = loadSettings(await this.loadData());
     try{if(await this.app.vault.adapter.exists(this.projectImportsPath())){const text=await this.app.vault.adapter.read(this.projectImportsPath());if(new TextEncoder().encode(text).length>16*1048576)throw Error('History exceeds metadata budget.');this.projectImports=loadProjectImports(JSON.parse(text));this.projectImportsText=text;}}

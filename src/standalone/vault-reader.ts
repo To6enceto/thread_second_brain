@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import type { Stats } from "node:fs";
 import { open, opendir, type FileHandle } from "node:fs/promises";
@@ -7,13 +8,13 @@ import type { NoteList, NoteSnapshot, ReadScope, VaultInfo } from "./contracts.t
 
 export const READ_LIMITS = { notes: 500, entries: 5000, depth: 16, bytes: 2 * 1024 * 1024, milliseconds: 10000 } as const;
 const directoryFlags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
-const fdPath = (handle: FileHandle, part?: string): string => `/proc/self/fd/${handle.fd}${part ? `/${part}` : ""}`;
+export const fdPath = (handle: FileHandle, part?: string): string => `/proc/self/fd/${handle.fd}${part ? `/${part}` : ""}`;
 const stamp = (stat: Stats): string => [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(":");
 interface Selection { path: string; dev: number; ino: number; revision: number; scope: ReadScope; }
 
 // Directory-relative descriptors prevent a parent rename/symlink swap from
 // redirecting a later open outside the selected root on the supported Linux host.
-async function absoluteDirectory(path: string): Promise<FileHandle> {
+export async function absoluteDirectory(path: string): Promise<FileHandle> {
   if (!isAbsolute(path) || normalize(path) !== path || path.includes("\0")) throw new DesktopError("Choose an ordinary absolute directory.");
   let handle = await open("/", directoryFlags);
   try {
@@ -76,6 +77,37 @@ export class VaultReader {
       }
       return handle;
     } catch (error) { await handle.close(); throw error; }
+  }
+  async identity(revision: unknown): Promise<string> {
+    const selected = this.current(revision), root = await this.openRoot(selected);
+    try { const stat = await root.stat(); this.current(revision); return createHash("sha256").update(`${stat.dev}:${stat.ino}`).digest("hex"); }
+    finally { await root.close(); }
+  }
+  /** Explicit metadata consent only; never added to the text index or read grants. */
+  async pluginFiles(input: unknown, revision: unknown): Promise<Record<string, string | null>> {
+    if (typeof input !== "string" || !/^[.]?[A-Za-z0-9_-]{1,100}$/.test(input)) throw new DesktopError("Use a single ordinary Obsidian configuration folder name, such as .obsidian.");
+    const selected = this.current(revision), base = `${input}/plugins/thread`, files: Record<string, string | null> = {};
+    let total = 0;
+    for (const [name, limit] of [["manifest.json", 65536], ["data.json", 1048576], ["changes.json", 24 * 1048576], ["project-imports.json", 16 * 1048576]] as const) {
+      const path = `${base}/${name}`;
+      if (selected.scope.excluded.some(root => root === "." || path === root || path.startsWith(`${root}/`))) throw new DesktopError("Plugin metadata is excluded. Review exclusions explicitly before compatibility inspection.");
+      let file: FileHandle;
+      try { file = await this.openPath(selected, path); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { files[name] = null; continue; } throw new DesktopError("Plugin metadata is unavailable or uses a link. Preserve it; writing remains disabled."); }
+      try {
+        const before = await file.stat();
+        if (!before.isFile() || before.nlink !== 1 || before.size > limit) throw new DesktopError("Plugin metadata exceeds its ordinary-file budget. Preserve it; writing remains disabled.");
+        const buffer = Buffer.alloc(before.size + 1); let count = 0;
+        while (count < buffer.length) { this.current(revision); const part = await file.read(buffer, count, buffer.length - count, count); if (!part.bytesRead) break; count += part.bytesRead; }
+        const after = await file.stat(), current = await this.openPath(selected, path);
+        let actual; try { actual = await current.stat(); } finally { await current.close(); }
+        if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("Plugin metadata changed. Inspect compatibility again.");
+        this.current(revision); total += count;
+        if (total > 40 * 1048576) throw new DesktopError("Plugin metadata exceeds the 40 MiB inspection budget.");
+        files[name] = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, count));
+      } finally { await file.close(); }
+    }
+    const root = await this.openRoot(selected); await root.close(); this.current(revision); return files;
   }
   async list(revision: unknown): Promise<NoteList> {
     const selected = this.current(revision);

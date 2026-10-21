@@ -2,9 +2,9 @@
 
 Thread has an independent Linux window with scoped vault browsing, keyword
 evidence search, safe Markdown navigation, project home, recorded Resume, optional
-local AI interpretation and an Ask evidence workbench. Obsidian can stay closed.
-Reviewed saves and remaining desktop workflows are tracked in items 54-62 of the
-build plan; the existing plugin remains available.
+local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
+new-note saves. Obsidian can stay closed. Remaining desktop workflows are tracked
+in items 55-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -86,8 +86,8 @@ source text can receive keyboard focus for scrolling and selection.
   window. `npm run verify` typechecks/tests both targets and builds both.
 
 The standalone UI cannot load Obsidian community plugins/themes. It currently
-leaves every plugin setting, journal and source unchanged. Later write features
-must establish compatible persistence and cross-process coordination before use.
+leaves plugin settings, journals and existing sources unchanged. New-note saves
+require the explicit desktop storage setup below.
 
 A failed or bounded Markdown enumeration leaves stable-ID uniqueness unproven.
 Known omitted Markdown files are counted separately from unsupported attachments;
@@ -129,7 +129,8 @@ folder contents, explicit links from those notes, and matching project IDs.
 External edits, access changes and Cancel indexing clear the project output too.
 Refresh projects and select again to rebuild it. Source bytes/dependencies are
 checked before publication and citation navigation. Mapping and selection clear on
-vault change/reload; all setup is still volatile and no notes/history are written.
+vault change/reload. Desktop preference drafts can be restored explicitly as described
+below; read grants and live model selection are never restored automatically.
 
 ## Optional local AI
 
@@ -157,7 +158,8 @@ transmission after model checks and after generation. Renderer content cannot
 supply arbitrary prompts or network URLs. Operations are bounded to 180 seconds
 and provider responses to 2 MiB; try a smaller model if these limits are reached.
 
-Model setup is volatile and resets on vault change/reload. Selecting a model never
+Active model setup resets on vault change/reload. Saved preference drafts require
+explicit restoration and Apply AI settings. Selecting a model never
 grants note access. Cloud status must be explicitly disabled and a fully local
 completion capability confirmed; remote aliases and enabled/unknown cloud status
 are refused. The downloaded runtime/model work offline once installed, with no
@@ -200,5 +202,83 @@ Missing/incompatible/unavailable embeddings produce an explicit keyword fallback
 Canceled or stale requests cannot become a fallback success. A missing text model
 disables generation while retrieval remains useful. Invalid answers/connection
 failures retain current evidence with safe feedback. Embedding vectors and all
-workbench state remain session-only; invalidation clears the cache. No answer
-saves, conversations, plugin history imports or note changes ship in this milestone.
+workbench state remain session-only; invalidation clears the cache. Explicit saves
+use the reviewed flows below; nothing is saved automatically.
+
+
+## Follow-ups and corrections
+
+Expand **Correct claim N** to edit its text/classification, then **Apply correction**.
+The original model output, model name, generation time and citations remain intact.
+Corrections express your judgment, not independently verified truth. Unapplied
+correction drafts block saving and continuing; apply or explicitly revert them.
+
+Enter a **Follow-up question** and choose **Continue with current evidence**.
+This explicitly reuses the retrieval; review Include/Pin/Exclude again and choose
+**Generate from chosen evidence**. Inspect **Exact earlier conversation context
+(not evidence)** for included/omitted turns. Earlier output is never new evidence.
+The shared bounds are six turns, 4000 earlier-context characters and 24000 total
+prompt characters. Excluding a prior turn's supporting passages omits that turn
+from model context. **New conversation** or a new retrieval resets the conversation.
+Source/project/model/scope changes invalidate it. Reload does not resume inference.
+
+## Enable reviewed desktop saves
+
+1. Close the Obsidian process and other editors of this vault. Open **Desktop
+   storage and writing** in Vault settings. Read the compatibility consent text,
+   enter the actual Obsidian configuration folder (normally `.obsidian`), then
+   **Read plugin settings and recovery files**. This explicitly reads only Thread's manifest,
+   settings, changes and project-import journals, up to 40 MiB. Stored originals
+   may include formerly permitted content. They are never indexed or sent to AI.
+2. An installed plugin must be the compatible Thread 0.4.2 build. Unsupported,
+   malformed or unresolved plugin journals block desktop writing; resolve them in
+   the compatible plugin and close Obsidian first. An absent plugin is allowed.
+   Inspecting the wrong configuration folder cannot certify another installation.
+3. Choose **Enable desktop writing**. The compatible plugin and desktop use a
+   kernel-held exclusive writer handle for the same vault filesystem identity.
+   The plugin retains it until its Obsidian process exits, including after plugin
+   disable, to cover pending operations. Desktop releases after its operation
+   settles on close or explicit release. Coordination requires the same Linux
+   host, user and network namespace; isolated containers/Flatpak namespaces and
+   unrelated editors are not covered. Keep them closed during saves.
+4. Optionally **Copy previewed plugin preferences and history** after inspecting the exact
+   copy. This saves preference drafts and a separate immutable history snapshot;
+   plugin files/live journals, read grants and PDF consent never migrate. **Use
+   preference drafts** still requires explicit Apply AI settings and project refresh.
+   **Save desktop preferences** retains the current model drafts and folder roles;
+   neither action grants reads. All-permitted-notes saves require a mapped Knowledge
+   folder and separate read permission for that destination.
+
+The desktop profile stores versioned per-vault JSON under `thread-v1/` in Electron's
+application user-data folder, outside the vault. Development launch uses the ignored
+local profile configured by the launcher. Do not reset an invalid/unknown profile:
+reading remains available, while writing fails closed. Preserve it for recovery.
+At most twenty save receipts, five imported-history copies and 64 MiB total state
+are retained; full history blocks new entries instead of pruning unresolved state.
+
+## Exact new-note saves and interrupted saves
+
+In Ask, enter **New note name** and choose the current reviewed answer or selected
+conversation turns. Choose **Preview new note** and review the exact path and
+Markdown. Project notes go under `Answers/` or `Conversations/` inside the selected
+project; all-permitted-notes saves use the explicitly mapped Knowledge role. Missing
+ordinary destination subfolders are created only after Save. **Save exact new note**
+creates exclusively; existing files, case/normalization collisions, links, changed
+sources/choices/corrections or revoked access are refused. Saves are bounded to 1 MiB.
+The Markdown uses the same answer/conversation schemas as the plugin. Open it in
+Obsidian normally after releasing desktop writing; transcripts do not become
+source evidence or resume a conversation automatically.
+
+Before any vault creation, a durable receipt stores the exact intended bytes in
+the separate desktop profile. Confirmed bytes mark it complete. Interrupted or
+unconfirmed saves keep their pending receipt and block further note saves. Reopen
+Thread, select the vault, explicitly restore read grants and writer ownership,
+then **Refresh desktop state** and **Inspect pending save**. Review the intended
+bytes and whether the current file matches. **Confirm completed save** is available
+only for matching bytes; it does not prove which process created those bytes.
+**Keep files and close recovery** acknowledges the unresolved result while retaining
+its receipt. Both actions recheck the target and modify only the receipt; neither
+removes, rewrites or rolls back vault files. Inspect any partial note or empty
+folders yourself before deciding what to keep. Unsupported/oversized targets require
+manual inspection. No whole-filesystem transaction or lock against unrelated editors
+is claimed. Existing-note changes and guarded undo are planned in feature 55.

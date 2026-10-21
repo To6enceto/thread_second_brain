@@ -151,3 +151,144 @@ test("desktop IPC rejects non-string scope, method, budget and evidence choice e
   assert.ok(!excluded.bundle.sources.some(source => source.id === id));
   assert.equal(f.p.calls.length, 0);
 });
+
+test("desktop follow-ups preserve original provenance and corrected context, using current evidence only", async t => {
+  const f = await fixture(t); f.configure(); let found = await f.ask.retrieve(options, f.info.revision);
+  const first = await f.ask.choose(found.id, {}, f.info.revision), original = await f.ask.generate(first.id, f.info.revision);
+  const corrected = await f.ask.correct(original.id, 0, "Treat the recorded budget as a proposed limit.", "suggestion", f.info.revision);
+  assert.notEqual(corrected.id, original.id); assert.deepEqual(corrected.answer, original.answer); assert.equal(corrected.generatedAt, original.generatedAt); assert.equal(corrected.model, original.model);
+  assert.equal(corrected.corrections[0]!.kind, "suggestion");
+  await assert.rejects(f.ask.continue(original.id, "What does that mean?", f.info.revision), /Answer or correction changed/);
+  found = await f.ask.continue(corrected.id, "What does that mean?", f.info.revision);
+  assert.equal(found.history.length, 1); found.history[0]!.corrections[0]!.text = "FORGED RENDERER HISTORY";
+  const next = await f.ask.choose(found.id, {}, f.info.revision);
+  assert.equal(next.conversation.turns[0]!.claims[0]!.text, "Treat the recorded budget as a proposed limit."); assert.equal(next.conversation.turns[0]!.claims[0]!.userCorrected, true);
+  const answer = await f.ask.generate(next.id, f.info.revision); assert.equal(answer.turnNumber, 2);
+  const chat = f.p.calls.filter(call => call.path === "/api/chat").at(-1)!;
+  const prompt = JSON.parse((chat.body.messages as { content: string }[])[1]!.content);
+  assert.deepEqual(prompt.earlierConversation, next.conversation.turns); assert.deepEqual(prompt.evidence, next.bundle.sources); assert.ok(!JSON.stringify(prompt).includes("FORGED RENDERER"));
+});
+
+test("desktop evidence exclusions omit earlier response text, and six-turn limit prevents unbounded continuation", async t => {
+  const f = await fixture(t); f.configure(); let found = await f.ask.retrieve(options, f.info.revision);
+  let context = await f.ask.choose(found.id, {}, f.info.revision), answer = await f.ask.generate(context.id, f.info.revision);
+  found = await f.ask.continue(answer.id, "Continue with only one passage", f.info.revision);
+  const excluded = found.bundle.sources[0]!.id;
+  context = await f.ask.choose(found.id, { [excluded]: "exclude" }, f.info.revision);
+  assert.equal(context.conversation.turns.length, 0); assert.deepEqual(context.conversation.omitted, [{ turn: 1, reason: "evidence selection" }]);
+  answer = await f.ask.generate(context.id, f.info.revision);
+  const chat = f.p.calls.filter(call => call.path === "/api/chat").at(-1)!;
+  assert.deepEqual(JSON.parse((chat.body.messages as { content: string }[])[1]!.content).earlierConversation, []);
+  for (let number = 3; number <= 6; number++) {
+    found = await f.ask.continue(answer.id, `Follow-up ${number}`, f.info.revision);
+    context = await f.ask.choose(found.id, { [excluded]: "exclude" }, f.info.revision);
+    answer = await f.ask.generate(context.id, f.info.revision); assert.equal(answer.turnNumber, number);
+  }
+  const count = f.p.calls.length; await assert.rejects(f.ask.continue(answer.id, "Turn seven", f.info.revision), /Six-turn/); assert.equal(f.p.calls.length, count);
+  const reset = await f.ask.retrieve(options, f.info.revision); assert.deepEqual(reset.history, []);
+});
+
+test("desktop correction and follow-up identities reject invalid input and stale sources, models and revoked grants", async t => {
+  const f = await fixture(t); f.configure(); const found = await f.ask.retrieve(options, f.info.revision), context = await f.ask.choose(found.id, {}, f.info.revision);
+  const answer = await f.ask.generate(context.id, f.info.revision);
+  for (const [index, text, kind] of [["0", "valid", "fact"], [0, " ", "fact"], [0, "x".repeat(1201), "fact"], [0, "text", ["fact"]], [9, "text", "fact"]]) await assert.rejects(f.ask.correct(answer.id, index, text, kind, f.info.revision));
+  for (const question of ["", ["question"], "x".repeat(1001)]) await assert.rejects(f.ask.continue(answer.id, question, f.info.revision));
+  await writeFile(join(f.root, "Projects/Demo/Overview.md"), f.notes["Projects/Demo/Overview.md"] + "\nExternal edit");
+  const requestsBeforeEdit = f.p.calls.length;
+  await assert.rejects(f.ask.correct(answer.id, 0, "changed", "interpretation", f.info.revision), /Local AI canceled/);
+  await assert.rejects(f.ask.continue(answer.id, "Next", f.info.revision), /Answer or correction changed/);
+  assert.equal(f.p.calls.length, requestsBeforeEdit);
+  const second = await f.ask.retrieve(options, f.info.revision), chosen = await f.ask.choose(second.id, {}, f.info.revision), fresh = await f.ask.generate(chosen.id, f.info.revision);
+  f.configure(); await assert.rejects(f.ask.continue(fresh.id, "Next", f.info.revision), /changed/);
+  f.reader.grant({ roots: [], excluded: [] }, f.info.revision);
+  await assert.rejects(f.ask.correct(fresh.id, 0, "text", "fact", f.info.revision), /changed/);
+});
+
+async function saving(t: TestContext) {
+  const f = await fixture(t); f.configure();
+  const { DesktopStorage } = await import("./storage.ts"), { DesktopSaves } = await import("./saves.ts");
+  const profile = await mkdtemp(join(tmpdir(), "thread-save-profile-")); t.after(() => rm(profile, { recursive: true, force: true }));
+  const storage = new DesktopStorage(f.reader, profile); await storage.initialize(f.info.revision); t.after(() => storage.close());
+  const compatibility = await storage.inspect(".obsidian", f.info.revision); await storage.enable(compatibility.id, f.info.revision);
+  const saves = new DesktopSaves(f.reader, storage, f.ask);
+  const found = await f.ask.retrieve(options, f.info.revision), context = await f.ask.choose(found.id, {}, f.info.revision), answer = await f.ask.generate(context.id, f.info.revision);
+  return { ...f, profile, storage, saves, found, context, answer };
+}
+
+test("desktop exact answer and selected conversation saves retain correction provenance and refuse overwrites", async t => {
+  const { readFile } = await import("node:fs/promises"), { metadata } = await import("./metadata.ts");
+  const f = await saving(t), revision = f.info.revision;
+  const corrected = await f.ask.correct(f.answer.id, 0, "Reviewed orchid budget: 20 euros.", "interpretation", revision);
+  const first = await f.saves.prepare(corrected.id, "answer", "Reviewed budget", [1], revision);
+  assert.match(first.content, /User correction/); assert.match(first.content, /Original model/); assert.ok(first.content.includes(corrected.model));
+  const exact = first.content; first.content = "renderer forged"; first.path = "Projects/Private/forged.md";
+  const saved = await f.saves.save(first.id, revision); assert.equal(await readFile(join(f.root, saved.path), "utf8"), exact);
+  assert.equal(metadata(exact).type, "answer");
+  const { answerRecordProjection } = await import("../vault/answer-record.ts"), { readSourceReferences } = await import("../vault/freshness.ts");
+  assert.match(answerRecordProjection(exact, metadata(exact), readSourceReferences(metadata(exact).thread_sources)).text, /Reviewed orchid budget/);
+  assert.equal(f.storage.status(revision).saves[0]!.status, "complete");
+  // A new index generation is required after creation; retrieve starts a fresh conversation.
+  await f.evidence.refresh(revision);
+  const found = await f.ask.retrieve(options, revision), chosen = await f.ask.choose(found.id, {}, revision), answer = await f.ask.generate(chosen.id, revision);
+  await assert.rejects(f.saves.prepare(answer.id, "answer", "Reviewed budget", [1], revision), /already exists/);
+  const next = await f.ask.continue(answer.id, "What is deferred?", revision), context = await f.ask.choose(next.id, {}, revision), second = await f.ask.generate(context.id, revision);
+  const conversation = await f.saves.prepare(second.id, "conversation", "Selected discussion", [2], revision);
+  assert.match(conversation.content, /Turn 2/); assert.match(conversation.content, /not included in this save/);
+  const result = await f.saves.save(conversation.id, revision); assert.equal(await readFile(join(f.root, result.path), "utf8"), conversation.content);
+  assert.equal(metadata(conversation.content).type, "conversation");
+  const { readConversationRecord } = await import("../vault/conversation-record.ts");
+  assert.equal(readConversationRecord(conversation.content, metadata(conversation.content)).turns[0]!.number, 2);
+});
+
+test("desktop save previews revoke on source, choice, correction, draft, preferences and permission changes", async t => {
+  const { readFile } = await import("node:fs/promises");
+  for (const change of ["source", "choice", "correction", "draft", "preferences", "permission", "target"] as const) {
+    const f = await saving(t), revision = f.info.revision, preview = await f.saves.prepare(f.answer.id, "answer", "Current answer", [1], revision);
+    if (change === "source") await writeFile(join(f.root, "Projects/Demo/Overview.md"), "Externally changed");
+    if (change === "choice") await f.ask.choose(f.found.id, {}, revision);
+    if (change === "correction") await f.ask.correct(f.answer.id, 0, "Updated correction", "suggestion", revision);
+    if (change === "draft") f.saves.revoke();
+    if (change === "preferences") await f.storage.savePreferences({ ...f.storage.status(revision).preferences, model: "other:local" }, revision);
+    if (change === "permission") f.reader.grant({ roots: [], excluded: [] }, revision);
+    if (change === "target") { await mkdir(join(f.root, "Projects/Demo/Answers")); await writeFile(join(f.root, preview.path), "external note"); }
+    await assert.rejects(f.saves.save(preview.id, revision));
+    if (change === "target") assert.equal(await readFile(join(f.root, preview.path), "utf8"), "external note");
+    else await assert.rejects(readFile(join(f.root, preview.path)), { code: "ENOENT" });
+    if (change !== "permission") assert.equal(f.storage.status(revision).saves.length, 0);
+  }
+});
+
+test("desktop interrupted receipt survives restart, blocks further saves and resolves without altering files", async t => {
+  const { chmod, readFile } = await import("node:fs/promises"), { DesktopStorage } = await import("./storage.ts"), { DesktopSaves } = await import("./saves.ts");
+  const f = await saving(t), revision = f.info.revision;
+  await mkdir(join(f.root, "Projects/Demo/Answers"));
+  const preview = await f.saves.prepare(f.answer.id, "answer", "Interrupted", [1], revision);
+  await chmod(join(f.root, "Projects/Demo/Answers"), 0o500);
+  try { await assert.rejects(f.saves.save(preview.id, revision), /pending recovery/); }
+  finally { await chmod(join(f.root, "Projects/Demo/Answers"), 0o700); }
+  const pending = f.storage.status(revision).saves[0]!; assert.equal(pending.status, "pending");
+  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "Another", [1], revision), /pending/);
+  await f.storage.close(); const restarted = new DesktopStorage(f.reader, f.profile); t.after(() => restarted.close());
+  await restarted.initialize(revision); const compatibility = await restarted.inspect(".obsidian", revision); await restarted.enable(compatibility.id, revision);
+  const saves = new DesktopSaves(f.reader, restarted, f.ask), recovery = await saves.inspectRecovery(pending.id, revision);
+  assert.equal(recovery.present, false); assert.equal(recovery.content, preview.content);
+  await assert.rejects(saves.resolveRecovery(recovery.id, "confirm", revision));
+  await writeFile(join(f.root, preview.path), "later external note");
+  await assert.rejects(saves.resolveRecovery(recovery.id, "leave", revision), /target changed/);
+  const updated = await saves.inspectRecovery(pending.id, revision); await saves.resolveRecovery(updated.id, "leave", revision);
+  assert.equal(restarted.status(revision).saves[0]!.status, "left"); assert.equal(await readFile(join(f.root, preview.path), "utf8"), "later external note");
+});
+
+test("desktop reconciliation confirms exact intended bytes only and preserves durable receipt limits", async t => {
+  const { hashText } = await import("./profile.ts"), { readFile } = await import("node:fs/promises");
+  const f = await saving(t), revision = f.info.revision;
+  const path = "Projects/Demo/Interrupted.md", content = "# Intended exact bytes\n";
+  await f.storage.owned(revision, (profile, current) => profile.store({ ...profile.state, saves: [{ id: "interrupted", path, content, hash: hashText(content), createdAt: new Date().toISOString(), status: "pending" }] }, current));
+  await writeFile(join(f.root, path), content);
+  const preview = await f.saves.inspectRecovery("interrupted", revision); assert.equal(preview.matches, true);
+  preview.content = "forged renderer content"; await f.saves.resolveRecovery(preview.id, "confirm", revision);
+  assert.equal(await readFile(join(f.root, path), "utf8"), content); assert.equal(f.storage.status(revision).saves[0]!.status, "complete");
+  await f.storage.owned(revision, (profile, current) => profile.store({ ...profile.state, saves: Array.from({ length: 20 }, (_, n) => ({ ...profile.state.saves[0]!, id: `retained-${n}` })) }, current));
+  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "More", [1], revision), /Twenty/);
+  assert.equal(f.storage.status(revision).saves.length, 20);
+});

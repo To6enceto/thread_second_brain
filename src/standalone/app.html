@@ -26,11 +26,31 @@
           <p class="thread-muted">Choosing a vault grants no access. Approve folders below for this session only.</p>
           <label for="roots">Allowed paths</label>
           <textarea id="roots" rows="3" placeholder="Projects&#10;Sources" spellcheck="false"></textarea>
-          <p id="roots-help" class="thread-muted">One relative folder or Markdown file per line. Use . only to grant the whole vault. Hidden folders are always unavailable.</p>
+          <p id="roots-help" class="thread-muted">One relative folder or Markdown file per line. Use . only to grant the whole vault. Hidden folders are unavailable as note evidence.</p>
           <label for="exclusions">Excluded paths</label><textarea id="exclusions" rows="2" placeholder="Projects/Private" spellcheck="false"></textarea>
           <p class="thread-muted">Exclusions always take precedence.</p>
           <div class="thread-scope-preview"><span class="thread-eyebrow">ACCESS AFTER APPROVAL</span><p id="scope-preview"></p></div>
           <button id="grant" class="thread-primary">Approve read access</button>
+        </details>
+        <details id="storage-setup">
+          <summary>Desktop storage and writing</summary>
+          <p class="thread-muted">Preferences and recovery stay in this app profile. Read access and PDF consent are never restored or imported. Writing is optional and each note still needs an exact preview.</p>
+          <p id="storage-status" role="status" aria-live="polite">Select a vault to inspect desktop state.</p>
+          <button id="storage-refresh">Refresh desktop state</button>
+          <details><summary>Saved preference drafts</summary><pre id="storage-preferences"></pre><button id="storage-use-drafts">Use preference drafts</button></details>
+          <label for="plugin-config">Obsidian configuration folder</label><input id="plugin-config" value=".obsidian" maxlength="101">
+          <p class="thread-muted">Inspecting explicitly reads only Thread's manifest.json, data.json, changes.json and project-imports.json under this configuration folder (up to 40 MiB). History may contain stored original notes, including formerly permitted content. It is never indexed or sent to AI. Files remain unchanged.</p>
+          <button id="storage-inspect">Read plugin settings and recovery files</button>
+          <div id="storage-compatibility"></div>
+          <p class="thread-muted">Close Obsidian before enabling writing. Compatible Thread writers use exclusive ownership; other editors must not edit concurrently. Unknown or unresolved plugin recovery blocks writing. Desktop reading stays available.</p>
+          <div class="thread-controls"><button id="storage-enable" disabled>Enable desktop writing</button><button id="storage-release">Release writing</button></div>
+          <details><summary>Folder preference drafts (grant no read access)</summary><div id="storage-roles"></div></details>
+          <button id="storage-save" disabled>Save desktop preferences</button>
+          <details open><summary>Exact preference copy preview (replaces saved drafts)</summary><pre id="storage-import-preferences" tabindex="0"></pre></details>
+          <button id="storage-import" disabled>Copy previewed plugin preferences and history</button>
+          <details><summary>Exact history copy preview</summary><pre id="storage-history-preview"></pre></details>
+          <p class="thread-muted">Copying retains a separate read-only history snapshot; it never migrates or shares the plugin's live journal. At most five copies and twenty save receipts are retained; full history blocks new entries.</p>
+          <div id="storage-recovery"></div>
         </details>
         <button id="close" class="thread-quiet">Close vault and clear access</button>
       </section>
@@ -45,7 +65,7 @@
         <div class="thread-controls"><button id="ai-apply">Apply AI settings</button><button id="ai-check" disabled>Test local connection</button><button id="ai-cancel-checks" disabled>Cancel local checks</button></div>
         <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Recorded context works without an AI model.</p>
       </details>
-      <p class="thread-footnote">Read-only milestone. Resume and Ask are available. Reviewed writing follows in the next planned features.</p>
+      <p class="thread-footnote">Resume and Ask run locally. New-note saves require explicit writer setup and exact approval; existing notes stay unchanged.</p>
     </aside>
     <section class="thread-library" aria-label="Permitted Markdown notes">
       <section class="thread-project-controls" aria-label="Projects">
@@ -94,7 +114,7 @@
           <label>From record date<input id="ask-from" type="date"></label>
           <label>Through record date<input id="ask-through" type="date"></label>
         </div><p class="thread-muted">Dates use recorded fields, falling back to file modification dates; they do not verify events.</p></details>
-        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button></div>
+        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button><button id="ask-new-conversation">New conversation</button></div>
         <p id="ask-status" role="status" aria-live="polite" class="thread-muted">Enter a question and retrieve current permitted evidence.</p>
         <div id="ask-results"></div>
       </section>

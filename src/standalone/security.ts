@@ -1,3 +1,4 @@
+import { WriterOwnershipError } from "../local/writer-ownership.ts";
 import { pathToFileURL } from "node:url";
 import type { ReadScope } from "./contracts.ts";
 
@@ -35,5 +36,5 @@ export function assetAllowed(url: string, assets: readonly string[]): boolean {
   return assets.some(asset => pathToFileURL(asset).href === url);
 }
 export function publicFailure(error: unknown): string {
-  return error instanceof DesktopError ? error.message : "Thread could not finish this read. Check folder access, then refresh or select the vault again.";
+  return error instanceof DesktopError || error instanceof WriterOwnershipError ? error.message : "Thread could not finish this read. Check folder access, then refresh or select the vault again.";
 }
