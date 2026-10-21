@@ -1,7 +1,7 @@
 .thread-desktop {
   --thread-background: #f8f6f2; --thread-surface: #efede8; --thread-card: #fffdfa;
   --thread-text: #292724; --thread-muted: #625d55; --thread-border: #cbc6bd;
-  --thread-recorded: #a65e20; --thread-button: #e9a867; --thread-button-text: #241b12;
+  --thread-ai: #505ba6; --thread-recorded: #a65e20; --thread-button: #e9a867; --thread-button-text: #241b12;
   --thread-serif: "Iowan Old Style", "Charter", Georgia, serif;
   --thread-interface: system-ui, sans-serif; --thread-mono: ui-monospace, monospace;
   color-scheme: light; margin: 0; background: var(--thread-background); color: var(--thread-text);
@@ -11,13 +11,13 @@
   .thread-desktop:not([data-theme="light"]) {
     --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
     --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
-    --thread-recorded: #e9a867; color-scheme: dark;
+    --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
   }
 }
 .thread-desktop[data-theme="dark"] {
   --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
   --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
-  --thread-recorded: #e9a867; color-scheme: dark;
+  --thread-ai: #a9b1f4; --thread-recorded: #e9a867; color-scheme: dark;
 }
 .thread-desktop :is(button, input, textarea, select) { font: inherit; color: inherit; border: 1px solid var(--thread-border); border-radius: 7px; background: var(--thread-card); padding: 8px 12px; box-sizing: border-box; min-height: 36px; }
 .thread-desktop button { cursor: pointer; }
@@ -91,3 +91,10 @@
 .thread-desktop .thread-source-chip { font: 11px/1.5 var(--thread-mono); color: var(--thread-recorded); min-height: 32px; margin: 4px 4px 4px 0; text-align: left; overflow-wrap: anywhere; max-width: 100%; }
 .thread-recorded-claim details { margin-top: 8px; }
 .thread-desktop section:focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }
+
+.thread-sidebar select { width: 100%; }
+.thread-ai-card { border: 1.5px dashed var(--thread-ai); border-radius: 12px; background: color-mix(in srgb, var(--thread-ai) 8%, var(--thread-background)); padding: 18px; margin-top: 24px; overflow-wrap: anywhere; }
+.thread-ai-card h2 { color: var(--thread-ai); }
+.thread-ai-card .thread-source-chip { color: var(--thread-ai); }
+.thread-ai-claim { border-top: 1px dashed var(--thread-ai); padding: 6px 0; }
+.thread-ai-claim p { font: 18px/1.6 var(--thread-serif); white-space: pre-wrap; }

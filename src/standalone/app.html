@@ -34,7 +34,16 @@
         </details>
         <button id="close" class="thread-quiet">Close vault and clear access</button>
       </section>
-      <p class="thread-footnote">Read-only milestone. Recorded Resume is available. AI, Ask and reviewed writing are coming in the next planned features.</p>
+      <details id="ai-setup">
+        <summary>Optional local AI</summary>
+        <p class="thread-muted">Use a downloaded Ollama text model. Start your local runtime with OLLAMA_NO_CLOUD=1. Thread does not install it or download models.</p>
+        <label for="ai-endpoint">Local Ollama endpoint</label><input id="ai-endpoint" value="http://127.0.0.1:11434" maxlength="200" spellcheck="false">
+        <button id="ai-discover">Find downloaded models</button>
+        <label for="ai-model">Available text models</label><select id="ai-model" aria-label="Available text models" disabled><option value="">Discover models first</option></select>
+        <div class="thread-controls"><button id="ai-apply">Apply AI settings</button><button id="ai-check" disabled>Test local connection</button><button id="ai-cancel-checks" disabled>Cancel local checks</button></div>
+        <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Recorded context works without an AI model.</p>
+      </details>
+      <p class="thread-footnote">Read-only milestone. Recorded Resume is available. Ask and reviewed writing are coming in the next planned features.</p>
     </aside>
     <section class="thread-library" aria-label="Permitted Markdown notes">
       <section class="thread-project-controls" aria-label="Projects">
@@ -46,6 +55,8 @@
         <button id="load-projects" disabled>Refresh projects</button>
         <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
+        <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
+        <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
         <p class="thread-muted">Recorded context first. Works without AI. Selection and mapping are session-only.</p>
       </section>
       <div class="thread-section-heading"><h2>Your notes</h2><button id="refresh" disabled>Refresh</button></div>
@@ -66,6 +77,7 @@
     <section class="thread-reader" aria-label="Source reader">
       <section id="project-panel" tabindex="-1" aria-label="Project home and recorded Resume" hidden></section>
       <div id="source-pane">
+      <button id="back-project" disabled>Back to project</button>
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
       <h2 id="note-title">Open a source</h2>
       <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>

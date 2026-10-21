@@ -1,5 +1,6 @@
-import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo } from "./contracts.ts";
-import { renderHome, renderRecorded } from "./project-view.ts";
+import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
+import { ModelSetup } from "./model-setup.ts";
+import { renderHome, renderRecorded, renderInterpretation } from "./project-view.ts";
 import { ReaderRequests } from "./reader-requests.ts";
 import { indexCoverageText } from "../vault/index-coverage.ts";
 import { markdownPreview, sourceHeadingCount, headingMatches } from "./markdown.ts";
@@ -13,7 +14,16 @@ const filter = element<HTMLInputElement>("filter"), status = element("status");
 const search = element<HTMLButtonElement>("search"), query = element<HTMLInputElement>("search-query"), cancel = element<HTMLButtonElement>("cancel-index");
 const projectFolder = element<HTMLInputElement>("projects-folder"), projectSelect = element<HTMLSelectElement>("project-select");
 const loadProjects = element<HTMLButtonElement>("load-projects"), homeButton = element<HTMLButtonElement>("project-home"), resumeButton = element<HTMLButtonElement>("resume-project");
+let aiEpoch = 0;
+let activePrepared: PreparedResume | null = null;
+const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
+function clearAI(): void {
+  aiEpoch++; document.querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
+}
+const modelSetup = new ModelSetup(bridge, clearAI);
+function cancelAI(): void { clearAI(); void bridge.cancelAI(); }
 function clearProjects(): void {
+  activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   element("project-panel").replaceChildren(); projectSelect.replaceChildren(new Option("Choose a permitted project", ""));
   projectSelect.disabled = true; homeButton.disabled = true; resumeButton.disabled = true; loadProjects.disabled = true;
 }
@@ -178,7 +188,7 @@ choose.addEventListener("click", () => { void (async () => {
     const selected = value(await bridge.selectVault());
     if (!selected) { announce("Folder selection canceled. Existing access is unchanged."); return; }
     clearContent(); vault = selected; generation = 0;
-    roots.value = ""; exclusions.value = ""; projectFolder.value = ""; scopePreview();
+    roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); scopePreview();
     element("vault-details").hidden = false;
     element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
     refresh.disabled = false;
@@ -203,7 +213,7 @@ grant.addEventListener("click", () => { void (async () => {
 })(); });
 close.addEventListener("click", () => { void (async () => {
   clearContent(); vault = null; generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
-  roots.value = ""; exclusions.value = ""; projectFolder.value = ""; element("vault-name").textContent = ""; element("vault-path").textContent = "";
+  roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); element("vault-name").textContent = ""; element("vault-path").textContent = "";
   try { value(await bridge.closeVault()); announce("Vault closed. All session read access is cleared."); choose.focus(); }
   catch (error) { report(error); }
 })(); });
@@ -218,6 +228,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
+  activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };
   const panel = element("project-panel"); panel.replaceChildren(); panel.hidden = false; element("source-pane").hidden = true;
   homeButton.disabled = true; resumeButton.disabled = true; loadProjects.disabled = true;
@@ -237,7 +248,10 @@ async function loadProject(resume = false, discover = false): Promise<void> {
       empty.textContent = result.projects.length ? "Choose a permitted project above." : "No projects found. Map a Projects folder with Overview.md notes, or use type: project metadata. Review read access separately."; panel.append(empty);
     }
     announce(resume ? "Recorded context ready. No AI or note changes were needed." : result.home ? "Project home ready. Dates describe records, not verified events." : "Project list ready. Mapping does not grant access.");
+    element<HTMLButtonElement>("back-project").disabled = false;
     if (!discover) panel.focus();
+    activePrepared = recorded;
+    if (recorded && modelSetup.model()) void interpretProject(recorded);
   } catch (error) { if (requests.current(ticket)) report(error); }
   finally {
     if (requests.current(ticket)) {
@@ -251,3 +265,23 @@ loadProjects.addEventListener("click", () => { void loadProject(false, true); })
 projectSelect.addEventListener("change", () => { requests.invalidate(); element("project-panel").replaceChildren(); void loadProject(); });
 homeButton.addEventListener("click", () => { void loadProject(); });
 resumeButton.addEventListener("click", () => { void loadProject(true); });
+
+async function interpretProject(recorded: PreparedResume): Promise<void> {
+  const epoch = ++aiEpoch;
+  aiCancel.disabled = false; aiFeedback.textContent = "Recorded context ready. Generating AI interpretation locally...";
+  const current = (): boolean => epoch === aiEpoch && activePrepared === recorded && vault?.revision === recorded.revision && generation === recorded.generation;
+  try {
+    const result = value(await bridge.interpretResume(recorded.briefingId, recorded.revision));
+    if (!current() || result.briefingId !== recorded.briefingId) return;
+    renderInterpretation(element("project-panel"), result, recorded, (path, heading, hash) => { void openNote(path, heading, hash); });
+    aiFeedback.textContent = "Briefing ready. Recorded context and AI interpretations are shown separately.";
+  } catch (error) {
+    if (current()) aiFeedback.textContent = `Recorded context remains available. ${error instanceof Error ? error.message : "Local AI could not finish."}`;
+  } finally { if (epoch === aiEpoch) aiCancel.disabled = true; }
+}
+aiCancel.addEventListener("click", () => { cancelAI(); aiFeedback.textContent = "AI interpretation canceled. Current recorded context remains available."; });
+
+element("back-project").addEventListener("click", () => {
+  if (!element("project-panel").childElementCount) return;
+  element("source-pane").hidden = true; element("project-panel").hidden = false; element("project-panel").focus();
+});

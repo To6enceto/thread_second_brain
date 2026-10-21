@@ -14,7 +14,12 @@ export interface DesktopBridge {
   resolveLink(from: string, target: string, revision: number): Promise<DesktopResult<import("./links.ts").LinkResolution>>;
   onIndexEvent(listener: (event: IndexEvent) => void): () => void;
   projectHome(selection: ProjectRequest, revision: number): Promise<DesktopResult<ProjectSnapshot>>;
-  resumeProject(selection: ProjectRequest, revision: number): Promise<DesktopResult<RecordedSnapshot>>;
+  resumeProject(selection: ProjectRequest, revision: number): Promise<DesktopResult<PreparedResume>>;
+  discoverModels(endpoint: string): Promise<DesktopResult<{ models: import("../intelligence/ollama.ts").DownloadedModel[]; total: number; omitted: number }>>;
+  configureAI(config: AIConfig): Promise<DesktopResult<AIConfig>>;
+  checkAI(): Promise<DesktopResult<string>>;
+  cancelAI(): Promise<DesktopResult<null>>;
+  interpretResume(briefingId: string, revision: number): Promise<DesktopResult<AIInterpretation>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
@@ -32,4 +37,13 @@ export interface RecordedSnapshot extends ProjectSnapshot {
   bundle: import("../vault/evidence.ts").EvidenceBundle;
   recorded: import("../intelligence/briefing.ts").Briefing;
   generatedAt: number;
+}
+
+export interface AIConfig { endpoint: string; model: string; }
+export interface PreparedResume extends RecordedSnapshot { briefingId: string; }
+export interface AIInterpretation {
+  briefingId: string; revision: number; generation: number; model: string; generatedAt: number;
+  interpretations: import("../intelligence/briefing.ts").Claim[];
+  nextActions: import("../intelligence/briefing.ts").Claim[];
+  modelGaps: string[];
 }

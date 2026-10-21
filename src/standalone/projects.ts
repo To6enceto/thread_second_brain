@@ -33,6 +33,18 @@ export class DesktopProjects {
     return { revision: snapshot.revision, generation: snapshot.generation, projects,
       home: selection.project ? projectHome(this.evidence.index, settings) : null, index: snapshot };
   }
+  async assertCurrent(recorded: RecordedSnapshot): Promise<void> {
+    const snapshot = recorded.index;
+    await this.evidence.refresh(snapshot.revision);
+    this.evidence.assertCurrent(snapshot);
+    for (const [path, hash] of Object.entries(recorded.bundle.noteHashes)) {
+      this.evidence.assertCurrent(snapshot);
+      const file = snapshot.listing.files[path];
+      if (!file || await contentHash((await this.reader.read(path, snapshot.revision, file.bytes)).text) !== hash) throw new DesktopError("Supporting source changed. Resume again.");
+    }
+    await this.evidence.refresh(snapshot.revision);
+    this.evidence.assertCurrent(snapshot);
+  }
   async resume(input: unknown, revision: unknown, now = Date.now()): Promise<RecordedSnapshot> {
     const selection = request(input), home = await this.home(selection, revision);
     if (!home.home) throw new DesktopError("Choose a permitted project before Resume.");

@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { VaultReader } from "./vault-reader.ts";
+import { DesktopAI } from "./local-ai.ts";
 import { DesktopProjects } from "./projects.ts";
 import { EvidenceIndex } from "./evidence-index.ts";
 import { assetAllowed, DesktopError, publicFailure, trustedSender } from "./security.ts";
@@ -11,9 +12,11 @@ app.setName("Thread Desktop");
 app.enableSandbox();
 const reader = new VaultReader();
 let window: BrowserWindow | null = null;
-const evidence = new EvidenceIndex(reader, event => { if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+let ai: DesktopAI;
+const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") ai?.forget(); if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
-function clearVault(): void { evidence.reset(); reader.close(); }
+ai = new DesktopAI(projects, evidence);
+function clearVault(): void { ai.reset(); evidence.reset(); reader.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -60,18 +63,23 @@ async function start(): Promise<void> {
       const choice = await dialog.showOpenDialog(window, { title: "Choose your Obsidian vault folder", properties: ["openDirectory"] });
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
-      const selected = await reader.select(choice.filePaths[0]); evidence.reset(); return selected;
+      const selected = await reader.select(choice.filePaths[0]); ai.reset(); evidence.reset(); return selected;
     } finally { choosing = false; }
   });
-  handle("thread:grant-scope", 2, (scope, revision) => { const info = reader.grant(scope, revision); evidence.reset(); return info; });
+  handle("thread:grant-scope", 2, (scope, revision) => { const info = reader.grant(scope, revision); ai.forget(); evidence.reset(); return info; });
   handle("thread:list-notes", 1, revision => reader.list(revision));
   handle("thread:read-note", 3, (path, revision, hash) => evidence.source(path, revision, hash));
   handle("thread:refresh-index", 1, revision => evidence.refresh(revision, true));
   handle("thread:cancel-index", 1, revision => { evidence.cancel(revision); return null; });
   handle("thread:search-notes", 2, (query, revision) => evidence.search(query, revision));
   handle("thread:resolve-link", 3, (from, target, revision) => evidence.resolve(from, target, revision));
-  handle("thread:project-home", 2, (selection, revision) => projects.home(selection, revision));
-  handle("thread:resume-project", 2, (selection, revision) => projects.resume(selection, revision));
+  handle("thread:project-home", 2, (selection, revision) => { ai.forget(); return projects.home(selection, revision); });
+  handle("thread:resume-project", 2, (selection, revision) => ai.prepare(selection, revision));
+  handle("thread:discover-models", 1, endpoint => ai.discover(endpoint));
+  handle("thread:configure-ai", 1, settings => ai.configure(settings));
+  handle("thread:check-ai", 0, () => ai.check());
+  handle("thread:cancel-ai", 0, () => { ai.cancel(); return null; });
+  handle("thread:interpret-resume", 2, (identity, revision) => ai.interpret(identity, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();

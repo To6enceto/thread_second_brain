@@ -1,5 +1,5 @@
 import type { ProjectHome, HomeItem } from "../vault/project-home.ts";
-import type { RecordedSnapshot } from "./contracts.ts";
+import type { RecordedSnapshot, AIInterpretation } from "./contracts.ts";
 import { contextCoverageText } from "../vault/evidence.ts";
 import { indexCoverageText } from "../vault/index-coverage.ts";
 
@@ -33,7 +33,7 @@ export function renderRecorded(parent: HTMLElement, result: RecordedSnapshot, op
   add(parent, "p", result.home!.project, "thread-path");
   const card = add(parent, "section", "", "thread-recorded-card");
   add(card, "h2", "Recorded context");
-  add(card, "p", `Prepared ${new Date(result.generatedAt).toLocaleString()}. From your notes; no AI generation.`, "thread-muted");
+  add(card, "p", `Prepared ${new Date(result.generatedAt).toLocaleString()}. From your notes without AI; optional interpretation appears separately.`, "thread-muted");
   const labels = { objective: "Objective", lastActivity: "Last recorded activity", decisions: "Recorded decisions", openQuestions: "Open questions", newEvidence: "New evidence" } as const;
   for (const key of Object.keys(labels) as (keyof typeof labels)[]) {
     const section = add(card, "section", "", "thread-project-section"); add(section, "h3", labels[key], "thread-eyebrow");
@@ -60,4 +60,24 @@ export function renderRecorded(parent: HTMLElement, result: RecordedSnapshot, op
     chip(sources, `${source.id} ${source.path} > ${source.heading || source.property || "Note"}`, source.path, source.heading, result.bundle.noteHashes[source.path]!, open);
     add(sources, "p", source.excerpt);
   }
+}
+
+export function renderInterpretation(parent: HTMLElement, result: AIInterpretation, recorded: RecordedSnapshot, open: OpenSource): void {
+  const card = add(parent, "section", "", "thread-ai-card");
+  add(card, "h2", "AI interpretation");
+  add(card, "p", `Generated ${new Date(result.generatedAt).toLocaleString()} using ${result.model}. Doesn't change your notes or recorded context.`, "thread-muted");
+  const claims = (title: string, items: AIInterpretation["interpretations"]): void => {
+    add(card, "h3", title);
+    if (!items.length) add(card, "p", "No supported items returned.", "thread-muted");
+    for (const claim of items) {
+      const row = add(card, "div", "", "thread-ai-claim"); add(row, "p", `${claim.kind}: ${claim.text}`);
+      for (const id of claim.sourceIds) {
+        const source = recorded.bundle.sources.find(s => s.id === id)!;
+        chip(row, `${id} ${source.path.split("/").at(-1)} > ${source.heading || source.property || "Note"}`, source.path, source.heading, recorded.bundle.noteHashes[source.path]!, open);
+      }
+    }
+  };
+  claims("Interpretations", result.interpretations); claims("Suggested next actions", result.nextActions);
+  const details = add(card, "details"); add(details, "summary", "Model-reported gaps"); const list = add(details, "ul");
+  for (const gap of result.modelGaps) add(list, "li", gap);
 }

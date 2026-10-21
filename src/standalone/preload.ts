@@ -17,6 +17,11 @@ const bridge: DesktopBridge = {
   },
   projectHome: (selection, revision) => ipcRenderer.invoke("thread:project-home", selection, revision),
   resumeProject: (selection, revision) => ipcRenderer.invoke("thread:resume-project", selection, revision),
+  discoverModels: endpoint => ipcRenderer.invoke("thread:discover-models", endpoint),
+  configureAI: settings => ipcRenderer.invoke("thread:configure-ai", settings),
+  checkAI: () => ipcRenderer.invoke("thread:check-ai"),
+  cancelAI: () => ipcRenderer.invoke("thread:cancel-ai"),
+  interpretResume: (identity, revision) => ipcRenderer.invoke("thread:interpret-resume", identity, revision),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

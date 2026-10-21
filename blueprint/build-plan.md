@@ -107,7 +107,7 @@ verifiable boundaries; no earlier feature is renumbered.
 ## Milestone P - Resume and research in Thread Desktop
 
 - [x] 51. **Desktop project home and recorded Resume** - Map permitted projects, show existing project records and deterministic sourced briefings, and navigate citations inside Thread without opening Obsidian. Keep missing evidence and recorded dates explicit. Depends on 50.
-- [ ] 52. **Desktop local AI setup and Resume interpretation** - Reuse cloud-disabled loopback Ollama validation, compatible downloaded-model selection, cancellation and structured briefing validation; preserve recorded context when inference is unavailable. Demonstrate real local inference in the desktop app. Depends on 51.
+- [x] 52. **Desktop local AI setup and Resume interpretation** - Reuse cloud-disabled loopback Ollama validation, compatible downloaded-model selection, cancellation and structured briefing validation; preserve recorded context when inference is unavailable. Demonstrate real local inference in the desktop app. Depends on 51.
 - [ ] 53. **Desktop Ask evidence workbench** - Port bounded retrieval, filters, include/pin/exclude, exact model context, sourced answers and optional local hybrid search; invalidate on external source/scope/model changes. Demonstrate real text/embedding inference and keyword fallback. Depends on 52.
 - [ ] 54. **Desktop follow-ups and reviewed new-note saves** - Add bounded conversations, claim corrections and exact new-note previews/saves using existing Markdown schemas; refuse collisions/stale sources and preserve original model provenance. Establish desktop-owned settings/history and explicit compatibility with existing plugin data before writes. Depends on 53.
 

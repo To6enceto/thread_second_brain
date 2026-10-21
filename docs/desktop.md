@@ -1,9 +1,9 @@
 # Thread Desktop preview
 
 Thread has an independent Linux window with scoped vault browsing, keyword
-evidence search, safe Markdown navigation, project home and recorded Resume. Obsidian can stay closed. The
-existing plugin also provides AI Resume, Ask and the other completed workflows;
-remaining desktop features are tracked in items 52-62 of the build plan.
+evidence search, safe Markdown navigation, project home, recorded Resume and optional local AI interpretation. Obsidian can stay closed. The
+existing plugin also provides Ask and the other completed workflows;
+remaining desktop features are tracked in items 53-62 of the build plan.
 
 ## Run from this checkout
 
@@ -114,8 +114,9 @@ notes; it never grants access. Root-level projects are not supported in this mil
 Select **Project** to see recent sessions, decision status/date summaries and open
 questions. Choose **Resume project** for deterministic quoted context and source
 chips. Expand **Supporting excerpt** or **Evidence used** to inspect the supporting
-passages. A chip opens the current source inside Thread; **Project home** or
-**Resume project** returns to the project view. No Ollama/model is required here.
+passages. A chip opens the current source inside Thread; **Back to project** returns to
+the current briefing without regeneration. **Project home** and **Resume project**
+explicitly rebuild their views. No Ollama/model is required here.
 
 Missing records remain explicit. Recorded dates and user-reported progress are not
 independently verified events. Index and 16,000-character context limits remain
@@ -127,3 +128,35 @@ External edits, access changes and Cancel indexing clear the project output too.
 Refresh projects and select again to rebuild it. Source bytes/dependencies are
 checked before publication and citation navigation. Mapping and selection clear on
 vault change/reload; all setup is still volatile and no notes/history are written.
+
+## Optional local AI
+
+1. Start your existing Ollama runtime with cloud disabled (`OLLAMA_NO_CLOUD=1`).
+   Download a free text model separately if needed. Thread never starts services,
+   downloads models, uses a hosted fallback or selects one automatically.
+2. Expand **Optional local AI** in Thread's left sidebar. Enter the loopback
+   endpoint for your runtime, normally `http://127.0.0.1:11434`.
+3. Choose **Find downloaded models**, select a compatible text model, then
+   **Apply AI settings** and **Test local connection**. Discovery inspects at most
+   40 entries and checks local capability, not answer quality. The isolated test
+   model is `qwen3:4b-instruct`; your installed model names may differ.
+4. Choose **Resume project**. Recorded context appears first. If an applied model
+   is selected, a separate dashed AI card adds interpretations and suggested
+   actions, with model/time and source chips. Those suggestions do not alter the
+   recorded facts or any notes.
+5. **Cancel AI interpretation** stops the optional inference while keeping the
+   current recorded context. Model/setup edits clear AI output; apply the draft
+   before using it. **Recorded only (no model)** disables automatic interpretation.
+
+Connection failure, malformed output or cancellation leaves still-current recorded
+context available. Changing projects/read access, external edits or vault closure
+invalidates obsolete snapshots. Context is main-owned and revalidated before
+transmission after model checks and after generation. Renderer content cannot
+supply arbitrary prompts or network URLs. Operations are bounded to 180 seconds
+and provider responses to 2 MiB; try a smaller model if these limits are reached.
+
+Model setup is volatile and resets on vault change/reload. Selecting a model never
+grants note access. Cloud status must be explicitly disabled and a fully local
+completion capability confirmed; remote aliases and enabled/unknown cloud status
+are refused. The downloaded runtime/model work offline once installed, with no
+account, subscription or hosted API cost.
