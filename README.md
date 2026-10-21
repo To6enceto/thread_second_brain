@@ -1,5 +1,12 @@
 # Thread
 
+**Independent desktop preview:** `npm run desktop:setup` downloads the local
+Electron runtime once; `npm run desktop:start` builds and opens Thread without
+Obsidian. The first desktop milestone browses explicitly permitted Markdown and
+reads sources without changing any files. Resume, Ask and the remaining desktop
+workflows are planned next; they remain available in the existing plugin.
+See [desktop setup and limits](docs/desktop.md).
+
 Open **Thread: Open full workspace**, then **Actions**, to inspect the current four-column action board. **Refresh action board** rereads permitted records; stale or unsupported records have generic unavailable counts. **Review action** selects a current record in the explicit transition form and does not move it automatically. In **Wrap up**, click **Refresh recorded actions**, select up to five records (none are selected by default), then generate locally. The preview separates those user reports from the model summary; saving the session never changes action statuses. Changing inputs, sources or selections revokes older save previews. Large selections that cannot fit the existing context budget must be reduced explicitly.
 
 

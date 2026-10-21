@@ -99,7 +99,45 @@ verifiable boundaries; no earlier feature is renumbered.
 - [x] 47. **Validated local update previews** - Validate an explicitly selected local Thread package, exact inventory/hashes, supported versions and host/data compatibility, then preview code/assets to replace without touching notes, settings or journals. Demonstrate malformed/corrupt/unexpected-file/version rejection on disposable installations. Depends on 34.
 - [x] 48. **Recoverable local updates** - Apply an exact approved update to a disposable installation with durable interruption recovery and compatible previous-code rollback, preserving settings, caches where appropriate and all journals. Detect changed targets and unsupported data compatibility; never imply code rollback undoes migrations. Demonstrate interrupted updates, refusal paths, final native offline workflow and verified local package. Depends on 35-47.
 
-## Build discipline
+## Milestone O - Open a vault independently of Obsidian
+
+- [x] 49. **Independent desktop vault reader** - Launch a Fedora-first Electron app with no running Obsidian dependency; select a vault, preview and explicitly grant read roots/exclusions, browse a bounded Markdown list and read source text. Keep all vault/plugin files unchanged, isolate renderer privileges, refuse unsafe paths and revoke old views on scope/vault changes. Prove the actual desktop window using synthetic notes.
+- [ ] 50. **Desktop indexed evidence and source navigation** - Reuse the bounded index, keyword ranking and section logic through a desktop file adapter; add safe Markdown/link navigation, explicit refresh and incremental invalidation for external edits, renames and exclusions. Report coverage and ambiguous links. Preserve keyword-only use without AI. Depends on 49.
+
+## Milestone P - Resume and research in Thread Desktop
+
+- [ ] 51. **Desktop project home and recorded Resume** - Map permitted projects, show existing project records and deterministic sourced briefings, and navigate citations inside Thread without opening Obsidian. Keep missing evidence and recorded dates explicit. Depends on 50.
+- [ ] 52. **Desktop local AI setup and Resume interpretation** - Reuse cloud-disabled loopback Ollama validation, compatible downloaded-model selection, cancellation and structured briefing validation; preserve recorded context when inference is unavailable. Demonstrate real local inference in the desktop app. Depends on 51.
+- [ ] 53. **Desktop Ask evidence workbench** - Port bounded retrieval, filters, include/pin/exclude, exact model context, sourced answers and optional local hybrid search; invalidate on external source/scope/model changes. Demonstrate real text/embedding inference and keyword fallback. Depends on 52.
+- [ ] 54. **Desktop follow-ups and reviewed new-note saves** - Add bounded conversations, claim corrections and exact new-note previews/saves using existing Markdown schemas; refuse collisions/stale sources and preserve original model provenance. Establish desktop-owned settings/history and explicit compatibility with existing plugin data before writes. Depends on 53.
+
+## Milestone Q - Preserve reviewed workflows outside Obsidian
+
+- [ ] 55. **Desktop change review and recovery** - Adapt shared proposals, editable diffs, before-hash checks, durable originals, guarded undo and interruption recovery to direct file access. Define a safe policy for simultaneous plugin/desktop writers and existing pending plugin recovery; no silent journal migration. Prove interruption/concurrent-editor behavior. Depends on 54.
+- [ ] 56. **Desktop decisions and managed questions** - Port explicit decision creation/review and managed question states, preserving prior reasoning, status, answer and reopening history through reviewed writes. Depends on 55.
+- [ ] 57. **Desktop actions and session wrap-up** - Port durable action transitions, accessible board and explicitly selected recorded progress into reviewed session notes; AI never changes status. Depends on 56.
+- [ ] 58. **Desktop freshness and project reviews** - Port dependency-aware stale output, review queue/acknowledgements, weekly review, timeline, multi-project overview and bounded health diagnostics with individual reviewed repairs. Depends on 57.
+- [ ] 59. **Desktop capture and research collections** - Port non-overwriting capture/local clipped-note intake, source metadata, duplicate review, named collections and reviewed knowledge synthesis. Revalidate references; never fetch imported URLs. Depends on 55 and 58.
+- [ ] 60. **Desktop local PDFs and page citations** - Adapt the consented offline PDF worker/assets, extraction, current-original checks and page source navigation; preserve all limits and demonstrate with authored PDFs and actual desktop AI. Depends on 59.
+- [ ] 61. **Desktop project portability** - Port exact export previews, validated new-copy imports/recovery and checkpoint comparisons, retaining shared formats and current permissions. Prove plugin/desktop round trips and refuse overwrites. Depends on 60.
+
+## Milestone R - Deliver the independent local application
+
+- [ ] 62. **Desktop packaging and offline acceptance** - Produce a separately versioned local Fedora desktop artifact and launcher instructions, with bundled licenses/assets and clear update compatibility. Verify the full desktop workflow offline, plugin regressions, data preservation and real local inference. Keep installation/publication explicit; do not reuse the plugin updater for desktop binaries. Depends on 49-61.
+
+## Desktop build discipline
+
+Approved on 2026-10-21: implement the three-stage Thread Desktop proposal alongside
+the existing plugin. Preserve completed 1-48 and all archive bytes. Desktop is a
+separate local Electron runtime sharing Markdown, not an emulation of Obsidian or
+a hosted web service. One feature at a time; prove its actual runtime and obtain
+required independent review before completion. The first feature reads only;
+later write features must first freeze history interoperability and concurrency
+contracts. Use synthetic vaults/profiles, never personal notes. No claim of full
+desktop feature parity until every applicable feature passes. Existing platform,
+cost, permission, explicit-write, recovery and publication boundaries still apply.
+
+## Original build discipline
 
 The first feature includes only the connection and read boundaries necessary for
 its briefing. It reads current notes directly; the reusable index arrives in

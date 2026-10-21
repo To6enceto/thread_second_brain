@@ -1,0 +1,64 @@
+.thread-desktop {
+  --thread-background: #f8f6f2; --thread-surface: #efede8; --thread-card: #fffdfa;
+  --thread-text: #292724; --thread-muted: #625d55; --thread-border: #cbc6bd;
+  --thread-recorded: #a65e20; --thread-button: #e9a867; --thread-button-text: #241b12;
+  --thread-serif: "Iowan Old Style", "Charter", Georgia, serif;
+  --thread-interface: system-ui, sans-serif; --thread-mono: ui-monospace, monospace;
+  color-scheme: light; margin: 0; background: var(--thread-background); color: var(--thread-text);
+  font: 14px/1.55 var(--thread-interface); height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  .thread-desktop:not([data-theme="light"]) {
+    --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
+    --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
+    --thread-recorded: #e9a867; color-scheme: dark;
+  }
+}
+.thread-desktop[data-theme="dark"] {
+  --thread-background: #202221; --thread-surface: #272a28; --thread-card: #2e312e;
+  --thread-text: #eeeae2; --thread-muted: #bcb7ae; --thread-border: #4f554f;
+  --thread-recorded: #e9a867; color-scheme: dark;
+}
+.thread-desktop :is(button, input, textarea, select) { font: inherit; color: inherit; border: 1px solid var(--thread-border); border-radius: 7px; background: var(--thread-card); padding: 8px 12px; box-sizing: border-box; min-height: 36px; }
+.thread-desktop button { cursor: pointer; }
+.thread-desktop button:hover { border-color: var(--thread-recorded); }
+.thread-desktop button:disabled { cursor: default; opacity: .55; }
+.thread-desktop :is(button, input, textarea, select, summary, pre):focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }
+.thread-desktop :is(input, textarea) { width: 100%; }
+.thread-desktop textarea { font-family: var(--thread-mono); resize: vertical; }
+.thread-desktop label { display: block; margin: 12px 0 6px; }
+.thread-desktop :is(h1, h2) { font-family: var(--thread-serif); font-weight: 400; line-height: 1.2; }
+.thread-desktop h1 { font-size: 32px; }
+.thread-desktop h2 { font-size: 25px; margin: 12px 0; overflow-wrap: anywhere; }
+.thread-header { display: flex; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid var(--thread-border); flex-shrink: 0; }
+.thread-wordmark { font: italic 29px var(--thread-serif); }
+.thread-badge { border: 1px solid var(--thread-border); border-radius: 20px; padding: 3px 10px; color: var(--thread-muted); font-size: 12px; }
+.thread-desktop .thread-theme { margin: 0 0 0 auto; display: flex; gap: 10px; align-items: center; }
+.thread-layout { display: grid; grid-template-columns: 290px 310px minmax(280px, 1fr); min-height: 0; flex: 1; overflow: hidden; }
+.thread-layout > :is(.thread-sidebar, .thread-library, .thread-reader) { overflow-y: auto; min-height: 0; }
+.thread-sidebar { padding: 26px 24px; background: var(--thread-surface); border-right: 1px solid var(--thread-border); }
+.thread-eyebrow { color: var(--thread-recorded); letter-spacing: .09em; font-size: 10px; font-weight: 650; }
+.thread-muted, .thread-footnote { color: var(--thread-muted); font-size: 12px; }
+.thread-footnote { padding-top: 20px; border-top: 1px solid var(--thread-border); margin-top: 24px; }
+.thread-path { font: 11px/1.6 var(--thread-mono); color: var(--thread-muted); overflow-wrap: anywhere; }
+.thread-desktop .thread-primary { width: 100%; background: var(--thread-button); color: var(--thread-button-text); border-color: var(--thread-button); font-weight: 600; min-height: 44px; }
+.thread-desktop .thread-quiet { width: 100%; margin-top: 16px; background: transparent; }
+.thread-desktop details { margin-top: 20px; }
+.thread-desktop summary { cursor: pointer; min-height: 32px; }
+.thread-scope-preview { border-left: 2px solid var(--thread-recorded); padding-left: 12px; margin: 18px 0; font-size: 12px; overflow-wrap: anywhere; }
+.thread-library { padding: 24px 20px; border-right: 1px solid var(--thread-border); }
+.thread-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.thread-note-list { list-style: none; padding: 0; margin: 20px 0; }
+.thread-desktop .thread-note { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; margin-bottom: 8px; padding: 12px; border-left: 2px solid var(--thread-recorded); overflow-wrap: anywhere; }
+.thread-reader { padding: 32px; min-width: 0; }
+.thread-reader pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.8 var(--thread-mono); tab-size: 2; }
+.thread-empty { color: var(--thread-muted); font-family: var(--thread-serif); font-size: 20px; padding: 30px 0; }
+.thread-status { border-top: 1px solid var(--thread-border); padding: 8px 28px; background: var(--thread-surface); flex-shrink: 0; }
+.thread-status p { margin: 4px 0; }
+@media (max-width: 1050px) {
+  .thread-layout { grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(180px, 35%) minmax(0, 1fr); }
+  .thread-sidebar { grid-row: span 2; }
+  .thread-library { border-right: none; border-bottom: 1px solid var(--thread-border); }
+  .thread-note-list { max-height: 260px; overflow-y: auto; }
+  .thread-reader { padding: 24px; }
+}

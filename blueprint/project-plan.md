@@ -1,7 +1,8 @@
 # Thread - Project Plan
 
 Planning date: 2026-10-14. This is the product direction for a desktop Obsidian
-plugin. The accompanying build plan is the ordered implementation checklist;
+plugin, extended by the approved independent desktop application below.
+The accompanying build plan is the ordered implementation checklist;
 individual feature specs will define the exact changes and acceptance evidence.
 
 ## 1. Problem - What problem are we solving?
@@ -796,3 +797,74 @@ There is no mandatory paid runtime. Hardware, downloads, local storage, memory,
 power and optional development assistants remain real costs. Models/runtime stay
 separate downloads. Package the next private version after the queue passes and
 report measured platform, model and scale limits rather than universal support.
+
+## Approved direction - independent Thread Desktop (49-62)
+
+Approved on 2026-10-21 after reviewing the standalone application proposal. Give
+Thread its own Fedora-first desktop window and launch command while Obsidian can
+remain completely closed. Keep the existing plugin as an optional interface to
+the same Markdown vault. This section supersedes the plugin-only stack/runtime
+restrictions for the new desktop target only; prior features and archives remain
+intact. It does not authorize embedding Obsidian, claiming compatibility with its
+community plugins/themes, or replacing its entire editor feature set.
+
+### Runtime and implementation
+
+Use Electron, TypeScript, native DOM/CSS and the existing esbuild toolchain. Share
+the existing pure retrieval, evidence, AI, records, validation and proposal logic
+where it fits. Supply a separate main-process filesystem adapter, narrow typed
+preload bridge and sandboxed/context-isolated renderer without Node privileges.
+The desktop renderer cannot read arbitrary paths, spawn processes or fetch remote
+assets. Imported Markdown/model output is untrusted text. Keep explicit read
+roots/exclusions, local-only Ollama, no account/backend and no paid fallback.
+
+The first stage is independently launchable scoped vault reading; the second
+ports project home, recorded Resume, AI setup/interpretation and Ask; the third
+ports reviewed saves/changes, records, research, PDFs and portability, then ships
+a verified desktop package. Build-plan items 49-62 divide those stages into
+reviewable features. Current plugin functionality is not proof of desktop parity.
+
+### Files, permissions and coexistence
+
+Notes/attachments remain in the same ordinary vault folder. Selecting a vault
+does not grant content access. Preview explicit vault-relative read roots and
+exclusions before approval; exclusions always win. Do not automatically import
+the plugin's read permissions, settings or PDF consent. PDF bytes still require
+explicit per-file consent. Reject path traversal, symlink escapes and unsupported
+file types. Bound traversal, bytes and displayed results; report omissions.
+
+Desktop settings/caches/journals belong to a separate app profile, outside the
+vault and repository by default. Development/testing may explicitly use ignored
+project-local profiles. In the first read-only feature, access grants are volatile
+and must be reapproved after a restart. No note editing or plugin-state writes.
+Before desktop saves ship, define versioned persistence and explicit import of
+compatible settings/history where requested. Never silently copy, reset, migrate
+or share a mutable plugin journal; preserve unresolved plugin recovery state.
+
+Reuse existing readable Markdown schemas. Outside edits invalidate stale evidence
+and previews. All new-note saves refuse collisions. Existing-note updates require
+exact renewed approval, current source/target validation, retained originals and
+guarded recovery/undo. Before enabling concurrent writers, prove an explicit
+ownership/coordination policy; hashes alone are not a cross-process transaction.
+Do not promise atomic multi-file writes. No autonomous note changes or deletions.
+
+### Desktop experience, distribution and evidence
+
+Retain Thread's serif headings, amber recorded context, periwinkle AI distinction,
+source chips and accessible native controls. Define standalone light/dark tokens
+without depending on Obsidian-injected CSS or network fonts. Start with a literal
+Markdown source reader; add safe formatting/link navigation in feature 50. Later
+citations open inside Thread. No automatic attachment launch or external browsing.
+
+Preserve plugin build/package commands; add separately named desktop commands and
+build output, then a separately versioned local Linux distribution at feature 62.
+Do not feed desktop binaries to the plugin-only updater. Runtime updates require
+their own reviewed compatibility/packaging procedure. Test the actual Electron
+window, not a mock webpage, in an isolated synthetic profile with Obsidian absent
+from that process tree. Reuse owned local model fixtures when relevant; retain
+Verify, independent sensitive-change review and plugin regression evidence.
+
+There are no mandatory hosting/subscription/API fees. Models and runtime are local;
+downloads, storage, RAM, electricity and development time remain real resources.
+Do not install system-wide software, modify everyday installations or personal
+notes, publish releases or deploy services as part of this approval.

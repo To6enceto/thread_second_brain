@@ -13,7 +13,8 @@ for optional tool settings.
 
 ## What this is
 
-Thread is a desktop Obsidian plugin that uses a local AI model to help a person
+Thread is a desktop Obsidian plugin, with an approved independent Electron
+desktop target (features 49-62), that uses a local AI model to help a person
 resume projects, trace decisions, and connect research. Markdown notes remain
 the authoritative knowledge store. The first release requires no hosted model
 API, account, or backend. Codex and Claude Code are development adapters.
@@ -325,8 +326,10 @@ checks do not make the Blueprint unusable.
 - Package manager: npm; use the committed `package-lock.json`.
 - Install: `npm ci`.
 - Development watcher: `npm run dev` (rebuilds `main.js`; no web server).
+- Desktop runtime setup: `npm run desktop:setup` (explicit project-local Electron download).
+- Desktop build: `npm run desktop:build`; launch: `npm run desktop:start` (actual standalone window).
 - Typecheck: `npm run typecheck`.
-- Build: `npm run build`.
+- Build: `npm run build` (plugin production bundle plus standalone desktop build).
 - Test: `npm test` (Node's built-in test runner with TypeScript type stripping).
 - Verify: `npm run verify` (typecheck, tests, then production build).
 - Quality evaluation: `npm run evaluate` (offline harness self-check; opt-in live mode in evaluation/README.md).
@@ -348,9 +351,14 @@ Automatic GitHub checks are optional and separate from setup. Run `$ci` or
 
 ## Thread implementation boundaries
 
-- Use TypeScript, the Obsidian plugin API, native DOM helpers, and theme CSS
-  variables. Do not introduce a web application or server framework.
-- Use the Obsidian vault/storage APIs for user files and plugin-local data.
+- The existing plugin uses TypeScript, the Obsidian API, native DOM helpers and
+  theme CSS variables. The approved standalone target lives in `src/standalone/`
+  and uses Electron, native DOM/CSS and a separate filesystem adapter. No hosted
+  web application or server framework. Share pure logic without emulating Obsidian.
+- Use Obsidian vault/storage APIs for plugin files and plugin-local data. Desktop
+  file access belongs in the main process behind a narrow validated preload API;
+  keep the renderer sandboxed and context-isolated without Node integration.
+  Desktop must not silently inherit plugin grants or mutate plugin journals.
   Keep real vault contents and model data out of this source repository.
 - Local-only inference uses Ollama over loopback with cloud features disabled.
   No paid API fallback is part of the initial release.
@@ -366,3 +374,7 @@ Automatic GitHub checks are optional and separate from setup. Run `$ci` or
   transient dashboard state through `blueprint/.state/.gitignore`.
 - Product progress lives in the build checklist and feature history. Report only
   features with implementation and verification evidence as completed.
+
+For standalone UI features, native evidence means the actual Electron application
+using an isolated profile and synthetic vault. The Obsidian acceptance requirement
+still applies to changed plugin behavior. Preserve all completed feature archives.

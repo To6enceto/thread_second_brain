@@ -1,177 +1,188 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash f166180d101c673cfc78c3133ceb7dbb808a3fb991568df1d98f550284ed6ccd -->
+<!-- blueprint:source-hash 56740df5b97df8468e887bc97b533f14eaaffc63ae40fb4ab846674062ca20c4 -->
 
-> A desktop Obsidian plugin that helps individuals resume projects, recover
-> decision reasoning, and connect research through a local AI model.
+> Local project memory and sourced research, available as an Obsidian plugin
+> and an approved independent Electron desktop application sharing Markdown.
 
-## Problem
+## Problem and users
 
-Project objectives, activity, decisions and questions are scattered across notes.
-**Resume project** gathers sourced context so a user can return within minutes.
-Recorded facts, AI interpretations, gaps and suggestions stay distinct; original
-Markdown remains authoritative.
+Help individual builders, students, researchers and writers resume projects,
+recover decision reasoning and connect evidence. Recorded facts, user reports,
+AI interpretations, gaps and suggestions stay distinct. Personal desktop use,
+multiple projects, one active vault per instance. No account, backend or paid API.
 
-## Users
+## Current implementation and build order
 
-- Independent developers and solo founders returning to experiments and decisions.
-- Students and researchers connecting evidence and unanswered questions.
-- Writers and knowledge workers reusing accumulated research.
+Plugin features 1-48 are complete (private 0.4.1); archives contain exact schemas,
+verification and limits. Desktop 49-62 is approved, not yet equivalent to the plugin.
+Preserve prior archive bytes and all notes/history. Implement one feature at a time.
 
-The initial release serves personal desktop use. No account is required. Codex
-and Claude Code are development assistants, not runtime prerequisites.
+1. **Local project briefings**
+2. **Reusable project workspaces**
+3. **Indexed evidence recall**
+4. **Ask your vault**
+5. **Decision records**
+6. **Inbox capture**
+7. **Reviewed knowledge updates**
+8. **Decision evidence review**
+9. **Session wrap-up**
+10. **Weekly project review**
+11. **Source freshness**
+12. **Offline release readiness**
+13. **Repeatable answer-quality evaluation**
+14. **Dependable recorded briefings**
+15. **Project home and quick switching**
+16. **Ranked evidence search**
+17. **Optional local semantic search**
+18. **Editable change review**
+19. **Guided local setup**
+20. **Incremental dependency indexing**
+21. **Project review queue**
+22. **Editor selection actions**
+23. **Evidence workbench**
+24. **Managed project questions**
+25. **Review acknowledgements and snoozing**
+26. **Project timeline**
+27. **Multi-project overview**
+28. **Vault health and compatibility**
+29. **Section-aware long-note indexing**
+30. **Broader hybrid retrieval**
+31. **Local PDF extraction**
+32. **PDF evidence and page citations**
+33. **Project exports and checkpoints**
+34. **Reviewed project package import**
+35. **Fedora desktop launcher**
+36. **Clear setup progress and feedback**
+37. **Full-width Thread workspace**
+38. **Claim classification and quality regressions**
+39. **Reviewed claim corrections**
+40. **Evidence-aware Ask follow-ups**
+41. **Explicit conversation saves**
+42. **Saved research collections**
+43. **Durable project action records**
+44. **Action board and recorded wrap-up**
+45. **Project checkpoint comparisons**
+46. **Reviewed Web Clipper intake**
+47. **Validated local update previews**
+48. **Recoverable local updates**
+49. **Independent desktop vault reader**
+50. **Desktop indexed evidence and source navigation**
+51. **Desktop project home and recorded Resume**
+52. **Desktop local AI setup and Resume interpretation**
+53. **Desktop Ask evidence workbench**
+54. **Desktop follow-ups and reviewed new-note saves**
+55. **Desktop change review and recovery**
+56. **Desktop decisions and managed questions**
+57. **Desktop actions and session wrap-up**
+58. **Desktop freshness and project reviews**
+59. **Desktop capture and research collections**
+60. **Desktop local PDFs and page citations**
+61. **Desktop project portability**
+62. **Desktop packaging and offline acceptance**
 
-## Usage model
+## Data and safety
 
-Private local 0.3.0 includes features 1-34 and the panel redesign. One user/vault
-per plugin instance, several projects; desktop Linux first, other platforms need
-verification. No large-vault performance guarantee. Loopback cloud-disabled Ollama
-only; no hosted fallback. Empty initial read scope; exclusions before all reads,
-retrieval, context and reuse. Imported text cannot grant access or execute code.
-No account, mobile inference, collaboration, unattended service/agent or enterprise
-requirements. Weekly reviews are on demand. OCR/audio/automatic web fetching remain
-deferred; approved Clipper intake reads deliberately saved local notes only.
+Markdown and original attachments are authoritative; indexes/caches rebuildable.
+New records have stable IDs and readable YAML/Markdown, with namespaced thread_*
+fields. Legacy notes need no forced conversion. Properties/headings/explicit links
+establish project membership, never read permission. Explicit read roots start
+empty; exclusions precede reading/indexing/retrieval/context and reuse. PDF original
+bytes need separate exact-file consent. Imported content and model output are
+untrusted data, never commands, permissions or raw executable HTML.
 
-## Features
+Projects: id/type/project status active|paused|archived, dates, objective/constraints.
+Sources: optional identity/type/capture date/original URL or path and original text.
+Decisions: choice, alternatives, rationale, evidence, proposed|accepted|superseded,
+explicit decided/revisit dates and supersession. Sessions: dated user-reported
+progress, decisions, questions and suggested next action. Knowledge: concept or
+comparison with dated sources. Outputs: briefing/answer/review, generated time,
+model, evidence and readable content. Never infer verified events from file mtime.
+Questions, actions, corrections, conversations, collections and review events use
+the versioned schemas in their feature archives; retain historical provenance.
 
-Build in order; 1-34 are complete and immutable, 35-48 are approved/pending.
-Exact dependencies and acceptance live in the build plan; native evidence is required.
+Evidence binds path/stable note ID, heading/block, excerpt and full content hash.
+Resolve identities under present scope; changed/missing/excluded dependencies
+invalidate outputs/previews. Citations validate identity, not semantic truth.
+Model prompts are bounded structured requests over selected current evidence.
 
-1. **Local project briefings** - Sourced local Resume, cancellation and gaps.
-2. **Reusable project workspaces** - Previewed workspace mapping and starter notes.
-3. **Indexed evidence recall** - Current scoped passage index.
-4. **Ask your vault** - Sourced answers and explicit new-note saves.
-5. **Decision records** - Explicit choices, status, rationale and revisit conditions.
-6. **Inbox capture** - Reviewed text capture/import and provenance.
-7. **Reviewed knowledge updates** - Exact proposed changes, recovery and guarded undo.
-8. **Decision evidence review** - Sourced retain/annotate/supersede review.
-9. **Session wrap-up** - Reviewed recorded progress and next-step suggestions.
-10. **Weekly project review** - On-demand sourced review with explicit save.
-11. **Source freshness** - Dependency freshness and reviewed regeneration.
-12. **Offline release readiness** - Verified native offline package and instructions.
-13. **Repeatable answer-quality evaluation** - Reusable fixtures and opt-in live quality evaluation.
-14. **Dependable recorded briefings** - Deterministic sourced context before AI.
-15. **Project home and quick switching** - Permitted project selector and recent records.
-16. **Ranked evidence search** - Bounded ranked keyword search and honest coverage.
-17. **Optional local semantic search** - Opt-in hybrid embeddings, keyword fallback.
-18. **Editable change review** - Diffs, editable drafts and renewed exact previews.
-19. **Guided local setup** - Local model discovery and explicit read grants.
-20. **Incremental dependency indexing** - Changed/dependency indexing and immediate exclusions.
-21. **Project review queue** - On-demand affected-record review queue.
-22. **Editor selection actions** - Native commands on permitted current selections.
-23. **Evidence workbench** - Inspect/include/pin/exclude and exact context.
-24. **Managed project questions** - Explicit durable question states and history.
-25. **Review acknowledgements and snoozing** - Snapshot-bound review/snooze and resurfacing.
-26. **Project timeline** - Recorded chronology with unknown history visible.
-27. **Multi-project overview** - Permitted project overview and chosen next actions.
-28. **Vault health and compatibility** - Bounded diagnostics and individually reviewed repairs.
-29. **Section-aware long-note indexing** - Bounded sections, progress and visible omissions.
-30. **Broader hybrid retrieval** - Explicit wider candidate budgets and search-more.
-31. **Local PDF extraction** - Consented PDFs, preserved originals and local extraction.
-32. **PDF evidence and page citations** - Verified original hashes, page citations and invalidation.
-33. **Project exports and checkpoints** - Previewed selected-project portable snapshots.
-34. **Reviewed project package import** - Validated new-copy imports, collisions and recovery.
-35. **Fedora desktop launcher** - Configured Fedora shortcut and consented local startup.
-36. **Clear setup progress and feedback** - Visible checks and sample/existing-note setup paths.
-37. **Full-width Thread workspace** - Native main-tab navigation retaining sidebar/layouts.
-38. **Claim classification and quality regressions** - Recorded/interpretation/action quality regressions.
-39. **Reviewed claim corrections** - Explicit corrections with original provenance.
-40. **Evidence-aware Ask follow-ups** - Bounded turns using current evidence.
-41. **Explicit conversation saves** - Explicit Markdown conversation preview/save.
-42. **Saved research collections** - Revalidated named evidence selection intent.
-43. **Durable project action records** - Explicit Markdown action states and history.
-44. **Action board and recorded wrap-up** - Accessible board and selected recorded progress.
-45. **Project checkpoint comparisons** - Actual checkpoint versus permitted current content.
-46. **Reviewed Web Clipper intake** - Local clip templates, metadata and reviewed intake.
-47. **Validated local update previews** - Strict package/compatibility and replacement preview.
-48. **Recoverable local updates** - Guarded update/recovery/rollback and verified package.
+Writes require explicit approval of exact previews. Creates refuse collisions;
+updates revalidate before hashes and source context. Preserve affected originals
+before the first write; recheck each operation and expose partial recovery.
+Undo checks after hashes to preserve later user changes. Last-20-batch change
+history is bounded recovery, not an independent vault backup. Never auto-delete,
+move or silently expand grants. Unknown/invalid journals fail closed and survive.
 
-## Data model
+## Stack and source boundaries
 
-Markdown is authoritative; use frontmatter plus readable content, no forced legacy
-conversion. New records have stable `id`; Thread metadata uses `thread_*`.
-Displayed dates use the local timezone. Freeze new exact versioned schemas in each
-spec before later consumers depend on them; reject invalid external metadata.
+Strict TypeScript, npm lockfile, esbuild, Node >=22.15 for tools. Plugin entry
+src/main.ts uses Obsidian Vault/storage/native DOM/theme APIs, with host modules
+external. UI src/ui; vault parsing/scope/records src/vault; retrieval src/retrieval;
+AI src/intelligence; portability src/portability; offline extraction src/pdf.
+Plugin-only updater/launcher src/desktop. Local cloud-disabled loopback Ollama
+for chosen downloaded text/optional embedding models, no hosted fallback or silent
+install/download. PDF.js owned worker/assets, no CDN/document scripts/network.
 
-- Project: id, type project, status active/paused/archived, created/updated dates;
-  objective, constraints and linked records. Folder mapping, project properties or
-  explicit links establish membership but never read access.
-- Source: optional id/type source/captured_on/original URL or path; preserve raw
-  Markdown/text. Publication/event and capture dates stay distinct. PDFs require
-  exact binary consent and verified derived page provenance (contracts below).
-- Decision: id, type decision, project ID, proposed/accepted/superseded status,
-  decided_on, choice, alternatives, rationale, evidence, constraints/revisit
-  conditions, optional revisit_on and superseding reference. Acceptance explicit.
-- Session: id, type session, project ID, recorded_on; user-reported progress,
-  decisions, questions and suggested next step. Knowledge: concept/comparison,
-  updated date, sources and distinguishable interpretation.
-- Saved output: id, briefing/answer/review, optional project, generated_on/model,
-  evidence and Markdown. New-evidence comparisons require actual recorded baseline.
-- Evidence: optional note ID, current path, heading/block, excerpt, full hash.
-  Index: path/ID/title/properties/headings/links/chunks/hash. Re-resolve identity
-  within current scope; changed/missing/excluded dependencies invalidate output.
-  Caches are rebuildable, never authoritative. Settings/caches/journals excluded
-  from retrieval; no personal runtime data in the development repository.
-- Proposal: ID/time, create/update targets, before hashes, proposed content and
-  source refs. Pending/applied/rejected/stale/recovery-required. Retain last 20
-  applied batches with originals and after hashes; not permanent version history.
-  Preserve originals before first write, recheck before each write, attempt rollback
-  on failure and expose incomplete recovery. Undo requires matching after hashes;
-  no filesystem-wide atomicity or automatic deletion/move of user notes.
-- Settings: local model/endpoint, role mappings, allowed/excluded paths, timeout,
-  selected project and opt-in semantic/PDF settings; plugin-local Obsidian storage.
-  Preserve existing data.json and changes/imports/project-imports/renames journals.
-- Planned versioned records: corrections retain original model text/type and
-  user/time/evidence; conversations retain finite per-turn provenance; collections
-  hold ID/name/scope and bounded identity/heading/hash/choice refs without cached
-  excerpts; actions hold ID/project/title, explicit status and transition history.
-  See queue contracts below; exact schemas freeze in specs before consumers.
+Standalone src/standalone uses Electron main process, narrow typed preload and
+sandboxed context-isolated renderer without Node access. Direct filesystem adapter
+validates paths/identities/scope; never emulate Obsidian or import its runtime in
+the desktop bundle. Reuse pure domain logic, native DOM and esbuild; no web server.
+The plugin remains available. Desktop features do not imply Obsidian plugin/theme
+compatibility. Electron is a separate dependency/build/distribution target.
 
-## Tech stack
+## Desktop contracts (49-62)
 
-Strict TypeScript, Obsidian Vault/storage/native DOM/theme APIs and esbuild CommonJS
-with host modules external. Node >=22.15/npm lockfile are tooling, not a server.
-AI Blueprint 1.13.0 Codex/Claude adapters are outside runtime. Local cloud-disabled
-Ollama for structured text/optional embeddings; no mandatory vector database.
-PDF.js 6.4.299 owned local worker and bundled assets, no CDN/document scripts/fetch.
-Pipeline: current permitted sources -> bounded retrieval/selection -> optional
-model -> validation -> render -> explicit save/reviewed update. Citation identity
-is not semantic support. Reuse services; no unrelated architecture or dependencies.
-Commands: npm ci, npm run dev (watcher only), typecheck, test, build, verify,
-evaluate (live opt-in), package. Verify = typecheck/tests/build; CI separate.
+Selecting a vault grants no note access. Native picker selects the root, followed
+by explicit preview/approval of relative read roots/exclusions. Bound traversal,
+bytes and output; reject links/escapes and report omissions. Feature 49 is a literal
+Markdown source reader with volatile grants, no AI/writes and no plugin-state read
+or mutation. Restart requires fresh permission. Feature 50 adds safe formatting,
+links, shared index/search and external-change invalidation. Then home/recorded
+Resume (51), model setup/AI Resume (52), Ask/hybrid search (53), conversations and
+reviewed new saves (54), changes/recovery (55), records/actions/reviews/research
+(56-59), PDFs (60), portability (61), and distribution/offline acceptance (62).
 
-## Monetization
+Keep desktop profile settings/caches/history outside vault/repository by default;
+explicit ignored local profiles are allowed for development/tests. Before writes,
+freeze compatible versioned persistence and cross-process ownership policy. Never
+silently inherit grants/PDF consent, migrate/reset/share plugin journals or erase
+pending plugin recovery. Hash checks alone are not a multi-process transaction.
+Current file reads and source revalidation precede reuse/saves. Exact reviewed
+writes and all existing recovery/undo boundaries persist in the new adapter.
+No note copy/sync database: both applications use the same Markdown files.
 
-No required account/API/subscription/hosting fees. Hardware, storage, power,
-downloads and development assistants still cost resources. Obsidian is free, not
-open-source; model/tool licenses remain separate. Thread is private/UNLICENSED.
+Desktop has its own light/dark local CSS/fonts and source navigation; no automatic
+external links/attachment launch. UI tests run actual Electron with synthetic vaults
+and isolated profiles, not a webpage mock. Keep Obsidian evidence for plugin
+behavior changes and shared-core regressions. Package desktop separately; the
+plugin-only updater cannot install desktop binaries. Fedora first, other platforms
+only after verification. No system-wide/user desktop installation by default.
 
-## UI/UX
+## UX, costs and deployment
 
-Native controls/theme variables, readable Markdown, keyboard/focus and text statuses.
-Separate recorded statements, interpretations, gaps and actions; current source
-links, no invented confidence/health. Preserve all actions. Useful idle/loading/
-empty/canceled/stale/error states; unavailable model leaves recorded work usable.
-Relevant source/target/scope changes immediately revoke unsafe content/previews.
+Serif headings, amber recorded context, dashed periwinkle AI, source chips, native
+accessible controls, visible focus, keyboard/light/dark support. Useful idle, busy,
+empty, canceled, stale, denied and failure states. Relevant async changes revoke
+obsolete outputs; cancellation/unload cleans tasks. Non-AI work stays useful offline.
 
-## Deployment
+No required hosting/account/API/subscription. Hardware, downloads, storage, power,
+time and optional development assistants cost resources. Private UNLICENSED;
+public license/distribution deferred. Obsidian is free, not open source. Model and
+dependency licenses remain separate. No mobile AI, team/collaboration, autonomous
+agent, OCR/audio, automatic web fetching, billing or cloud service scope.
 
-Desktop plugin, no host/domain/remote database/cron/remote worker. Current private
-0.3.0 requires Obsidian1.14.4 and ships191 inventoried files (main.js, manifest,
-styles, PDF worker/CMaps/fonts/licenses) in dist/thread-0.3.0.zip to <vault>/.obsidian/plugins/thread/. Ollama/model setup is
-separate and local-only; no silent install/download. Inference works offline after
-setup. Preserve data.json, changes.json, imports.json, project-imports.json and
-renames.json on upgrade.
-Keep independent backups; writes are not atomic and the journal is bounded.
-Existing Git push authorization does not authorize force pushes, public release/
-license, deployment, paid services, system-wide installs or destructive actions.
+Plugin package dist/thread-0.4.1.zip has 192 inventoried files including PDF resources;
+install into a separate test vault's .obsidian/plugins/thread. npm run dev only
+rebuilds the plugin. Verify = npm run verify (typecheck, tests, production build).
+Separate desktop build/start commands arrive with 49; shipping package arrives62.
+Do not substitute artifact success for runtime acceptance. No CI configured.
 
-## Limits and open questions
-
-Tested Linux, Obsidian 1.14.4, Ollama 0.40.4, qwen3:4b-instruct. Measure actual
-budgets and platform/model support; no scale promises. Personal scope/PDF consent
-remain explicit. No unresolved product decision blocks 35-48. Public license and
-distribution deferred; current private version uses ZIP/CRC/SHA/resource checks.
+Known verified plugin environment: Linux, Obsidian1.14.4, Ollama0.40.4,
+qwen3:4b-instruct. No universal scale/model-quality promises; live evaluation38
+retains14/15 with one proposed-decision paraphrase conservatively interpreted.
+Normal pushes to existing origin are separately authorized; no force push,
+remote changes, public release, deployment, paid services, system-wide install,
+user-process termination or destructive user-data operations. Preserve reports.
 
 ## Implemented contracts (22-34)
 

@@ -1,6 +1,7 @@
 # Coding Standards
 
-These conventions apply to Thread, a desktop Obsidian plugin. Read AGENTS.md
+These conventions apply to Thread's Obsidian plugin and approved standalone
+Electron target. Read AGENTS.md
 for the commands that actually exist. Keep Blueprint workflow policy in
 `blueprint/config.json` and product scope in the planning documents.
 
@@ -15,6 +16,9 @@ for the commands that actually exist. Keep Blueprint workflow policy in
 - Use inference for obvious locals and explicit contracts at module boundaries.
 - Obsidian provides the plugin runtime. Node.js is development tooling, not a
   separate application server.
+- Electron supplies the standalone runtime. Keep `src/standalone/` separate from
+  the plugin entry point and bundle; share pure domain modules where needed.
+  No Obsidian API emulation or hosted server. Use exact project-local dependencies.
 - Keep `obsidian` and other host-supplied modules external to the esbuild bundle.
 - Add a dependency only for a demonstrated need. Preserve exact dependency
   versions and the npm lockfile.
@@ -51,6 +55,13 @@ for the commands that actually exist. Keep Blueprint workflow policy in
 
 - Access user files through Obsidian's Vault and storage adapter APIs; do not
   bypass scope boundaries using direct filesystem calls.
+- In the standalone target only, direct file access is owned by Electron's main
+  process, enforcing explicit scope/exclusions and filesystem identity/path checks
+  for each operation. Renderer IPC is untrusted input; expose finite typed methods,
+  validate the sender and payload, and never expose generic fs/shell/IPC objects.
+  No Node integration in the sandboxed renderer; context isolation, CSP, denied
+  navigation/popups/downloads and permission requests are required. Render source
+  content as text or explicitly sanitized Markdown; never execute imported HTML.
 - Markdown is authoritative. Indexes and caches must be rebuildable.
 - Never persist runtime personal content in this development repository.
 - Select allowed paths explicitly and apply exclusions before reads, indexing,
@@ -112,6 +123,9 @@ for the commands that actually exist. Keep Blueprint workflow policy in
   Verify plugin loading, lifecycle, keyboard use, themes, real source links,
   local-model requests, cancellation, and relevant recovery behavior.
 - A mock webpage or a successful bundle is not proof that the plugin works.
+- Standalone behavior requires actual Electron acceptance in an isolated profile
+  with synthetic notes. Preserve plugin Verify/build evidence; changes shared with
+  the plugin additionally require relevant Obsidian regression acceptance.
 - Browser automation is separately opt-in and must suit the actual host. Do not
   install Playwright as if Thread were a web application.
 - CI is not configured. The standalone CI skill can reuse Verify when requested.

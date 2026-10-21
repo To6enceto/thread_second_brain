@@ -13,17 +13,21 @@
     "dev": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
-    "build": "node esbuild.config.mjs --production",
+    "build": "node esbuild.config.mjs --production && npm run desktop:build",
     "verify": "npm run typecheck && npm test && npm run build",
     "package": "npm run verify && node --experimental-strip-types scripts/package.mjs",
     "evaluate": "node --experimental-strip-types scripts/evaluate.mjs",
     "evaluate:index": "node --experimental-strip-types scripts/evaluate-index.mjs",
     "evaluate:retrieval": "node --experimental-strip-types scripts/evaluate-retrieval.mjs",
     "fixtures:pdf": "node --experimental-strip-types scripts/pdf-fixtures.mjs",
-    "updater": "node --experimental-strip-types scripts/update-thread.mjs"
+    "updater": "node --experimental-strip-types scripts/update-thread.mjs",
+    "desktop:build": "node scripts/desktop-build.mjs",
+    "desktop:start": "npm run desktop:build && node scripts/desktop-start.mjs",
+    "desktop:setup": "node scripts/desktop-setup.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
+    "electron": "45.0.0",
     "esbuild": "0.28.2",
     "obsidian": "1.14.4",
     "typescript": "7.0.2"
