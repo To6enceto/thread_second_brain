@@ -5,7 +5,7 @@ evidence search, safe Markdown navigation, project home, recorded Resume, option
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
 new-note saves, exact existing-note change review, guarded undo and interruption
 recovery, decisions and managed questions. Obsidian can stay closed. Remaining
-desktop workflows are tracked in items 57-62 of the build plan; the existing plugin remains available.
+desktop workflows are tracked in items 58-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -70,8 +70,10 @@ source text can receive keyboard focus for scrolling and selection.
   larger finite budgets described below. Coverage reports omitted
   notes and shortened sections; it does not establish exhaustive vault coverage.
 - YAML 1.2 metadata uses the bundled ISC-licensed yaml parser. Invalid, duplicate,
-  unknown-tag, aliased or over-64-KiB headers omit the note from evidence; its
-  original source remains readable. No plugin metadata parser is required.
+  unknown-tag or aliased headers omit the note from evidence; its original source
+  remains readable. Ordinary metadata is limited to 64 KiB. Supported action
+  histories may exceed that header limit within their 256 KiB record and 1 MiB
+  note bounds. No plugin metadata parser is required.
 - The formatted preview is capped at 120,000 characters, 2,000 blocks and 5,000
   inline tokens. The literal source remains available. Parent traversal, hidden,
   external and attachment links are refused. Full Obsidian syntax is not emulated.
@@ -374,3 +376,34 @@ project switching and changed inputs invalidate affected pending results; refres
 and review again. Existing durable pending proposals remain available separately
 in Review changes. Citation presence identifies a passage, not independent proof
 of its claim. Other editors must remain closed during writes.
+
+
+## Actions and session wrap-up
+
+Choose a permitted project, then **Actions and wrap-up**. The board groups current
+records into Planned, In progress, Blocked and Done. Counts disclose unavailable
+or omitted records. Dates and completion states are user reports; legacy chosen
+next-action notes remain readable in Your notes and are not migrated.
+
+To create an action, enter its note name, title, reason and reported date. New
+actions always start Planned. Optionally select up to four current supporting
+notes with Ctrl/Shift. Choose **Preview action**, inspect the pending change and
+its exact renewed preview, then Apply explicitly. To change a state, use a card's
+**Record transition** button, choose the new state and enter a reason/date. Earlier
+transitions and references stay in the same readable Markdown record. Unsupported,
+externally edited, stale or ambiguous records are preserved and require manual
+inspection before they can be updated. These manual flows work without Ollama.
+Histories retain at most 64 events and 100 reference snapshots without truncation.
+The existing 1 MB reviewed-batch budget still applies to the combined before/after
+text, so very large histories can remain readable while refusing another update.
+
+For a wrap-up, enter a session note name and optional reported progress, then
+explicitly check up to five current action reports. None are selected by default.
+With a downloaded local text model applied, choose **Generate session wrap-up**.
+Inspect the user report, selected recorded progress, local summary and current
+supporting passages. A Done record does not prove the work happened in this session;
+model claims still need judgment. **Preview session note** sends the exact new
+note to Review changes. Saving refuses an existing destination and never changes
+any action status or accepts a decision. Input, scope, source, model or writer
+changes discard stale drafts; refresh or generate again. The existing guarded
+Undo/recovery workflow applies to these reviewed writes too.

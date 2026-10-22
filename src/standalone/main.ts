@@ -127,6 +127,10 @@ async function start(): Promise<void> {
   handle("thread:assess-decision", 4, (id, path, sources, revision) => records.assess(id, path, sources, revision));
   handle("thread:record-draft-changed", 1, keep => { records.draftChanged(keep); return null; });
   handle("thread:cancel-records", 0, () => { records.invalidate(); return null; });
+  handle("thread:load-actions", 2, (selection, revision) => records.loadActions(selection, revision));
+  handle("thread:prepare-action", 3, (id, command, revision) => records.prepareAction(id, command, revision));
+  handle("thread:generate-session", 3, (id, input, revision) => records.generateSession(id, input, revision));
+  handle("thread:prepare-session", 2, (id, revision) => records.prepareSession(id, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();

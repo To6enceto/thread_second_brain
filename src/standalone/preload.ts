@@ -53,6 +53,10 @@ const bridge: DesktopBridge = {
   assessDecision: (id, path, sources, revision) => ipcRenderer.invoke("thread:assess-decision", id, path, sources, revision),
   recordDraftChanged: keep => ipcRenderer.invoke("thread:record-draft-changed", keep),
   cancelRecords: () => ipcRenderer.invoke("thread:cancel-records"),
+  loadActions: (selection, revision) => ipcRenderer.invoke("thread:load-actions", selection, revision),
+  prepareAction: (id, command, revision) => ipcRenderer.invoke("thread:prepare-action", id, command, revision),
+  generateSession: (id, input, revision) => ipcRenderer.invoke("thread:generate-session", id, input, revision),
+  prepareSession: (id, revision) => ipcRenderer.invoke("thread:prepare-session", id, revision),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

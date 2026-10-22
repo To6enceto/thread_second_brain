@@ -134,3 +134,14 @@
 .thread-record-status-accepted { background: color-mix(in srgb, var(--thread-added) 12%, var(--thread-card)); }
 .thread-record-status-proposed { border: 1px dashed var(--thread-recorded); }
 .thread-record-status-superseded { text-decoration: line-through; color: var(--thread-muted); }
+
+.thread-action-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; align-items: start; }
+.thread-action-column { min-width: 0; border-top: 2px solid var(--thread-recorded); }
+.thread-action-column h3 { font: 21px var(--thread-serif); }
+.thread-action-column h4 { margin: 0 0 10px; font: 19px var(--thread-serif); }
+.thread-action-column button { max-width: 100%; margin-top: 8px; white-space: normal; overflow-wrap: anywhere; }
+.thread-action-state-planned { border-style: dashed; }
+.thread-action-state-in-progress { border-color: var(--thread-recorded); border-width: 2px; }
+.thread-action-state-blocked { border: 2px dashed var(--thread-recorded); }
+.thread-action-state-done { border-color: var(--thread-added); background: color-mix(in srgb, var(--thread-added) 12%, var(--thread-card)); }
+.thread-action-form > label[hidden] { display: none; }

@@ -1,3 +1,4 @@
+import { ActionsView } from "./actions-view.ts";
 import { RecordsView } from "./records-view.ts";
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
 import { StorageView } from "./storage-view.ts";
@@ -21,15 +22,17 @@ const loadProjects = element<HTMLButtonElement>("load-projects"), homeButton = e
 let askView: AskView;
 let changesView: ChangesView;
 let recordsView: RecordsView;
+let actionsView: ActionsView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
 function clearAI(): void {
   aiEpoch++; element("project-panel").querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
 }
-const modelSetup = new ModelSetup(bridge, () => { recordsView?.invalidate("Model setup changed. Refresh records."); clearAI(); askView?.invalidate("Local model setup changed. Retrieve evidence again."); });
+const modelSetup = new ModelSetup(bridge, () => { actionsView?.invalidate("Model setup changed. Refresh actions."); recordsView?.invalidate("Model setup changed. Refresh records."); clearAI(); askView?.invalidate("Local model setup changed. Retrieve evidence again."); });
 function cancelAI(): void { clearAI(); void bridge.cancelAI(); }
 function clearProjects(): void {
+  actionsView?.invalidate("Project or source context changed. Refresh actions.");
   recordsView?.invalidate("Project or source context changed. Refresh records.");
   askView?.invalidate(); askView?.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
@@ -39,8 +42,8 @@ function clearProjects(): void {
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
-const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => { recordsView?.invalidate("Writer setup changed. Refresh records."); changesView?.invalidate("Writer setup changed. Refresh and inspect the exact change again."); });
-changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
+const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => { actionsView?.invalidate("Writer setup changed. Refresh actions."); recordsView?.invalidate("Writer setup changed. Refresh records."); changesView?.invalidate("Writer setup changed. Refresh and inspect the exact change again."); });
+changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { actionsView?.hide(); recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
 function value<T>(result: DesktopResult<T>): T {
@@ -67,9 +70,12 @@ function clearContent(invalidate = true): void {
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
 }
 askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); });
-element("open-ask").addEventListener("click", () => { recordsView.hide(); changesView.hide(); cancelAI(); askView.open(); });
+element("open-ask").addEventListener("click", () => { actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); askView.open(); });
 recordsView = new RecordsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { actionsView?.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
+actionsView = new ActionsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
+  () => { recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
 function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
@@ -119,7 +125,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
-  recordsView.hide(); changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
+  actionsView.hide(); recordsView.hide(); changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
   clearReader(); announce("Reading the selected source...");
   try {
     const note = value(await bridge.readNote(path, vault.revision, expectedHash));
@@ -247,7 +253,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
-  recordsView.hide(); changesView.hide();
+  actionsView.hide(); recordsView.hide(); changesView.hide();
   askView.invalidate("Project changed. Retrieve evidence again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };

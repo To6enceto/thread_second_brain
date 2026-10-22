@@ -79,6 +79,7 @@
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
         <button id="open-ask" disabled>Ask your vault</button>
         <button id="open-records">Decisions and questions</button>
+        <button id="open-actions">Actions and wrap-up</button>
         <button id="open-changes">Review changes</button>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
         <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
@@ -100,6 +101,13 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="actions-panel" tabindex="-1" aria-label="Project actions and session wrap-up" hidden>
+        <h2>Actions and wrap-up</h2>
+        <p class="thread-muted">Recorded progress, explicit choices. AI never changes an action status.</p>
+        <div class="thread-controls"><button id="actions-refresh">Refresh actions</button><button id="actions-cancel">Cancel actions and wrap-up</button><button id="actions-close">Close actions</button></div>
+        <p id="actions-status" role="status" aria-live="polite"></p>
+        <div id="actions-content"></div>
+      </section>
       <section id="records-panel" tabindex="-1" aria-label="Decisions and managed questions" hidden>
         <h2>Decisions and questions</h2>
         <p class="thread-muted">Record your choices and questions explicitly. Earlier reasoning and answers stay in Markdown. Preview every change before applying.</p>
