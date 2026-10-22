@@ -8,8 +8,9 @@ import { DesktopError, permitted, relativePath, within } from "./security.ts";
 import type { VaultReader } from "./vault-reader.ts";
 import type { DesktopStorage } from "./storage.ts";
 import { VaultWriter, type DestinationState } from "./vault-writer.ts";
+import { catalogFingerprint } from "./catalog.ts";
 
-interface ChangeContext { schemaVersion: 1; scope: ReadScope; roles: FolderRoles; sources: { path: string; hash: string }[]; targets: Record<string, DestinationState>; }
+interface ChangeContext { schemaVersion: 1 | 2; scope: ReadScope; roles: FolderRoles; sources: { path: string; hash: string }[]; targets: Record<string, DestinationState>; catalog?: string; }
 export interface ChangeSummary { id: string; createdAt: string; paths: string[]; status: string; available: boolean; }
 export interface ChangesSnapshot { pending: ChangeSummary | null; recovery: ChangeSummary | null; history: ChangeSummary[]; }
 export type ChangeAction = "apply" | "undo" | "recover";
@@ -43,7 +44,8 @@ export class DesktopChanges {
   private context(batch: ChangeBatch, revision: unknown, requireScope = true): ChangeContext {
     let data: ChangeContext;
     try { data = JSON.parse(batch.context) as ChangeContext; } catch { throw new DesktopError("Unsupported desktop change context. Preserve the journal."); }
-    if (!data || data.schemaVersion !== 1 || !Array.isArray(data.sources) || data.sources.length > 100 || !data.targets || typeof data.targets !== "object") throw new DesktopError("Unsupported desktop change context. Preserve the journal.");
+    if (!data || ![1, 2].includes(data.schemaVersion) || !Array.isArray(data.sources) || data.sources.length > 100 || !data.targets || typeof data.targets !== "object") throw new DesktopError("Unsupported desktop change context. Preserve the journal.");
+    if (data.schemaVersion === 2 && (Object.keys(data).sort().join(",") !== "catalog,roles,schemaVersion,scope,sources,targets" || typeof data.catalog !== "string" || !/^[a-f0-9]{64}$/.test(data.catalog))) throw new DesktopError("Unsupported guarded review context. Preserve the journal.");
     if (requireScope && JSON.stringify({ scope: data.scope, roles: data.roles }) !== this.settings(revision)) throw new DesktopError("Read scope or writable folders changed. Restore explicit access or reject and regenerate.");
     for (const op of batch.operations) this.check(op.path, revision);
     for (const source of data.sources) {
@@ -80,6 +82,7 @@ export class DesktopChanges {
   }
   private async sources(context: ChangeContext, revision: unknown): Promise<boolean> {
     for (const source of context.sources) if (hashText((await this.reader.read(source.path, revision)).text) !== source.hash) return false;
+    if (context.schemaVersion === 2 && catalogFingerprint(await this.reader.list(revision), Object.keys(context.targets)) !== context.catalog) return false;
     return true;
   }
   private async run<T>(revision: unknown, work: (manager: ChangeManager, current: () => void) => Promise<T>, states: Record<string, DestinationState> = {}): Promise<T> {
@@ -112,7 +115,7 @@ export class DesktopChanges {
     } finally { this.applying = false; this.approval = null; }
   }
   /** Called by trusted main-process record generators; never exposed as generic IPC. */
-  async propose(inputs: Inputs, sources: ChangeContext["sources"], revision: unknown): Promise<ChangesSnapshot> {
+  async propose(inputs: Inputs, sources: ChangeContext["sources"], revision: unknown, catalog?: string): Promise<ChangesSnapshot> {
     this.approval = null; const settings = this.settings(revision), targets: ChangeContext["targets"] = {};
     if (!inputs.length || inputs.length > 10 || sources.length > 100) throw new DesktopError("Keep proposals within ten notes and one hundred source references.");
     await this.run(revision, async (manager, current) => {
@@ -120,7 +123,7 @@ export class DesktopChanges {
         this.check(input.path, revision); targets[input.path] = await this.writer.inspect(input.path, revision); current();
         if (targets[input.path]!.file?.hash !== (input.before === null ? undefined : hashText(input.before))) throw new DesktopError("Target changed before proposal. Reopen the source.");
       }
-      const context: ChangeContext = { schemaVersion: 1, ...JSON.parse(settings), sources: structuredClone(sources), targets };
+      const context: ChangeContext = { schemaVersion: catalog === undefined ? 1 : 2, ...JSON.parse(settings), sources: structuredClone(sources), targets, ...(catalog === undefined ? {} : { catalog }) };
       // A target has its own before/after checks; separate supporting sources
       // must remain unchanged throughout a multi-note application.
       if (sources.some(source => inputs.some(input => input.path === source.path))) throw new DesktopError("Keep supporting references separate from changed targets.");

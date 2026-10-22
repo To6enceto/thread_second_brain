@@ -57,6 +57,12 @@ const bridge: DesktopBridge = {
   prepareAction: (id, command, revision) => ipcRenderer.invoke("thread:prepare-action", id, command, revision),
   generateSession: (id, input, revision) => ipcRenderer.invoke("thread:generate-session", id, input, revision),
   prepareSession: (id, revision) => ipcRenderer.invoke("thread:prepare-session", id, revision),
+  loadReviews: (request, revision) => ipcRenderer.invoke("thread:load-reviews", request, revision),
+  prepareReview: (id, command, revision) => ipcRenderer.invoke("thread:prepare-review", id, command, revision),
+  generateReview: (id, input, revision) => ipcRenderer.invoke("thread:generate-review", id, input, revision),
+  prepareReviewDraft: (id, revision) => ipcRenderer.invoke("thread:prepare-review-draft", id, revision),
+  reviewDraftChanged: () => ipcRenderer.invoke("thread:review-draft-changed"),
+  cancelReviews: () => ipcRenderer.invoke("thread:cancel-reviews"),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

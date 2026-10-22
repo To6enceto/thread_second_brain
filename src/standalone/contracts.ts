@@ -55,6 +55,12 @@ export interface DesktopBridge {
   prepareAction(id: string, command: import("./records.ts").ActionCommand, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   generateSession(id: string, input: import("./records.ts").SessionInput, revision: number): Promise<DesktopResult<import("./records.ts").SessionDraft>>;
   prepareSession(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  loadReviews(request: import("./reviews.ts").ReviewRequest, revision: number): Promise<DesktopResult<import("./reviews.ts").DesktopReviewSnapshot>>;
+  prepareReview(id: string, command: import("./reviews.ts").ReviewCommand, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  generateReview(id: string, input: import("./reviews.ts").ReviewGeneration, revision: number): Promise<DesktopResult<import("./reviews.ts").ReviewDraft>>;
+  prepareReviewDraft(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  reviewDraftChanged(): Promise<DesktopResult<null>>;
+  cancelReviews(): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";

@@ -79,6 +79,7 @@
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
         <button id="open-ask" disabled>Ask your vault</button>
         <button id="open-records">Decisions and questions</button>
+        <button id="open-reviews">Project reviews</button>
         <button id="open-actions">Actions and wrap-up</button>
         <button id="open-changes">Review changes</button>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
@@ -101,6 +102,17 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="reviews-panel" tabindex="-1" aria-label="Project reviews" hidden>
+        <h2>Project reviews</h2>
+        <p class="thread-muted">Inspect current records and make explicit choices. Review never runs automatically.</p>
+        <div class="thread-review-controls">
+          <label>Review view<select id="reviews-mode" aria-label="Review view"><option value="queue">Review queue</option><option value="freshness">Source freshness</option><option value="timeline">Project timeline</option><option value="overview">All projects</option><option value="health">Vault health</option><option value="weekly">Weekly review</option></select></label>
+          <label>Project status filter (All projects)<select id="reviews-filter" aria-label="Project status filter"><option value="all">All statuses</option><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="unknown">Unknown</option></select></label>
+        </div>
+        <div class="thread-controls"><button id="reviews-refresh">Refresh reviews</button><button id="reviews-cancel">Cancel review work</button><button id="reviews-close">Close reviews</button></div>
+        <p id="reviews-status" role="status" aria-live="polite"></p>
+        <div id="reviews-content"></div>
+      </section>
       <section id="actions-panel" tabindex="-1" aria-label="Project actions and session wrap-up" hidden>
         <h2>Actions and wrap-up</h2>
         <p class="thread-muted">Recorded progress, explicit choices. AI never changes an action status.</p>

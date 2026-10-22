@@ -8,6 +8,7 @@ import { VaultWriter } from "./vault-writer.ts";
 import { DesktopStorage } from "./storage.ts";
 import { DesktopChanges } from "./changes.ts";
 import { hashText } from "./profile.ts";
+import { catalogFingerprint } from "./catalog.ts";
 
 async function fixture(t: TestContext) {
   const root = await mkdtemp(join(tmpdir(), "thread-changes-")), vault = join(root, "vault"), profile = join(root, "profile");
@@ -130,4 +131,21 @@ test("explicit recovery restores a known applied write after interruption and ke
   assert.equal(await readFile(join(f.vault, f.path), "utf8"), "after"); assert.ok(f.storage.changeState(f.info.revision).recovery);
   const recovery = await f.changes.preview("recover", f.changes.snapshot(f.info.revision).recovery!.id, f.info.revision); await f.changes.confirm(recovery.id, f.info.revision);
   assert.equal(await readFile(join(f.vault, f.path), "utf8"), f.before); assert.equal(f.changes.snapshot(f.info.revision).recovery, null);
+});
+
+test("guarded review contexts survive restart, refuse newly appearing notes and retain guarded Undo", async t => {
+  const f = await fixture(t), target = "Projects/Review.md", inputs = [{ path: target, before: null, after: "Explicit reviewed snapshot" }];
+  await assert.rejects(f.changes.propose(inputs, [], f.info.revision, "invalid"), /guarded review context/); assert.equal(f.changes.snapshot(f.info.revision).pending, null);
+  const catalog = catalogFingerprint(await f.reader.list(f.info.revision), [target]); await f.changes.propose(inputs, [], f.info.revision, catalog);
+  const context = JSON.parse(f.storage.changeState(f.info.revision).pending!.context); assert.equal(context.schemaVersion, 2); assert.equal(context.catalog, catalog);
+  await f.storage.close();
+  const reader = new VaultReader(); let info = await reader.select(f.vault); assert.deepEqual(info.scope.roots, []); info = reader.grant({ roots: ["Projects"], excluded: [] }, info.revision);
+  const storage = new DesktopStorage(reader, f.profile); await storage.initialize(info.revision); const inspected = await storage.inspect(".obsidian", info.revision); await storage.enable(inspected.id, info.revision);
+  t.after(() => storage.close()); const changes = new DesktopChanges(reader, storage), pending = changes.snapshot(info.revision).pending!;
+  assert.equal((await changes.preview("apply", pending.id, info.revision)).ready, true);
+  await writeFile(join(f.vault, "Projects/New dependency.md"), "A previously absent dependency"); assert.equal((await changes.preview("apply", pending.id, info.revision)).ready, false); await assert.rejects(readFile(join(f.vault, target)), { code: "ENOENT" });
+  await changes.reject(pending.id, info.revision); await changes.propose(inputs, [], info.revision, catalogFingerprint(await reader.list(info.revision), [target]));
+  const preview = await changes.preview("apply", changes.snapshot(info.revision).pending!.id, info.revision); await changes.confirm(preview.id, info.revision); assert.equal(await readFile(join(f.vault, target), "utf8"), inputs[0]!.after);
+  await writeFile(join(f.vault, "Projects/New dependency.md"), "Changed after the reviewed write"); const batch = changes.snapshot(info.revision).history.at(-1)!, undo = await changes.preview("undo", batch.id, info.revision); await changes.confirm(undo.id, info.revision);
+  await assert.rejects(readFile(join(f.vault, target)), { code: "ENOENT" }); assert.equal(await readFile(join(f.vault, "Projects/New dependency.md"), "utf8"), "Changed after the reviewed write");
 });

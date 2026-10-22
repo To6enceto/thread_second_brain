@@ -145,3 +145,10 @@
 .thread-action-state-blocked { border: 2px dashed var(--thread-recorded); }
 .thread-action-state-done { border-color: var(--thread-added); background: color-mix(in srgb, var(--thread-added) 12%, var(--thread-card)); }
 .thread-action-form > label[hidden] { display: none; }
+
+.thread-review-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
+.thread-review-controls select { width: 100%; }
+.thread-review-card { border-left: 2px solid var(--thread-recorded); }
+.thread-review-card button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; margin: 6px 6px 0 0; }
+.thread-review-form > label[hidden] { display: none; }
+.thread-review-form { border-top: 1px solid var(--thread-border); padding-top: 16px; margin-top: 24px; }

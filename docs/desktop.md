@@ -4,8 +4,9 @@ Thread has an independent Linux window with scoped vault browsing, keyword
 evidence search, safe Markdown navigation, project home, recorded Resume, optional
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
 new-note saves, exact existing-note change review, guarded undo and interruption
-recovery, decisions and managed questions. Obsidian can stay closed. Remaining
-desktop workflows are tracked in items 58-62 of the build plan; the existing plugin remains available.
+recovery, decisions, managed questions, actions, session wrap-up and on-demand
+project reviews. Obsidian can stay closed. Remaining
+desktop workflows are tracked in items 59-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -407,3 +408,71 @@ note to Review changes. Saving refuses an existing destination and never changes
 any action status or accepts a decision. Input, scope, source, model or writer
 changes discard stale drafts; refresh or generate again. The existing guarded
 Undo/recovery workflow applies to these reviewed writes too.
+
+
+## Project reviews and freshness
+
+Choose **Project reviews** and a **Review view**. These views work on demand and
+never grant access or change records automatically. **Refresh reviews** rebuilds
+the snapshot; **Cancel review work**, input edits, model changes, source changes
+and revoked access discard obsolete work. A queue or timeline needs a selected
+permitted project. Overview, freshness and health can inspect the current granted
+scope without a selected project. Source chips open the original inside Thread.
+
+- **Review queue:** inspect pending categories and expand Handled snapshots.
+  Choose **Review item**, then Reviewed - no change, a future-date snooze or a
+  follow-up question. Enter a reason and a new record name; **Preview review
+  action** opens exact change review. Acknowledgements match the exact source
+  snapshot only. Changed sources can bring an item back; acknowledging never
+  makes output fresh, resolves a question or accepts a decision. Follow-up
+  questions are separate open records. Existing records stay in Markdown.
+- **Source freshness:** inspect saved output states and permitted references.
+  Unavailable references have hidden paths. To refresh, explicitly select one to
+  five current replacement notes with Ctrl/Shift; none are selected by default.
+  The original output is never model evidence. With an applied local model,
+  choose **Generate refreshed**, inspect the draft and supporting passages, then
+  **Preview refreshed note**. The original is retained and a separate new note
+  goes into the mapped Reviews folder.
+- **Project timeline:** distinguish recorded event dates, capture dates and file
+  modifications; unknown dates stay unknown. Enter your milestone title, detail,
+  event date and new note name, then **Preview milestone note**. Milestones remain
+  user reports, not verified achievements.
+- **All projects:** use **Project status filter (All projects)** for recorded
+  Active, Paused, Archived or Unknown states. Cards show bounded record/review
+  counts, activity and chosen actions without inferred priority. **Open project**
+  switches to an already listed permitted project. A chosen next action is a
+  separate explicit record: enter the choice and **Preview next action record**.
+  It never changes a project, decision or action-board state.
+- **Vault health:** inspect concrete date, heading, identity and reference
+  diagnostics, their effects and manual guidance. Eligible date/heading issues
+  offer **Prepare individual repair**. Select one, provide its actual date or
+  recognized heading, then **Preview individual repair**. Other fields and
+  original contents are preserved. There are no bulk fixes, identity reassignments
+  or automatic migrations. Unsupported, ambiguous and stale notes require manual
+  inspection.
+- **Weekly review:** selected-project scope is the default; All explicitly
+  permitted notes is an explicit choice. Choose the seven-day period's ending
+  date and new note name, then **Generate weekly review** with an applied local
+  text model. Inspect user reports, interpretations, resolution claims, sources
+  and gaps; **Preview weekly review note** prepares exactly that draft for review.
+  Generation does not save it or change any status. The Reviews folder needs an
+  explicit role mapping and read grant before saving.
+
+All previews above use **Review changes**, **Preview pending change** and
+**Apply exact change**. Existing destinations are refused. Source/identity/catalog
+changes invalidate sensitive proposals, including newly appearing dependencies;
+refresh, reject and prepare a new proposal when needed. Concurrent external edits
+remain preserved. Guarded Undo and recovery retain the original-write guarantees.
+The guarded desktop proposal context is version 2; existing version-1 history
+remains supported. Older desktop builds refuse version 2 instead of silently
+omitting its checks. Do not reset a retained journal to bypass that refusal.
+
+Coverage is finite: queue snapshots inspect 200 candidates per category and show
+up to 20 pending and 20 handled per category. Dependency traversal is bounded to
+200 notes and 2000 references; acknowledgements exceeding the journal's 100-source
+budget are refused. Timelines show at most 200 events from 2000 records; overview
+shows 20 projects and bounds each card to 2000 records. Health checks at most 500
+indexed files, 1 MiB per file and 8 MiB total, displaying 200 diagnostics. Weekly
+review considers the 80 most recently modified eligible notes before the existing
+16000-character evidence limit. No view certifies complete vault coverage or model
+truth; inspect current source excerpts and reported limits.
