@@ -48,6 +48,11 @@ const bridge: DesktopBridge = {
   rejectChange: (id, revision) => ipcRenderer.invoke("thread:reject-change", id, revision),
   changeDraftEdited: id => ipcRenderer.invoke("thread:change-draft-edited", id),
   invalidateChangeView: () => ipcRenderer.invoke("thread:invalidate-change-view"),
+  loadRecords: (selection, revision) => ipcRenderer.invoke("thread:load-records", selection, revision),
+  prepareRecord: (id, command, revision) => ipcRenderer.invoke("thread:prepare-record", id, command, revision),
+  assessDecision: (id, path, sources, revision) => ipcRenderer.invoke("thread:assess-decision", id, path, sources, revision),
+  recordDraftChanged: keep => ipcRenderer.invoke("thread:record-draft-changed", keep),
+  cancelRecords: () => ipcRenderer.invoke("thread:cancel-records"),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

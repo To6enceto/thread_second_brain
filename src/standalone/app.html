@@ -78,6 +78,7 @@
         <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
         <button id="open-ask" disabled>Ask your vault</button>
+        <button id="open-records">Decisions and questions</button>
         <button id="open-changes">Review changes</button>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
         <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
@@ -99,6 +100,13 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="records-panel" tabindex="-1" aria-label="Decisions and managed questions" hidden>
+        <h2>Decisions and questions</h2>
+        <p class="thread-muted">Record your choices and questions explicitly. Earlier reasoning and answers stay in Markdown. Preview every change before applying.</p>
+        <div class="thread-controls"><button id="records-refresh">Refresh records</button><button id="records-cancel">Cancel record work</button><button id="records-close">Close records</button></div>
+        <p id="records-status" role="status" aria-live="polite"></p>
+        <div id="records-content"></div>
+      </section>
       <section id="changes-panel" tabindex="-1" aria-label="Change review and recovery" hidden>
         <h2>Review changes</h2>
         <p class="thread-muted">Inspect exact changes and retained originals. Nothing applies automatically. Close other editors and enable writing in Desktop storage before confirming.</p>

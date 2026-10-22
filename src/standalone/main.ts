@@ -3,6 +3,7 @@ import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { DesktopSaves } from "./saves.ts";
 import { DesktopStorage } from "./storage.ts";
+import { DesktopRecords } from "./records.ts";
 import { DesktopChanges } from "./changes.ts";
 import { VaultReader } from "./vault-reader.ts";
 import { DesktopAsk } from "./ask.ts";
@@ -21,11 +22,12 @@ let ask: DesktopAsk;
 let storage: DesktopStorage;
 let saves: DesktopSaves;
 let changes: DesktopChanges;
-const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+let records: DesktopRecords;
+const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { records?.invalidate(); changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
 ai = new DesktopAI(projects, evidence);
 ask = new DesktopAsk(reader, evidence, projects, ai);
-function clearVault(): void { changes?.invalidate(); saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
+function clearVault(): void { records?.invalidate(); changes?.invalidate(); saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -47,6 +49,7 @@ async function start(): Promise<void> {
   storage = new DesktopStorage(reader, app.getPath("userData"));
   saves = new DesktopSaves(reader, storage, ask);
   changes = new DesktopChanges(reader, storage);
+  records = new DesktopRecords(reader, evidence, projects, storage, changes, ai);
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -75,25 +78,25 @@ async function start(): Promise<void> {
       const choice = await dialog.showOpenDialog(window, { title: "Choose your Obsidian vault folder", properties: ["openDirectory"] });
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
-      await storage.close();
+      records.invalidate(); await storage.close();
       const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); await storage.initialize(selected.revision); return selected;
     } finally { choosing = false; }
   });
-  handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
+  handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); records.invalidate(); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
   handle("thread:list-notes", 1, revision => reader.list(revision));
   handle("thread:read-note", 3, (path, revision, hash) => evidence.source(path, revision, hash));
   handle("thread:refresh-index", 1, revision => evidence.refresh(revision, true));
   handle("thread:cancel-index", 1, revision => { evidence.cancel(revision); return null; });
   handle("thread:search-notes", 2, (query, revision) => evidence.search(query, revision));
   handle("thread:resolve-link", 3, (from, target, revision) => evidence.resolve(from, target, revision));
-  handle("thread:project-home", 2, (selection, revision) => { ask.forget(); ai.forget(); return projects.home(selection, revision); });
-  handle("thread:resume-project", 2, (selection, revision) => { ask.forget(); return ai.prepare(selection, revision); });
+  handle("thread:project-home", 2, (selection, revision) => { records.invalidate(); ask.forget(); ai.forget(); return projects.home(selection, revision); });
+  handle("thread:resume-project", 2, (selection, revision) => { records.invalidate(); ask.forget(); return ai.prepare(selection, revision); });
   handle("thread:discover-models", 1, endpoint => ai.discover(endpoint));
-  handle("thread:configure-ai", 1, settings => { const result = ai.configure(settings); ask.forget(); return result; });
+  handle("thread:configure-ai", 1, settings => { const result = ai.configure(settings); records.invalidate(); ask.forget(); return result; });
   handle("thread:check-ai", 0, () => ai.check());
-  handle("thread:cancel-ai", 0, () => { saves.revoke(); ai.cancel(); return null; });
+  handle("thread:cancel-ai", 0, () => { records.draftChanged(false); saves.revoke(); ai.cancel(); return null; });
   handle("thread:interpret-resume", 2, (identity, revision) => ai.interpret(identity, revision));
-  handle("thread:retrieve-ask", 2, (request, revision) => { ai.forget(); return ask.retrieve(request, revision); });
+  handle("thread:retrieve-ask", 2, (request, revision) => { records.invalidate(); ai.forget(); return ask.retrieve(request, revision); });
   handle("thread:choose-ask", 3, (identity, choices, revision) => { saves.revoke(); return ask.choose(identity, choices, revision); });
   handle("thread:generate-ask", 2, (identity, revision) => { saves.revoke(); return ask.generate(identity, revision); });
   handle("thread:correct-ask", 5, (identity, index, text, kind, revision) => { saves.revoke(); return ask.correct(identity, index, text, kind, revision); });
@@ -102,9 +105,9 @@ async function start(): Promise<void> {
   handle("thread:storage-status", 1, revision => storage.status(revision));
   handle("thread:inspect-compatibility", 2, (folder, revision) => storage.inspect(folder, revision));
   handle("thread:enable-writing", 2, (id, revision) => storage.enable(id, revision));
-  handle("thread:release-writing", 0, async () => { changes.invalidate(); await storage.release(); return null; });
-  handle("thread:save-preferences", 2, (preferences, revision) => { changes.invalidate(); return storage.savePreferences(preferences, revision); });
-  handle("thread:import-plugin-copy", 2, (id, revision) => { changes.invalidate(); return storage.importCopy(id, revision); });
+  handle("thread:release-writing", 0, async () => { records.invalidate(); changes.invalidate(); await storage.release(); return null; });
+  handle("thread:save-preferences", 2, (preferences, revision) => { records.invalidate(); changes.invalidate(); return storage.savePreferences(preferences, revision); });
+  handle("thread:import-plugin-copy", 2, (id, revision) => { records.invalidate(); changes.invalidate(); return storage.importCopy(id, revision); });
   handle("thread:preview-ask-save", 5, (id, kind, title, selected, revision) => saves.prepare(id, kind, title, selected, revision));
   handle("thread:save-ask-preview", 2, (id, revision) => saves.save(id, revision));
   handle("thread:revoke-save-preview", 0, () => { saves.revoke(); return null; });
@@ -119,6 +122,11 @@ async function start(): Promise<void> {
   handle("thread:reject-change", 2, (id, revision) => changes.reject(id, revision));
   handle("thread:change-draft-edited", 1, id => { changes.draftChanged(id); return null; });
   handle("thread:invalidate-change-view", 0, () => { changes.invalidate(); return null; });
+  handle("thread:load-records", 2, (selection, revision) => records.load(selection, revision));
+  handle("thread:prepare-record", 3, (id, command, revision) => records.prepare(id, command, revision));
+  handle("thread:assess-decision", 4, (id, path, sources, revision) => records.assess(id, path, sources, revision));
+  handle("thread:record-draft-changed", 1, keep => { records.draftChanged(keep); return null; });
+  handle("thread:cancel-records", 0, () => { records.invalidate(); return null; });
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();

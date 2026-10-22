@@ -4,8 +4,8 @@ Thread has an independent Linux window with scoped vault browsing, keyword
 evidence search, safe Markdown navigation, project home, recorded Resume, optional
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
 new-note saves, exact existing-note change review, guarded undo and interruption
-recovery. Obsidian can stay closed. Remaining desktop workflows are tracked
-in items 56-62 of the build plan; the existing plugin remains available.
+recovery, decisions and managed questions. Obsidian can stay closed. Remaining
+desktop workflows are tracked in items 57-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -331,3 +331,46 @@ editor writing during the final write syscall interval. Multi-note writes are no
 atomic. Completed operations are rolled back on failure where safe; uncertain writes
 retain durable originals for explicit recovery. Process-interruption acceptance was
 performed in an isolated synthetic vault; power-loss recovery is not claimed.
+
+## Decisions and managed questions
+
+Choose a project, then **Decisions and questions**. **Refresh records** reads only
+current permitted notes. The expandable list opens original decisions/questions;
+status is recorded metadata, never model acceptance. Index/identity limits may
+require a narrower explicit scope before record changes are available.
+
+Enable writing and map Projects as described above before preparing proposals.
+Every action opens **Review changes**. Use **Preview pending change**, inspect the
+exact before/after and diff, then choose **Apply exact change** or **Reject
+proposal**. Preparing or assessing never changes a note. The same guarded Undo
+and recovery rules apply to these records.
+
+- **Create decision:** enter a new name, question, choice and rationale; record
+  alternatives, constraints, dates and revisit conditions when known. Proposed
+  is the default. Choose **Accepted - I accept this choice** only for your own
+  explicit acceptance. The destination is the project's `Decisions` folder.
+- **Create open question:** enter a new name and question. Optionally select a
+  legacy question section and choose **Copy legacy section into new question**,
+  then edit the copy. The original remains unchanged and is linked as evidence.
+  The destination is the project's `Questions` folder; new questions start open.
+- **Update managed question:** select a version-1 question, choose Investigating,
+  Answered or Open/reopen, and record your reason and event date. Answered also
+  requires your answer. Each event appends to the note; reopening preserves
+  previous answers and reasons. Unsupported/ambiguous properties or duplicate
+  IDs require manual resolution; Thread does not normalize them automatically.
+- **Review decision evidence:** select an accepted/proposed decision and one to
+  four other evidence notes. Configure a downloaded local text model, then choose
+  **Assess selected decision evidence**. Inspect interpretations, gaps and cited
+  excerpts. Enter your reasoning and choose Retain, Annotate or Supersede.
+  Supersede also requires a distinct replacement name and fields with explicit
+  Accepted status; its exact preview contains both the preserved original and
+  new replacement. No existing destination is overwritten.
+
+The evidence selector supports Ctrl/Shift selection: up to ten notes for new
+manual decisions, four for question actions/review, plus an explicitly copied
+legacy source. Context stays bounded to 16000 characters and discloses omissions.
+Manual decisions and questions need no model. Cancel, source/access changes,
+project switching and changed inputs invalidate affected pending results; refresh
+and review again. Existing durable pending proposals remain available separately
+in Review changes. Citation presence identifies a passage, not independent proof
+of its claim. Other editors must remain closed during writes.

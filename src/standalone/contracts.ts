@@ -46,6 +46,11 @@ export interface DesktopBridge {
   rejectChange(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   changeDraftEdited(id: string): Promise<DesktopResult<null>>;
   invalidateChangeView(): Promise<DesktopResult<null>>;
+  loadRecords(selection: ProjectRequest, revision: number): Promise<DesktopResult<import("./records.ts").RecordsSnapshot>>;
+  prepareRecord(id: string, command: import("./records.ts").RecordCommand, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  assessDecision(id: string, path: string, sources: string[], revision: number): Promise<DesktopResult<import("./records.ts").DecisionAssessment>>;
+  recordDraftChanged(keepAssessment: boolean): Promise<DesktopResult<null>>;
+  cancelRecords(): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";

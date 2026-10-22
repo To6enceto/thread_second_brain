@@ -126,3 +126,11 @@
 .thread-diff-same { color: var(--thread-muted); }
 .thread-exact-change { max-height: 420px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 var(--thread-mono); background: var(--thread-surface); padding: 12px; }
 .thread-desktop :is(.thread-change-diff, .thread-exact-change):focus-visible { outline: 2px solid var(--thread-recorded); outline-offset: 3px; }
+
+.thread-record-form > section, .thread-record-form > details { margin: 18px 0; padding: 14px; border: 1px solid var(--thread-border); border-radius: 8px; }
+.thread-record-form select { width: 100%; }
+.thread-record-form > button { margin: 14px 8px 0 0; }
+.thread-record-status { display: inline-block; border: 1px solid var(--thread-border); border-radius: 20px; padding: 2px 8px; font: 12px/1.5 var(--thread-interface); margin-right: 8px; }
+.thread-record-status-accepted { background: color-mix(in srgb, var(--thread-added) 12%, var(--thread-card)); }
+.thread-record-status-proposed { border: 1px dashed var(--thread-recorded); }
+.thread-record-status-superseded { text-decoration: line-through; color: var(--thread-muted); }
