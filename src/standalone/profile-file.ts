@@ -15,7 +15,7 @@ export class ProfileFile<T> {
   private validate: (input: unknown) => T | Promise<T>;
   private maxBytes: number;
   constructor(profileDirectory: string, filename: string, initial: T, validate: (input: unknown) => T | Promise<T>, maxBytes: number) {
-    if (!/^(?:vault|changes)-[a-f0-9]{64}\.json$/.test(filename)) throw new DesktopError("Invalid vault identity.");
+    if (!/^(?:vault|changes|imports)-[a-f0-9]{64}\.json$/.test(filename)) throw new DesktopError("Invalid vault identity.");
     this.directory = profileDirectory; this.filename = filename; this.state = initial; this.validate = validate; this.maxBytes = maxBytes;
   }
   private async folder(): Promise<FileHandle> {

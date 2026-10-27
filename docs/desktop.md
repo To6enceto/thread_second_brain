@@ -6,9 +6,10 @@ local AI interpretation, an Ask evidence workbench, bounded follow-ups and revie
 new-note saves, exact existing-note change review, guarded undo and interruption
 recovery, decisions, managed questions, actions, session wrap-up, on-demand
 project reviews, reviewed capture and clip intake, saved research collections,
-cited knowledge synthesis and offline extraction of explicitly granted local PDFs
-with page citations. Obsidian can stay closed. Remaining
-desktop workflows are tracked in items 61-62 of the build plan; the existing plugin remains available.
+cited knowledge synthesis, offline extraction of explicitly granted local PDFs
+with page citations, and portable project checkpoints shared with the plugin.
+Obsidian can stay closed. Desktop packaging is tracked in item 62 of the build
+plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -580,3 +581,49 @@ omitted. Selectable text only: scanned or image-only pages need OCR, which
 Thread does not provide. Encrypted, malformed and oversized files are refused
 with the original unchanged. Text order and missing fonts can omit or reorder
 content, and a citation does not prove the extracted claim is true.
+
+## Project portability
+
+Choose **Project portability** with a selected project. Packages use the same
+`.thread-project.json` format as the Obsidian plugin, so checkpoints move both
+ways. A checkpoint is a selected project package, not a full vault backup or a
+change journal. Settings, caches, journals, models and plugin data are never
+included. Exports and imports need desktop writing (see **Enable reviewed
+desktop saves**).
+
+- **Export a checkpoint:** tick the current permitted project files to include.
+  Granted PDFs that extracted notes depend on are offered too; stale, ambiguous
+  and unsupported records are left out and counted. Enter a folder inside your
+  current read roots (outside exclusions) and a name, then **Preview checkpoint**
+  to see the destination, each entry with its hash and text, and omissions.
+  **Save previewed checkpoint** rebuilds the package, rechecks every source and
+  refuses existing names or names that differ only by case. Sources and read
+  access stay unchanged.
+- **Compare a checkpoint:** choose a package file in the system dialog. It is
+  validated as inert data first; reading it grants nothing. **Compare with
+  current project** lists unchanged, changed, missing and current-only files for
+  the same project and counts files unavailable under current access, such as
+  excluded folders or PDFs without a grant. Comparison never restores or changes
+  notes. Long texts are shown up to 20000 characters; the package keeps every
+  byte.
+- **Import a package as new copies:** choose a package, enter a new top-level
+  folder outside every read root, exclusion and PDF grant, then **Preview
+  import** to see each destination and any duplicate-ID warnings. **Import as new
+  copies** writes only new files and verifies every written copy. Existing files
+  are never overwritten and IDs are never rewritten. The new folder stays
+  unreadable to Thread until you add it to read access. Links and recorded PDF
+  paths may need manual review; copied PDFs need their own grant and extraction.
+  Whole-vault read access (`.`) leaves no folder outside access, so narrow read
+  roots before importing.
+
+If an import is interrupted, the panel shows it with progress. Choose the same
+package again to inspect it: verified copies are kept, an uncertain last copy is
+adopted only if its bytes match, and **Import as new copies** continues. **Close
+interrupted import (keep partial copies)** stops recovery without deleting
+anything. Import history is kept in the desktop profile, separate from the
+plugin's history.
+
+Limits: 100 files, 2 MiB per text file, 16 MiB per PDF, 32 MiB expanded and
+48 MiB per package; at most 10 PDF originals and 32 MiB of PDFs per export; 100
+recorded imports with one pending at a time. Package hashes prove integrity,
+not that the contents are trustworthy evidence.

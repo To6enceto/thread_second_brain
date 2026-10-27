@@ -78,6 +78,16 @@ export interface DesktopBridge {
   researchDraftChanged(keepClip: boolean): Promise<DesktopResult<null>>;
   cancelResearch(): Promise<DesktopResult<null>>;
   readPdfAsset(path: string): Promise<DesktopResult<Uint8Array>>;
+  exportInventory(selection: ProjectRequest, revision: number): Promise<DesktopResult<import("./portability.ts").ExportSnapshot>>;
+  previewExport(id: string, selected: string[], folder: string, name: string, revision: number): Promise<DesktopResult<import("./portability.ts").ExportPreviewSnapshot>>;
+  writeExport(id: string, revision: number): Promise<DesktopResult<string>>;
+  pickPackage(revision: number): Promise<DesktopResult<import("./portability.ts").PackageSummary | null>>;
+  compareCheckpoint(token: string, selection: ProjectRequest, revision: number): Promise<DesktopResult<import("./portability.ts").ComparisonSnapshot>>;
+  importStatus(revision: number): Promise<DesktopResult<import("./portability.ts").ImportStatus>>;
+  previewImport(token: string, root: string, revision: number): Promise<DesktopResult<import("./portability.ts").ImportPreviewSnapshot>>;
+  applyImport(id: string, revision: number): Promise<DesktopResult<import("./portability.ts").ImportStatus>>;
+  leaveImport(revision: number): Promise<DesktopResult<import("./portability.ts").ImportStatus>>;
+  cancelPortability(): Promise<DesktopResult<null>>;
   loadPdfs(revision: number): Promise<DesktopResult<import("./pdf.ts").PdfSnapshot>>;
   consentPdf(path: string, granted: boolean, revision: number): Promise<DesktopResult<VaultInfo>>;
   readPdf(id: string, path: string, revision: number): Promise<DesktopResult<import("./pdf.ts").PdfOriginalSnapshot>>;

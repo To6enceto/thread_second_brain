@@ -5,6 +5,7 @@ import { inspectCompatibility, type PluginCompatibility } from "./compatibility.
 import type { VaultReader } from "./vault-reader.ts";
 import { DesktopError, permitted } from "./security.ts";
 import { ChangeJournal } from "./change-journal.ts";
+import { ImportJournal } from "./import-journal.ts";
 export interface StorageStatus {
   preferences: ProfileState["preferences"]; warning: string; writing: boolean;
   saves: { id: string; path: string; status: string }[]; importedCopies: number; changesPending: boolean; changesRecovery: boolean;
@@ -16,6 +17,7 @@ export class DesktopStorage {
   private profileDirectory: string;
   private profile: DesktopProfile | null = null;
   private journal: ChangeJournal | null = null;
+  private imports: ImportJournal | null = null;
   private identity = "";
   private warning = "";
   private owner: WriterOwnership | null = null;
@@ -27,17 +29,17 @@ export class DesktopStorage {
     this.epoch++; this.preview = null;
     const owner = this.owner; this.owner = null;
     await this.active?.catch(() => {}); await owner?.release();
-    this.profile = null; this.journal = null; this.identity = ""; this.warning = "";
+    this.profile = null; this.journal = null; this.imports = null; this.identity = ""; this.warning = "";
   }
   async initialize(revision: unknown): Promise<StorageStatus> {
     await this.close(); const epoch = this.epoch;
     const identity = await this.reader.identity(revision);
     if (epoch !== this.epoch) throw new DesktopError("Vault changed during profile loading.");
     const profile = new DesktopProfile(this.profileDirectory, identity);
-    const journal = new ChangeJournal(this.profileDirectory, identity);
-    try { await profile.load(); await journal.load(); } catch (error) { this.warning = error instanceof Error ? error.message : "Desktop history unavailable. Preserve the profile."; }
+    const journal = new ChangeJournal(this.profileDirectory, identity), imports = new ImportJournal(this.profileDirectory, identity);
+    try { await profile.load(); await journal.load(); await imports.load(); } catch (error) { this.warning = error instanceof Error ? error.message : "Desktop history unavailable. Preserve the profile."; }
     if (epoch !== this.epoch || identity !== await this.reader.identity(revision)) throw new DesktopError("Vault changed during profile loading.");
-    this.identity = identity; this.profile = profile; this.journal = journal; return this.status(revision);
+    this.identity = identity; this.profile = profile; this.journal = journal; this.imports = imports; return this.status(revision);
   }
   status(revision: unknown): StorageStatus {
     if (!this.profile || revision !== this.reader.getInfo()?.revision) throw new DesktopError("Select a vault before opening desktop storage.");
@@ -107,6 +109,20 @@ export class DesktopStorage {
       return work(this.journal, current);
     }, true);
   }
+  importState(revision: unknown): ImportJournal["state"] {
+    this.status(revision);
+    if (this.warning || !this.imports) throw new DesktopError(this.warning || "Project import history unavailable. Preserve the profile.");
+    return structuredClone(this.imports.state);
+  }
+  /** Writer-owned project import work; the journal state object is mutated and persisted by the shared importer. */
+  async importWork<T>(revision: unknown, work: (journal: ImportJournal, current: () => void) => Promise<T>): Promise<T> {
+    return this.owned(revision, async (_profile, current) => {
+      if (!this.imports) throw new DesktopError("Project import history unavailable.");
+      return work(this.imports, current);
+    });
+  }
+  /** Writer-owned vault work that needs no journal, such as create-only package exports. */
+  async exclusiveWrite<T>(revision: unknown, work: (current: () => void) => Promise<T>): Promise<T> { return this.owned(revision, async (_profile, current) => work(current)); }
   async savePreferences(input: unknown, revision: unknown): Promise<StorageStatus> {
     const next = preferences(input);
     await this.owned(revision, async (profile, current) => profile.store({ ...profile.state, preferences: next }, current)); return this.status(revision);

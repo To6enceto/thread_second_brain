@@ -80,6 +80,7 @@
         <button id="open-ask" disabled>Ask your vault</button>
         <button id="open-records">Decisions and questions</button>
         <button id="open-research">Capture and research</button>
+        <button id="open-portability">Project portability</button>
         <button id="open-reviews">Project reviews</button>
         <button id="open-actions">Actions and wrap-up</button>
         <button id="open-changes">Review changes</button>
@@ -113,6 +114,16 @@
         <div class="thread-controls"><button id="research-refresh">Refresh research context</button><button id="research-cancel">Cancel research work</button><button id="research-close">Close research</button></div>
         <p id="research-status" role="status" aria-live="polite"></p>
         <div id="research-content"></div>
+      </section>
+      <section id="portability-panel" tabindex="-1" aria-label="Project portability" hidden>
+        <h2>Project portability</h2>
+        <p class="thread-muted">Checkpoints are selected project packages, not full vault backups or change journals. Nothing is overwritten, restored or granted automatically.</p>
+        <div class="thread-review-controls">
+          <label>Portability workflow<select id="portability-mode" aria-label="Portability workflow"><option value="export">Export a checkpoint</option><option value="compare">Compare a checkpoint</option><option value="import">Import a package as new copies</option></select></label>
+        </div>
+        <div class="thread-controls"><button id="portability-refresh">Refresh portability</button><button id="portability-cancel">Cancel portability work</button><button id="portability-close">Close portability</button></div>
+        <p id="portability-status" role="status" aria-live="polite"></p>
+        <div id="portability-content"></div>
       </section>
       <section id="reviews-panel" tabindex="-1" aria-label="Project reviews" hidden>
         <h2>Project reviews</h2>

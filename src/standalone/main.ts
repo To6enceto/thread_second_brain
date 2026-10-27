@@ -3,6 +3,8 @@ import { DesktopCollections } from "./collections.ts";
 import { DesktopKnowledge } from "./knowledge.ts";
 import { DesktopPdfAssets } from "./pdf-assets.ts";
 import { DesktopPdf } from "./pdf.ts";
+import { DesktopPortability } from "./portability.ts";
+import { VaultFiles } from "./vault-files.ts";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
@@ -34,7 +36,10 @@ let intake: DesktopIntake;
 let collections: DesktopCollections;
 let knowledge: DesktopKnowledge;
 let pdf: DesktopPdf;
-function invalidateResearch(): void { intake?.invalidate(); collections?.invalidate(); knowledge?.invalidate(); pdf?.invalidate(); }
+let portability: DesktopPortability;
+function cancelResearchWork(): void { intake?.invalidate(); collections?.invalidate(); knowledge?.invalidate(); pdf?.invalidate(); }
+// Scope, vault, writer and evidence changes also discard portability tokens and previews.
+function invalidateResearch(): void { cancelResearchWork(); portability?.invalidate(); }
 function researchDraftChanged(keepClip = false): void { intake?.draftChanged(keepClip); collections?.draftChanged(); knowledge?.draftChanged(); pdf?.draftChanged(); }
 const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { invalidateResearch(); reviews?.invalidate(); records?.invalidate(); changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
@@ -69,6 +74,7 @@ async function start(): Promise<void> {
   collections = new DesktopCollections(reader, evidence, projects, storage, changes, ask);
   knowledge = new DesktopKnowledge(reader, evidence, projects, storage, changes, ai);
   pdf = new DesktopPdf(reader, evidence, storage, changes);
+  portability = new DesktopPortability(reader, evidence, storage, new VaultFiles(reader));
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -175,12 +181,26 @@ async function start(): Promise<void> {
   handle("thread:generate-knowledge", 3, (id, input, revision) => knowledge.generate(id, input, revision));
   handle("thread:prepare-knowledge", 2, (id, revision) => knowledge.prepare(id, revision));
   handle("thread:research-draft-changed", 1, keepClip => { if (typeof keepClip !== "boolean") throw new DesktopError("Use the current research controls."); researchDraftChanged(keepClip); return null; });
-  handle("thread:cancel-research", 0, () => { invalidateResearch(); return null; });
+  handle("thread:cancel-research", 0, () => { cancelResearchWork(); return null; });
   handle("thread:read-pdf-asset", 1, path => pdfAssets.read(path));
   handle("thread:load-pdfs", 1, revision => { intake.invalidate(); collections.invalidate(); knowledge.invalidate(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return pdf.load(revision); });
   // Consent keeps the vault revision (and writer ownership) but rebuilds evidence and discards dependent work.
   handle("thread:consent-pdf", 3, async (path, granted, revision) => { const info = await reader.consentPdf(path, granted, revision); invalidateResearch(); reviews.invalidate(); records.invalidate(); changes.invalidate(); saves.revoke(); ask.forget(); ai.forget(); evidence.reset(); void evidence.refresh(info.revision).catch(() => {}); return info; });
   handle("thread:read-pdf", 3, (id, path, revision) => pdf.read(id, path, revision));
+  handle("thread:export-inventory", 2, (selection, revision) => portability.exportInventory(selection as ProjectRequest, revision));
+  handle("thread:preview-export", 5, (id, selected, folder, name, revision) => portability.previewExport(id, selected, folder, name, revision));
+  handle("thread:write-export", 2, (id, revision) => portability.writeExport(id, revision));
+  handle("thread:pick-package", 1, async revision => {
+    if (choosing || !window || reader.getInfo()?.revision !== revision) throw new DesktopError("Finish the open dialog or refresh access first."); choosing = true;
+    try { return await portability.pick(async () => { const choice = await dialog.showOpenDialog(window!, { title: "Choose a Thread project package", properties: ["openFile"], filters: [{ name: "Thread project package", extensions: ["json"] }] }); return choice.canceled ? null : choice.filePaths[0] ?? null; }); }
+    finally { choosing = false; }
+  });
+  handle("thread:compare-checkpoint", 3, (token, selection, revision) => portability.compareCheckpoint(token, selection as ProjectRequest, revision));
+  handle("thread:import-status", 1, revision => portability.importStatus(revision));
+  handle("thread:preview-import", 3, (token, root, revision) => portability.previewImport(token, root, revision));
+  handle("thread:apply-import", 2, (id, revision) => portability.applyImport(id, revision));
+  handle("thread:leave-import", 1, revision => portability.leaveImport(revision));
+  handle("thread:cancel-portability", 0, () => { portability.draftChanged(); return null; });
   handle("thread:prepare-pdf", 5, (id, token, extraction, name, revision) => pdf.prepare(id, token, extraction, name, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
