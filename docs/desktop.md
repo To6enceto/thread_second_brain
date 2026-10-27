@@ -5,9 +5,10 @@ evidence search, safe Markdown navigation, project home, recorded Resume, option
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
 new-note saves, exact existing-note change review, guarded undo and interruption
 recovery, decisions, managed questions, actions, session wrap-up, on-demand
-project reviews, reviewed capture and clip intake, saved research collections and
-cited knowledge synthesis. Obsidian can stay closed. Remaining
-desktop workflows are tracked in items 60-62 of the build plan; the existing plugin remains available.
+project reviews, reviewed capture and clip intake, saved research collections,
+cited knowledge synthesis and offline extraction of explicitly granted local PDFs
+with page citations. Obsidian can stay closed. Remaining
+desktop workflows are tracked in items 61-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -62,7 +63,8 @@ source text can receive keyboard focus for scrolling and selection.
 
 - Linux only in this milestone, using descriptor-relative `/proc/self/fd` reads.
   Symlinked vaults/paths and hardlinked notes are refused; select ordinary folders.
-- Markdown `.md`, valid UTF-8, at most 2 MiB per source. Other formats are omitted.
+- Markdown `.md`, valid UTF-8, at most 2 MiB per source. Other formats are omitted
+  from the note list. Local PDFs need a separate per-file grant (see below).
 - At most 500 notes, 5000 encountered entries, 16 directory levels and a 10-second
   traversal budget. Coverage reports omissions/limits. Narrow the granted roots
   to inspect other notes; the path filter searches only the returned list.
@@ -539,3 +541,42 @@ records are skipped and any other managed record is refused on review. Collectio
 16000-character evidence limit. Captured text above the journal's 1 MB combined
 before/after budget is refused rather than truncated. A valid citation shows where
 text came from; it does not prove the claim is true.
+
+## Local PDFs and page citations
+
+Choose **Capture and research**, then **Extract a local PDF**. The list shows
+up to 200 ordinary PDFs inside your approved read roots; exclusions still win.
+Approving read access to notes never allows reading PDFs.
+
+1. Choose **Grant PDF read** for one exact file. Grants last for this session
+   only, cover at most 100 files, and end whenever read access changes or the
+   vault closes. They are never copied from the Obsidian plugin. **Revoke PDF
+   read** removes one grant. Each change rebuilds evidence; the list reloads
+   when ready.
+2. Pick a granted file in **PDF to extract**, enter a **New PDF source name**
+   and choose **Extract selected PDF**. Text is extracted locally by the bundled
+   PDF.js worker, checked against its packaged hash inventory. No website, CDN,
+   linked URL, remote font or document script is used. Progress shows the page
+   being read; **Cancel research work** stops it.
+3. Inspect each extracted page, then **Preview PDF source**. Review changes shows
+   the exact new note in the mapped Sources folder with the original path, hash,
+   page mapping and limitations. Existing names are refused; extract again under
+   a new name for a separate copy. The PDF and earlier extractions never change.
+
+Extracted pages become evidence for search, Ask, Resume, reviews, records and
+knowledge synthesis only while the granted original still matches the hash
+recorded at extraction. Editing, moving or removing the PDF, revoking its grant
+or excluding its folder removes those pages from evidence; restoring the exact
+original bytes brings them back. Citations such as `Study.md > PDF page 2` open
+the extracted note at that page heading inside Thread after checking the
+original. Thread does not render original pages or launch another viewer.
+Opening the extracted note from the note list is an ordinary note read.
+
+Limits: 16 MiB per PDF, 200 document pages, 40 examined pages, 8000 characters
+per page, 100000 characters in total and a 30-second extraction deadline. Each
+evidence rebuild verifies at most 10 granted originals or 32 MiB; coverage
+reports extracted sources that need a grant, have a changed original or were
+omitted. Selectable text only: scanned or image-only pages need OCR, which
+Thread does not provide. Encrypted, malformed and oversized files are refused
+with the original unchanged. Text order and missing fonts can omit or reorder
+content, and a citation does not prove the extracted claim is true.

@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import type { Stats } from "node:fs";
-import { open, opendir, type FileHandle } from "node:fs/promises";
+import { lstat, open, opendir, type FileHandle } from "node:fs/promises";
 import { basename, isAbsolute, normalize } from "node:path";
 import { DesktopError, permitted, relativePath, scopeInput } from "./security.ts";
 import type { NoteList, NoteSnapshot, ReadScope, VaultInfo } from "./contracts.ts";
+import { PDF_LIMITS } from "../pdf/record.ts";
+import { pdfPath } from "../pdf/scope.ts";
 
-export const READ_LIMITS = { notes: 500, entries: 5000, depth: 16, bytes: 2 * 1024 * 1024, milliseconds: 10000 } as const;
+export const READ_LIMITS = { notes: 500, entries: 5000, depth: 16, bytes: 2 * 1024 * 1024, milliseconds: 10000, pdfs: 200, pdfConsent: 100 } as const;
 const directoryFlags = constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW;
 export const fdPath = (handle: FileHandle, part?: string): string => `/proc/self/fd/${handle.fd}${part ? `/${part}` : ""}`;
 const stamp = (stat: Stats): string => [stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs].join(":");
-interface Selection { path: string; dev: number; ino: number; revision: number; scope: ReadScope; }
+interface Selection { path: string; dev: number; ino: number; revision: number; scope: ReadScope; pdfs: string[]; }
+export interface PdfOriginal { path: string; bytes: Uint8Array; hash: string; stamp: string; }
 
 // Directory-relative descriptors prevent a parent rename/symlink swap from
 // redirecting a later open outside the selected root on the supported Linux host.
@@ -33,7 +36,7 @@ export class VaultReader {
   close(): void { this.revision++; this.selection = null; }
   getInfo(): VaultInfo | null {
     const selected = this.selection;
-    return selected ? { name: basename(selected.path) || selected.path, path: selected.path, revision: selected.revision, scope: structuredClone(selected.scope) } : null;
+    return selected ? { name: basename(selected.path) || selected.path, path: selected.path, revision: selected.revision, scope: structuredClone(selected.scope), pdfs: [...selected.pdfs] } : null;
   }
   async select(path: string): Promise<VaultInfo> {
     const epoch = this.revision;
@@ -41,13 +44,33 @@ export class VaultReader {
     try {
       const stat = await root.stat();
       if (epoch !== this.revision) throw new DesktopError("Vault selection changed. Select the vault again.");
-      this.selection = { path, dev: stat.dev, ino: stat.ino, revision: ++this.revision, scope: { roots: [], excluded: [] } };
+      this.selection = { path, dev: stat.dev, ino: stat.ino, revision: ++this.revision, scope: { roots: [], excluded: [] }, pdfs: [] };
       return this.getInfo()!;
     } finally { await root.close(); }
   }
   grant(input: unknown, revision: unknown): VaultInfo {
     const selected = this.current(revision), scope = scopeInput(input);
-    this.selection = { ...selected, scope, revision: ++this.revision };
+    // Read-scope changes always clear PDF consent; it is never carried to a new scope.
+    this.selection = { ...selected, scope, pdfs: [], revision: ++this.revision };
+    return this.getInfo()!;
+  }
+  /** Volatile exact-file binary consent inside the current read scope; Markdown grants never imply it. */
+  async consentPdf(input: unknown, granted: unknown, revision: unknown): Promise<VaultInfo> {
+    const selected = this.current(revision); let path: string;
+    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("Choose an exact listed PDF inside the approved read scope."); }
+    if (typeof granted !== "boolean" || !permitted(path, selected.scope)) throw new DesktopError("Choose an exact listed PDF inside the approved read scope.");
+    const limit = (pdfs: string[]): void => { if (pdfs.filter(item => item !== path).length >= READ_LIMITS.pdfConsent) throw new DesktopError(`Grant at most ${READ_LIMITS.pdfConsent} PDFs. Revoke one first.`); };
+    if (granted) {
+      limit(selected.pdfs);
+      const handle = await this.openPath(selected, path);
+      try { const stat = await handle.stat(); if (!stat.isFile() || stat.nlink !== 1) throw new DesktopError("Only ordinary single-link PDF files can be granted."); }
+      finally { await handle.close(); }
+    }
+    // Recompute from the live selection so a concurrent revoke or grant is never lost or undone.
+    // Consent keeps the vault revision so writer ownership survives; main resets evidence and dependent work instead.
+    const now = this.current(revision); if (granted) limit(now.pdfs);
+    const pdfs = now.pdfs.filter(item => item !== path); if (granted) pdfs.push(path);
+    this.selection = { ...now, pdfs: pdfs.sort((a, b) => a.localeCompare(b)) };
     return this.getInfo()!;
   }
   private current(revision: unknown): Selection {
@@ -111,13 +134,19 @@ export class VaultReader {
   }
   async list(revision: unknown): Promise<NoteList> {
     const selected = this.current(revision);
-    const result: NoteList = { revision: selected.revision, paths: [], files: {}, omitted: 0, omittedMarkdown: 0, identityIncomplete: false, limited: false };
+    const result: NoteList = { revision: selected.revision, paths: [], files: {}, omitted: 0, omittedMarkdown: 0, identityIncomplete: false, limited: false, pdfs: {}, pdfLimited: false };
     const seen = new Set<string>(); let visited = 0;
     const deadline = performance.now() + READ_LIMITS.milliseconds;
     const bounded = (): boolean => {
       this.current(selected.revision);
       if (visited >= READ_LIMITS.entries || result.paths.length >= READ_LIMITS.notes || performance.now() > deadline) { result.limited = true; result.identityIncomplete = true; return true; }
       return false;
+    };
+    // PDFs stay omitted from the text listing; their stamps only feed consent and change detection.
+    const pdf = (path: string, stat: Stats): void => {
+      if (!path.toLowerCase().endsWith(".pdf") || !stat.isFile() || stat.nlink !== 1) return;
+      if (Object.keys(result.pdfs).length >= READ_LIMITS.pdfs) { result.pdfLimited = true; return; }
+      result.pdfs[path] = { stamp: stamp(stat), bytes: stat.size };
     };
     const walk = async (path: string, depth: number): Promise<void> => {
       if (seen.has(path) || !permitted(path, selected.scope) || bounded()) return;
@@ -138,7 +167,10 @@ export class VaultReader {
             if (!permitted(child, selected.scope)) continue;
             if (entry.isSymbolicLink()) { result.omitted++; result.identityIncomplete = true; continue; }
             if (entry.isDirectory() || entry.isFile() && child.toLowerCase().endsWith(".md")) await walk(child, depth + 1);
-            else { result.omitted++; if (child.toLowerCase().endsWith(".md")) { result.omittedMarkdown++; result.identityIncomplete = true; } }
+            else {
+              result.omitted++; if (child.toLowerCase().endsWith(".md")) { result.omittedMarkdown++; result.identityIncomplete = true; }
+              else if (entry.isFile() && child.toLowerCase().endsWith(".pdf")) { try { pdf(child, await lstat(fdPath(handle, entry.name))); } catch { /* Unreadable PDFs stay unlisted; text enumeration is unaffected. */ } }
+            }
           }
         } else if (stat.isFile() && stat.nlink === 1 && path.toLowerCase().endsWith(".md") && stat.size <= READ_LIMITS.bytes) {
           result.paths.push(path);
@@ -146,6 +178,7 @@ export class VaultReader {
         } else {
           result.omitted++;
           if (path.toLowerCase().endsWith(".md")) { result.omittedMarkdown++; result.identityIncomplete = true; }
+          else pdf(path, stat);
         }
       } catch (error) {
         this.current(selected.revision);
@@ -193,6 +226,34 @@ export class VaultReader {
       try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, count)); }
       catch { throw new DesktopError("This note is not valid UTF-8 text."); }
       return { revision: selected.revision, path, text, modifiedAt: after.mtimeMs, stamp: stamp(after) };
+    } finally { await handle.close(); }
+  }
+  /** Current SHA-256 of a permitted note's text, or of a consented PDF original's bytes. */
+  async currentHash(path: string, revision: unknown, current: () => void = () => {}, byteLimit: number = READ_LIMITS.bytes): Promise<string> {
+    if (/\.pdf$/i.test(path)) return (await this.readPdf(path, revision, current)).hash;
+    return createHash("sha256").update((await this.read(path, revision, byteLimit)).text).digest("hex");
+  }
+  /** Main only: bytes of an explicitly consented PDF; the renderer never names an absolute path. */
+  async readPdf(input: unknown, revision: unknown, current: () => void = () => {}): Promise<PdfOriginal> {
+    const selected = this.current(revision); let path: string;
+    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("PDF consent or scope changed. Select the current PDF and grant access explicitly."); }
+    const allowed = (): void => { current(); const now = this.current(revision); if (!now.pdfs.includes(path) || !permitted(path, now.scope)) throw new DesktopError("PDF consent or scope changed. Select the current PDF and grant access explicitly."); };
+    allowed();
+    let handle: FileHandle;
+    try { handle = await this.openPath(selected, path); } catch { allowed(); throw new DesktopError("The selected PDF is missing or uses a link. Select an existing ordinary vault PDF."); }
+    try {
+      const before = await handle.stat(); allowed();
+      if (!before.isFile() || before.nlink !== 1) throw new DesktopError("Only ordinary single-link PDF files can be read.");
+      if (before.size > PDF_LIMITS.bytes) throw new DesktopError("PDF exceeds the 16 MiB input limit.");
+      const buffer = Buffer.alloc(before.size + 1); let count = 0;
+      while (count < buffer.length) { allowed(); const part = await handle.read(buffer, count, buffer.length - count, count); if (!part.bytesRead) break; count += part.bytesRead; }
+      const after = await handle.stat(), fresh = await this.openPath(selected, path);
+      let actual; try { actual = await fresh.stat(); } finally { await fresh.close(); }
+      if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("PDF moved or changed during reading. Select it again.");
+      allowed();
+      // Exactly sized copy: budgets charge the backing buffer length.
+      const bytes = new Uint8Array(buffer.subarray(0, count));
+      return { path, bytes, hash: createHash("sha256").update(bytes).digest("hex"), stamp: stamp(after) };
     } finally { await handle.close(); }
   }
 }

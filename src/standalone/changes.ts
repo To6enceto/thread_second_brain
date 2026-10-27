@@ -81,7 +81,11 @@ export class DesktopChanges {
     return this.propose([{ path: edit.value.path, before: edit.before, after }], [], revision);
   }
   private async sources(context: ChangeContext, revision: unknown): Promise<boolean> {
-    for (const source of context.sources) if (hashText((await this.reader.read(source.path, revision)).text) !== source.hash) return false;
+    for (const source of context.sources) {
+      // Consented PDF originals are rechecked by binary hash; revoked consent makes the proposal not ready.
+      if (/\.pdf$/i.test(source.path)) { let hash = ""; try { hash = (await this.reader.readPdf(source.path, revision)).hash; } catch { return false; } if (hash !== source.hash) return false; }
+      else if (hashText((await this.reader.read(source.path, revision)).text) !== source.hash) return false;
+    }
     if (context.schemaVersion === 2 && catalogFingerprint(await this.reader.list(revision), Object.keys(context.targets)) !== context.catalog) return false;
     return true;
   }

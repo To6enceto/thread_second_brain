@@ -6,6 +6,8 @@ import type { CollectionHandoff, DesktopBridge, DesktopResult, IndexSnapshot } f
 import type { IntakeSnapshot, IntakeFile, ClipSnapshot, CaptureInput } from "./intake.ts";
 import type { KnowledgeDraft, KnowledgeInput } from "./knowledge.ts";
 import type { ChangesSnapshot } from "./changes.ts";
+import type { PdfOriginalSnapshot } from "./pdf.ts";
+import type { PdfExtraction } from "../pdf/record.ts";
 class Element {
   tagName: string; id = ""; textContent = ""; disabled = false; hidden = false; className = ""; selected = false; multiple = false; checked = false; readOnly = false; open = false; parentElement: Element | null = null;
   dataset: Record<string, string> = {}; attributes: Record<string, string> = {}; children: Element[] = []; listeners = new Map<string, (() => void)[]>(); private stored: string | null = null;
@@ -38,19 +40,23 @@ function fixture(t: TestContext) {
     const before = Object.getOwnPropertyDescriptor(globalThis, key); Object.defineProperty(globalThis, key, { configurable: true, value: replacement }); t.after(() => { if (before) Object.defineProperty(globalThis, key, before); else Reflect.deleteProperty(globalThis, key); });
   }
   el("research-mode").value = "capture"; el("research-scope").value = "project";
+  const pdfRead = deferred<DesktopResult<PdfOriginalSnapshot>>(), extracted = deferred<PdfExtraction>(), signals: AbortSignal[] = [];
   const loaded = deferred<DesktopResult<IntakeSnapshot>>(), picked = deferred<DesktopResult<IntakeFile | null>>(), reviewed = deferred<DesktopResult<ClipSnapshot>>(), generated = deferred<DesktopResult<KnowledgeDraft>>(), prepared = deferred<DesktopResult<ChangesSnapshot>>();
   const access = { revision: 1, generation: 1, selection: { folder: "Projects", project: "Projects/Demo" }, model: "local", embeddingModel: "" };
-  const calls = { edits: [] as boolean[], captures: [] as CaptureInput[], acknowledge: [] as boolean[], generations: [] as KnowledgeInput[], draftIds: [] as string[], reviews: 0, handoffs: [] as CollectionHandoff[], asks: 0, saveNames: [] as string[], resetAsk: 0 };
+  const calls = { edits: [] as boolean[], captures: [] as CaptureInput[], acknowledge: [] as boolean[], generations: [] as KnowledgeInput[], draftIds: [] as string[], reviews: 0, handoffs: [] as CollectionHandoff[], asks: 0, saveNames: [] as string[], resetAsk: 0, consents: [] as [string, boolean][], pdfPrepares: [] as [string, PdfExtraction, string][] };
   const bridge = { cancelResearch: async () => ({ ok: true, value: null }), researchDraftChanged: async (keep: boolean) => { calls.edits.push(keep); return { ok: true, value: null }; },
     loadIntake: () => loaded.promise, pickIntakeFile: () => picked.promise, suggestIntakeProject: async () => ({ ok: true, value: "Projects/Demo" }), prepareCapture: (_id: string, input: CaptureInput) => { calls.captures.push(input); return prepared.promise; }, reviewClip: () => reviewed.promise, prepareClip: (_id: string, _reviewId: string, ack: boolean) => { calls.acknowledge.push(ack); return prepared.promise; },
     loadKnowledge: async () => ({ ok: true, value: { id: "knowledge", project: "Projects/Demo", sources: [{ path: "Sources/Note.md", hash: "a".repeat(64) }], destinations: ["Knowledge/Existing.md"], links: ["Projects/Demo/Overview.md"], coverage: "Bounded context" } }),
     generateKnowledge: (_id: string, input: KnowledgeInput) => { calls.generations.push(input); return generated.promise; }, prepareKnowledge: (id: string) => { calls.draftIds.push(id); return prepared.promise; },
+    loadPdfs: async () => ({ ok: true, value: { id: "pdfs", files: [{ path: "Papers/Study.pdf", bytes: 2048, consented: true }, { path: "Papers/Other.pdf", bytes: 1024, consented: false }], coverage: "2 permitted PDFs" } }),
+    consentPdf: async (path: string, granted: boolean) => { calls.consents.push([path, granted]); return { ok: true, value: {} }; }, readPdf: () => pdfRead.promise, readPdfAsset: async () => ({ ok: true, value: new Uint8Array() }),
+    preparePdf: (_id: string, token: string, extraction: PdfExtraction, name: string) => { calls.pdfPrepares.push([token, extraction, name]); return prepared.promise; },
     resetAsk: async () => { calls.resetAsk++; return { ok: true, value: null }; }, cancelAI: async () => ({ ok: true, value: null }), retrieveAsk: async () => { calls.asks++; throw Error("No automatic retrieval"); }, saveAskCollection: (_id: string, name: string) => { calls.saveNames.push(name); return prepared.promise; }
   } as unknown as DesktopBridge;
-  const view = new ResearchView(bridge, () => access, () => {}, () => { calls.reviews++; }, () => {}, handoff => calls.handoffs.push(handoff));
+  const view = new ResearchView(bridge, () => access, () => {}, () => { calls.reviews++; }, () => {}, handoff => calls.handoffs.push(handoff), async (_bytes, _asset, signal) => { signals.push(signal); return extracted.promise; });
   const all = () => [...roots.values()].flatMap(root => root.all()), label = (name: string): Element => { const node = all().find(node => node.attributes["aria-label"] === name); assert.ok(node, name); return node; }, button = (name: string): Element => { const node = all().find(node => node.tagName === "BUTTON" && node.textContent === name); assert.ok(node, name); return node; };
   const ready = async (mode = "capture") => { el("research-mode").value = mode; const work = view.refresh(); loaded.resolve({ ok: true, value: intake }); await work; };
-  return { el, roots, view, bridge, access, calls, loaded, picked, reviewed, generated, prepared, label, button, ready, all };
+  return { el, roots, view, bridge, access, calls, pdfRead, extracted, signals, loaded, picked, reviewed, generated, prepared, label, button, ready, all };
 }
 test("research refresh and file picking discard late responses after access or input changes", async t => {
   const f = fixture(t), pending = f.view.refresh(); f.view.invalidate("Access revoked"); f.access.revision++; f.loaded.resolve({ ok: true, value: intake }); await pending; assert.equal(f.el("research-content").children.length, 0); assert.equal(f.el("research-refresh").disabled, false); assert.equal(f.el("research-status").textContent, "Access revoked");
@@ -91,4 +97,30 @@ test("Ask adopts a trusted collection without retrieval/generation and late coll
   const f = fixture(t), ask = new AskView(f.bridge, () => f.access, () => {}, () => { f.calls.reviews++; }), data = handoff(); ask.adoptCollection(data); assert.equal(f.calls.asks, 0); assert.equal(f.calls.resetAsk, 0); assert.equal(f.el("ask-question").value, data.snapshot.request.question); assert.equal(f.label("Evidence choice S1").value, "pin"); assert.match(f.el("ask-context-exact").textContent, /CURRENT_REFERENCE/); assert.equal(f.el("ask-generate").disabled, false);
   f.label("Collection name").value = "Research"; f.label("Collection name").fire("input"); f.button("Preview named collection").fire("click"); assert.deepEqual(f.calls.saveNames, ["Research"]); f.label("Collection name").value = "New name"; f.label("Collection name").fire("input"); f.prepared.resolve({ ok: true, value: changed }); await flush(); assert.equal(f.calls.reviews, 0);
   f.access.revision++; ask.adoptCollection(data); assert.equal(f.el("ask-results").children.length, 0); assert.equal(f.calls.resetAsk, 1);
+});
+const pdfOriginal: PdfOriginalSnapshot = { token: "token", path: "Papers/Study.pdf", hash: "a".repeat(64), bytes: new Uint8Array([37, 80, 68, 70]) };
+const pdfText: PdfExtraction = { totalPages: 1, pages: [{ page: 1, text: "EXTRACTED_PAGE_TEXT", shortened: false }] };
+test("PDF mode grants exact files, previews extracted pages and saves only the current extraction through review", async t => {
+  const f = fixture(t); f.el("research-mode").value = "pdfs"; await f.view.refresh(); assert.equal(f.button("Preview PDF source").disabled, true);
+  f.button("Grant PDF read: Papers/Other.pdf").fire("click"); f.button("Revoke PDF read: Papers/Study.pdf").fire("click"); await flush(); assert.deepEqual(f.calls.consents[0], ["Papers/Other.pdf", true]);
+  await f.view.refresh(); assert.deepEqual(f.label("PDF to extract").options.map(option => option.value), ["", "Papers/Study.pdf"]); f.label("PDF to extract").value = "Papers/Study.pdf"; f.label("New PDF source name").value = "Study text";
+  f.button("Extract selected PDF").fire("click"); f.pdfRead.resolve({ ok: true, value: pdfOriginal }); await flush(); f.extracted.resolve(pdfText); await flush(); await flush();
+  assert.ok(f.all().some(node => node.textContent === "EXTRACTED_PAGE_TEXT")); assert.equal(f.button("Preview PDF source").disabled, false);
+  f.label("New PDF source name").fire("input"); assert.equal(f.calls.edits.length, 0); f.button("Preview PDF source").fire("click"); assert.deepEqual(f.calls.pdfPrepares[0], ["token", pdfText, "Study text"]);
+  f.prepared.resolve({ ok: true, value: changed }); await flush(); assert.equal(f.calls.reviews, 1);
+});
+test("PDF extraction is aborted by cancel and late reads or extractions cannot display or enable saving", async t => {
+  const f = fixture(t); f.el("research-mode").value = "pdfs"; await f.view.refresh(); f.label("PDF to extract").value = "Papers/Study.pdf";
+  f.button("Extract selected PDF").fire("click"); f.pdfRead.resolve({ ok: true, value: pdfOriginal }); await flush(); assert.equal(f.signals.length, 1);
+  f.el("research-cancel").fire("click"); assert.equal(f.signals[0]!.aborted, true); f.extracted.resolve(pdfText); await flush(); await flush();
+  assert.ok(!f.all().some(node => node.textContent === "EXTRACTED_PAGE_TEXT")); assert.equal(f.el("research-content").children.length, 0); assert.equal(f.calls.pdfPrepares.length, 0);
+});
+test("changing the selected PDF clears a finished preview and aborts a running extraction", async t => {
+  const f = fixture(t); f.el("research-mode").value = "pdfs"; await f.view.refresh(); f.label("PDF to extract").value = "Papers/Study.pdf";
+  f.button("Extract selected PDF").fire("click"); f.pdfRead.resolve({ ok: true, value: pdfOriginal }); await flush(); f.extracted.resolve(pdfText); await flush(); await flush();
+  assert.equal(f.button("Preview PDF source").disabled, false); f.label("PDF to extract").value = ""; f.label("PDF to extract").fire("change");
+  assert.equal(f.button("Preview PDF source").disabled, true); assert.equal(f.el("research-pdf-preview").children.length, 0); assert.equal(f.signals[0]!.aborted, false);
+  const g = fixture(t); g.el("research-mode").value = "pdfs"; await g.view.refresh(); g.label("PDF to extract").value = "Papers/Study.pdf";
+  g.button("Extract selected PDF").fire("click"); g.pdfRead.resolve({ ok: true, value: pdfOriginal }); await flush(); g.label("PDF to extract").fire("change"); assert.equal(g.signals[0]!.aborted, true);
+  g.extracted.resolve(pdfText); await flush(); await flush(); assert.ok(!g.all().some(node => node.textContent === "EXTRACTED_PAGE_TEXT")); assert.equal(g.button("Preview PDF source").disabled, true);
 });

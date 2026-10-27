@@ -1,3 +1,4 @@
+import { READ_LIMITS } from "./vault-reader.ts";
 import { randomUUID } from "node:crypto";
 import { ANSWER_SCHEMA, answerPrompt, validateAnswer, type Answer } from "../intelligence/answer.ts";
 import { decisionComparison, decisionReviewBlock, reviewObservations, supersededStatus } from "../vault/decision-review.ts";
@@ -6,10 +7,10 @@ import { decisionMarkdown, type DecisionInput } from "../vault/decision.ts";
 import { questionMarkdown, questionRecord, updateQuestion, type QuestionUpdate } from "../vault/questions.ts";
 import { buildEvidence, type EvidenceBundle, type SourceNote } from "../vault/evidence.ts";
 import { identityFromIndex, type IndexEntry } from "../vault/index.ts";
-import { outputProjection } from "../vault/freshness.ts";
 import { noteName } from "../vault/workspace.ts";
 import type { IndexSnapshot, ProjectRequest } from "./contracts.ts";
 import type { EvidenceIndex } from "./evidence-index.ts";
+import { projectedSource } from "./evidence-index.ts";
 import type { DesktopProjects } from "./projects.ts";
 import type { DesktopStorage } from "./storage.ts";
 import type { DesktopChanges } from "./changes.ts";
@@ -122,8 +123,8 @@ export class DesktopRecords {
   private async verify(context: RecordContext, hashes: Record<string, string>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(context.index);
     for (const [path, hash] of Object.entries(hashes)) {
-      const file = context.index.listing.files[path];
-      if (!file || hashText((await this.reader.read(path, revision, file.bytes)).text) !== hash) throw new DesktopError("Record evidence changed. Refresh records and select current sources.");
+      const file = context.index.listing.files[path] ?? context.index.listing.pdfs[path];
+      if (!file || await this.reader.currentHash(path, revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Record evidence changed. Refresh records and select current sources.");
       current();
     }
     await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(context.index);
@@ -140,7 +141,7 @@ export class DesktopRecords {
       Object.assign(hashes, state.dependencies, { [path]: entry.hash });
       const note = await this.reader.read(path, revision, context.index.listing.files[path]!.bytes); current();
       if (hashText(note.text) !== entry.hash) throw new DesktopError("Selected source changed. Refresh records.");
-      notes.push({ ...note, text: outputProjection(note.text, entry.metadata).text, metadata: entry.metadata, fullHash: entry.hash });
+      notes.push({ ...note, ...await projectedSource(note.text, entry), metadata: entry.metadata, fullHash: entry.hash });
     }
     await this.verify(context, hashes, revision, current);
     const bundle = await buildEvidence(notes); current(); bundle.noteHashes = { ...bundle.noteHashes, ...hashes }; return bundle;

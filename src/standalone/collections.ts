@@ -45,7 +45,7 @@ export class DesktopCollections {
   private guard(context: Context, epoch: number, revision: unknown): void { if (epoch !== this.epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Collection choices changed or were canceled. Review again."); }
   private async verify(index: IndexSnapshot, hashes: Record<string, string>, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(index.revision); current(); this.evidence.assertCurrent(index);
-    for (const [path, hash] of Object.entries(hashes)) { const note = await this.reader.read(path, index.revision); current(); if (hashText(note.text) !== hash) throw new DesktopError("Collection or supporting source changed. Reopen it."); }
+    for (const [path, hash] of Object.entries(hashes)) { const actual = await this.reader.currentHash(path, index.revision, current); current(); if (actual !== hash) throw new DesktopError("Collection or supporting source changed. Reopen it."); }
     await this.evidence.refresh(index.revision); current(); this.evidence.assertCurrent(index);
   }
   async load(selection: ProjectRequest, scope: unknown, revision: unknown): Promise<CollectionsSnapshot> {

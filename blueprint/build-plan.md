@@ -118,7 +118,7 @@ verifiable boundaries; no earlier feature is renumbered.
 - [x] 57. **Desktop actions and session wrap-up** - Port durable action transitions, accessible board and explicitly selected recorded progress into reviewed session notes; AI never changes status. Depends on 56.
 - [x] 58. **Desktop freshness and project reviews** - Port dependency-aware stale output, review queue/acknowledgements, weekly review, timeline, multi-project overview and bounded health diagnostics with individual reviewed repairs. Depends on 57.
 - [x] 59. **Desktop capture and research collections** - Port non-overwriting capture/local clipped-note intake, source metadata, duplicate review, named collections and reviewed knowledge synthesis. Revalidate references; never fetch imported URLs. Depends on 55 and 58.
-- [ ] 60. **Desktop local PDFs and page citations** - Adapt the consented offline PDF worker/assets, extraction, current-original checks and page source navigation; preserve all limits and demonstrate with authored PDFs and actual desktop AI. Depends on 59.
+- [x] 60. **Desktop local PDFs and page citations** - Adapt the consented offline PDF worker/assets, extraction, current-original checks and page source navigation; preserve all limits and demonstrate with authored PDFs and actual desktop AI. Depends on 59.
 - [ ] 61. **Desktop project portability** - Port exact export previews, validated new-copy imports/recovery and checkpoint comparisons, retaining shared formats and current permissions. Prove plugin/desktop round trips and refuse overwrites. Depends on 60.
 
 ## Milestone R - Deliver the independent local application

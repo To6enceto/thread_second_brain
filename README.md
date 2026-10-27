@@ -5,7 +5,8 @@ Electron runtime once; `npm run desktop:start` builds and opens Thread without
 Obsidian. It includes scoped browsing, project home, recorded/local-AI Resume,
 keyword/hybrid Ask, bounded follow-ups, reviewed new-note saves, existing-note
 change review with guarded undo, decisions, questions, actions, project reviews,
-capture and clip intake, research collections and knowledge synthesis. Explicit
+capture and clip intake, research collections, knowledge synthesis and granted
+local PDF extraction with page citations. Explicit
 writer setup, renewed exact previews and
 durable originals govern every change. Further
 desktop workflows remain in the build plan; the existing plugin is preserved.

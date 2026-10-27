@@ -11,9 +11,10 @@ import { WEEKLY_SCHEMA, reviewPeriod, weeklyEvidence, weeklyPrompt, validateWeek
 import { refreshedMarkdown } from "../vault/knowledge.ts";
 import { buildEvidence, type EvidenceBundle, type SourceNote } from "../vault/evidence.ts";
 import type { IndexEntry } from "../vault/index.ts";
-import { outputProjection, type FreshState } from "../vault/freshness.ts";
+import type { FreshState } from "../vault/freshness.ts";
 import type { IndexSnapshot, ProjectRequest } from "./contracts.ts";
 import type { EvidenceIndex } from "./evidence-index.ts";
+import { projectedSource } from "./evidence-index.ts";
 import type { VaultReader } from "./vault-reader.ts";
 import type { DesktopProjects } from "./projects.ts";
 import type { DesktopStorage } from "./storage.ts";
@@ -153,7 +154,10 @@ export class DesktopReviews {
   }
   private async verify(context: ReviewContext, hashes: Record<string, string>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current();
-    for (const [path, hash] of Object.entries(hashes)) await this.read({ path, hash }, context.index, current);
+    for (const [path, hash] of Object.entries(hashes)) {
+      if (/\.pdf$/i.test(path)) { if (await this.reader.currentHash(path, context.index.revision, current) !== hash) throw new DesktopError("Review source changed. Refresh the snapshot."); current(); }
+      else await this.read({ path, hash }, context.index, current);
+    }
     await this.evidence.refresh(revision); current();
   }
   async prepare(id: unknown, input: unknown, revision: unknown) {
@@ -219,7 +223,7 @@ export class DesktopReviews {
       current(); const state = graph.assess(entry.path);
       if (!state.usable || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("Selected evidence is stale or ambiguous. Choose current original notes.");
       const raw = await this.read(entry, context.index, current);
-      notes.push({ path: entry.path, text: outputProjection(raw, entry.metadata).text, metadata: entry.metadata, modifiedAt: entry.modifiedAt, fullHash: entry.hash });
+      notes.push({ path: entry.path, ...await projectedSource(raw, entry), metadata: entry.metadata, modifiedAt: entry.modifiedAt, fullHash: entry.hash });
       Object.assign(hashes, state.dependencies, { [entry.path]: entry.hash });
     }
     await this.verify(context, hashes, revision, current); const bundle = await buildEvidence(notes); current(); bundle.noteHashes = { ...bundle.noteHashes, ...hashes }; return bundle;

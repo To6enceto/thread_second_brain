@@ -3,6 +3,9 @@ import { indexCoverage, retainIndexEntries } from "../vault/index-coverage.ts";
 import { indexNote, LocalIndex, type IndexEntry } from "../vault/index.ts";
 import { contentHash, type ReadScope } from "../vault/scope.ts";
 import { searchCoverageText } from "../retrieval/search.ts";
+import { PdfChecks } from "../pdf/checks.ts";
+import { pdfEvidenceText, readPdfSource, type PdfRecord } from "../pdf/record.ts";
+import { outputProjection } from "../vault/freshness.ts";
 import type { IndexSnapshot, SearchSnapshot, IndexEvent, NoteList, NoteSnapshot } from "./contracts.ts";
 import { metadata } from "./metadata.ts";
 import { resolveLink } from "./links.ts";
@@ -10,6 +13,12 @@ import { DesktopError } from "./security.ts";
 import type { VaultReader } from "./vault-reader.ts";
 
 const budget = indexBudget("conservative");
+/** Evidence text for a usable entry: validated page text for PDF extractions, fail-closed output projection otherwise. */
+export async function projectedSource(raw: string, entry: IndexEntry): Promise<{ text: string; pdf?: PdfRecord }> {
+  if (!entry.pdf) return { text: outputProjection(raw, entry.metadata).text };
+  const source = await readPdfSource(raw, metadata(raw));
+  return { text: pdfEvidenceText(source.extraction), pdf: source.record };
+}
 // Desktop enumeration can fail before it knows how many text files exist.
 // Keep that separate from the shared index's known-file admission counts.
 class DesktopIndex extends LocalIndex {
@@ -48,9 +57,10 @@ export class EvidenceIndex {
     this.requireRevision(snapshot.revision);
     if (this.paused || !this.index.ready || snapshot.generation !== this.generation) throw new DesktopError("Evidence changed or was canceled. Refresh and try again.");
   }
-  scope(): ReadScope {
-    const info = this.reader.getInfo();
-    return { allowedPaths: this.listing?.paths ?? [], excludedPaths: info?.scope.excluded ?? [] };
+  scope(): ReadScope & { pdfPaths: string[] } {
+    const info = this.reader.getInfo(), pdfPaths = (info?.pdfs ?? []).filter(path => this.listing?.pdfs[path] !== undefined);
+    // Consented PDFs are exact files; text reads still require a Markdown/text extension.
+    return { allowedPaths: [...this.listing?.paths ?? [], ...pdfPaths], excludedPaths: info?.scope.excluded ?? [], pdfPaths };
   }
   async refresh(revision: unknown, resume = false): Promise<IndexSnapshot> {
     const rev = this.requireRevision(revision);
@@ -75,7 +85,9 @@ export class EvidenceIndex {
   }
   private async reconcile(revision: number, current: () => void, signal: AbortSignal): Promise<IndexSnapshot> {
     const started = performance.now(), listing = await this.reader.list(revision); current();
-    const signature = JSON.stringify([listing.paths.map(path => [path, listing.files[path]!.stamp]), listing.omitted, listing.omittedMarkdown, listing.identityIncomplete, listing.limited]);
+    // Consented PDF stamps join the signature so original edits, removal or consent changes rebuild PDF evidence.
+    const consented = (this.reader.getInfo()?.pdfs ?? []).filter(path => listing.pdfs[path] !== undefined);
+    const signature = JSON.stringify([listing.paths.map(path => [path, listing.files[path]!.stamp]), listing.omitted, listing.omittedMarkdown, listing.identityIncomplete, listing.limited, consented.map(path => [path, listing.pdfs[path]!.stamp])]);
     if (this.signature === signature && this.snapshot) return this.snapshot;
     const generation = ++this.generation;
     this.index.clear(); this.snapshot = null;
@@ -83,6 +95,7 @@ export class EvidenceIndex {
     this.listing = listing;
     const next = new Map<string, { stamp: string; entry: IndexEntry }>(), entries: IndexEntry[] = [];
     let admittedBytes = 0, rawBytesRead = 0, filesRead = 0, sizeSkips = 0, readBudgetSkips = 0, invalid = 0, reused = 0;
+    const pdfChecks = new PdfChecks();
     for (const [position, path] of listing.paths.entries()) {
       current();
       const file = listing.files[path]!;
@@ -103,6 +116,12 @@ export class EvidenceIndex {
           const resolved = resolveLink(path, target, listing.paths); return resolved.paths.length === 1 ? resolved.paths : [];
         }))];
         entry = { ...entry, links };
+        // Extracted PDF pages are usable only while their consented original still matches; verified every rebuild.
+        if (entry.pdf) {
+          const pdfPath = entry.pdf.path, size = listing.pdfs[pdfPath]?.bytes;
+          const hash = consented.includes(pdfPath) ? await pdfChecks.verify(pdfPath, () => size ?? null, () => this.reader.readPdf(pdfPath, revision, current).then(original => ({ hash: original.hash, bytes: original.bytes.buffer as ArrayBuffer })), signal) : null;
+          current(); if (hash) this.index.binaries.set(pdfPath, hash); else this.index.binaries.delete(pdfPath);
+        }
         next.set(path, { stamp: file.stamp, entry }); entries.push(entry);
       } catch { current(); invalid++; }
       this.notify({ revision, generation, kind: "progress", message: `Indexing ${position + 1} of ${listing.paths.length} listed notes.` });
@@ -116,7 +135,9 @@ export class EvidenceIndex {
     this.index.enumerationComplete = !listing.identityIncomplete;
     this.index.replace(retained.entries, this.scope());
     this.signature = signature;
-    const snapshot: IndexSnapshot = { revision, generation, listing, coverage: this.index.coverage, invalid, reused };
+    const pdfEntries = entries.filter(entry => entry.pdf), ungranted = pdfEntries.filter(entry => !consented.includes(entry.pdf!.path)).length;
+    const changed = pdfEntries.filter(entry => { const hash = this.index.binaries.get(entry.pdf!.path); return hash !== undefined && hash !== entry.pdf!.hash; }).length;
+    const snapshot: IndexSnapshot = { revision, generation, listing, coverage: this.index.coverage, invalid, reused, ...(pdfEntries.length ? { pdfChecks: `${pdfEntries.length} extracted PDF sources; ${ungranted} need an explicit PDF grant; ${changed} have a changed original and stay out of evidence until re-extracted. ${pdfChecks.summary}` } : {}) };
     this.snapshot = snapshot;
     this.notify({ revision, generation, kind: "ready", message: "Index ready. Keyword search works without an AI model.", snapshot });
     return snapshot;
@@ -136,6 +157,9 @@ export class EvidenceIndex {
   async source(path: unknown, revision: unknown, expectedHash: unknown): Promise<NoteSnapshot & { generation: number }> {
     if (expectedHash !== undefined && (typeof expectedHash !== "string" || !/^[a-f0-9]{64}$/.test(expectedHash))) throw new DesktopError("Invalid source reference. Search again.");
     await this.refresh(revision); const generation = this.generation;
+    // Evidence and page citations into extracted PDF text require the consented original to match the extraction.
+    const pdf = expectedHash === undefined ? undefined : this.index.entries.find(entry => entry.path === path)?.pdf;
+    if (pdf && (this.index.binaries.get(pdf.path) !== pdf.hash || await this.reader.currentHash(pdf.path, revision).catch(() => "") !== pdf.hash)) throw new DesktopError("The original PDF changed, moved or is no longer granted. Grant it again or extract a new source; the saved extraction is unchanged.");
     const note = await this.reader.read(path, revision);
     const hash = await contentHash(note.text); this.requireRevision(revision);
     if (generation !== this.generation || expectedHash !== undefined && hash !== expectedHash) throw new DesktopError("Source changed. Search again before opening this evidence.");

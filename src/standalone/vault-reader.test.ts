@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, link, rename } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { READ_LIMITS, VaultReader } from "./vault-reader.ts";
@@ -116,4 +117,46 @@ test("desktop listing bounds unsupported entries too and never expands missing r
   assert.equal(limited.limited, true); assert.equal(limited.omitted, READ_LIMITS.entries);
   info = reader.grant({ roots: ["Missing"], excluded: [] }, info.revision);
   assert.deepEqual((await reader.list(info.revision)).paths, []);
+}));
+
+test("desktop PDF consent is exact, volatile and scoped; binary reads refuse links, oversize and changed originals", async () => fixture(async (reader, root, base) => {
+  const bytes = Buffer.from("%PDF-1.4\nsynthetic\n%%EOF\n");
+  await writeFile(join(root, "Projects", "Paper.pdf"), bytes); await writeFile(join(root, "Projects", "Private", "Hidden.pdf"), bytes);
+  await writeFile(join(base, "Outside.pdf"), bytes); await symlink(join(base, "Outside.pdf"), join(root, "Projects", "Linked.pdf")); await link(join(base, "Outside.pdf"), join(root, "Projects", "Hard.pdf"));
+  let info = await reader.select(root); info = reader.grant({ roots: ["Projects"], excluded: ["Projects/Private"] }, info.revision);
+  const listing = await reader.list(info.revision);
+  assert.deepEqual(Object.keys(listing.pdfs), ["Projects/Paper.pdf"]); assert.equal(listing.pdfs["Projects/Paper.pdf"]!.bytes, bytes.length); assert.ok(!listing.paths.some(path => path.endsWith(".pdf")));
+  await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /consent/);
+  for (const path of ["Projects/Private/Hidden.pdf", "Projects/Linked.pdf", "Projects/Hard.pdf", "Projects/Overview.md", "../Outside.pdf", "/tmp/Outside.pdf"]) await assert.rejects(reader.consentPdf(path, true, info.revision));
+  info = await reader.consentPdf("Projects/Paper.pdf", true, info.revision); assert.deepEqual(info.pdfs, ["Projects/Paper.pdf"]);
+  const original = await reader.readPdf("Projects/Paper.pdf", info.revision); assert.deepEqual(Buffer.from(original.bytes), bytes); assert.match(original.hash, /^[a-f0-9]{64}$/);
+  await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision, () => { throw Error("canceled"); }), /canceled/);
+  info = await reader.consentPdf("Projects/Paper.pdf", false, info.revision); assert.deepEqual(info.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /consent/);
+  info = await reader.consentPdf("Projects/Paper.pdf", true, info.revision); const regranted = reader.grant({ roots: ["Projects"], excluded: ["Projects/Private"] }, info.revision);
+  assert.deepEqual(regranted.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", regranted.revision), /consent/);
+  info = await reader.consentPdf("Projects/Paper.pdf", true, regranted.revision); await writeFile(join(root, "Projects", "Paper.pdf"), Buffer.alloc(16 * 1048576 + 1));
+  await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /16 MiB/);
+  await rm(join(root, "Projects", "Paper.pdf")); await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /missing/);
+  assert.equal(await readFile(join(base, "Outside.pdf"), "utf8"), bytes.toString());
+}));
+
+test("desktop PDF listing is bounded and never reads plugin consent", async () => fixture(async (reader, root) => {
+  await mkdir(join(root, "Papers"));
+  for (let i = 0; i < READ_LIMITS.pdfs + 3; i++) await writeFile(join(root, "Papers", `${String(i).padStart(3, "0")}.pdf`), "%PDF-1.4\n");
+  await writeFile(join(root, ".obsidian", "plugins", "thread", "data.json"), JSON.stringify({ pdfPaths: ["Papers/000.pdf"] }));
+  let info = await reader.select(root); info = reader.grant({ roots: ["Papers"], excluded: [] }, info.revision);
+  const listing = await reader.list(info.revision); assert.equal(Object.keys(listing.pdfs).length, READ_LIMITS.pdfs); assert.equal(listing.pdfLimited, true); assert.deepEqual(info.pdfs, []);
+  for (let i = 0; i < READ_LIMITS.pdfConsent; i++) info = await reader.consentPdf(`Papers/${String(i).padStart(3, "0")}.pdf`, true, info.revision);
+  await assert.rejects(reader.consentPdf("Papers/150.pdf", true, info.revision), /at most 100/);
+}));
+
+test("desktop PDF reads refuse a file changed during reading and concurrent consent updates never resurrect a revoke", async () => fixture(async (reader, root) => {
+  const bytes = Buffer.from("%PDF-1.4\n" + "x".repeat(4096) + "\n%%EOF\n");
+  await writeFile(join(root, "Projects", "A.pdf"), bytes); await writeFile(join(root, "Projects", "B.pdf"), bytes);
+  let info = await reader.select(root); info = reader.grant({ roots: ["Projects"], excluded: [] }, info.revision); info = await reader.consentPdf("Projects/A.pdf", true, info.revision);
+  let calls = 0; const original = await reader.readPdf("Projects/A.pdf", info.revision); assert.equal(original.bytes.buffer.byteLength, bytes.length);
+  await assert.rejects(reader.readPdf("Projects/A.pdf", info.revision, () => { if (++calls === 3) appendFileSync(join(root, "Projects", "A.pdf"), "% appended mid-read\n"); }), /moved or changed during reading/);
+  info = await reader.consentPdf("Projects/B.pdf", true, info.revision);
+  const grant = reader.consentPdf("Projects/A.pdf", true, info.revision), revoke = reader.consentPdf("Projects/B.pdf", false, info.revision);
+  await Promise.all([grant, revoke]); assert.deepEqual(reader.getInfo()!.pdfs, ["Projects/A.pdf"]);
 }));

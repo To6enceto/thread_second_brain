@@ -14,7 +14,6 @@ import type { DesktopChanges } from "./changes.ts";
 import { catalogFingerprint } from "./catalog.ts";
 import { metadata, parseMetadata } from "./metadata.ts";
 import { DesktopError } from "./security.ts";
-import { hashText } from "./profile.ts";
 import { readPickedText, type PickedText } from "./text-import.ts";
 
 export interface IntakeSnapshot { id: string; projects: string[]; clips: { path: string; hash: string }[]; coverage: string; }
@@ -61,7 +60,7 @@ export class DesktopIntake {
   private guard(context: Context, revision: unknown, epoch: number): void { if (this.epoch !== epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Intake inputs changed or were canceled. Preview again."); }
   private async verify(context: Context, hashes: Record<string, string>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current();
-    for (const [path, hash] of Object.entries(hashes)) { const note = await this.reader.read(path, revision); current(); if (hashText(note.text) !== hash) throw new DesktopError("Supporting source changed. Refresh intake."); }
+    for (const [path, hash] of Object.entries(hashes)) { const actual = await this.reader.currentHash(path, revision, current); current(); if (actual !== hash) throw new DesktopError("Supporting source changed. Refresh intake."); }
     await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(context.index);
   }
   /** Native dialog callback is supplied by main only. Renderer never supplies an absolute path. */

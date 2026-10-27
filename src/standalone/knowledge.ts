@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { ANSWER_SCHEMA, answerPrompt, validateAnswer, escapeMarkdown, type Answer } from "../intelligence/answer.ts";
 import { knowledgeMarkdown, synthesisBlock } from "../vault/knowledge.ts";
 import { buildEvidence, type EvidenceBundle, type SourceNote } from "../vault/evidence.ts";
-import { outputProjection } from "../vault/freshness.ts";
 import { overviewIdentity } from "../vault/project-overview.ts";
 import { noteName } from "../vault/workspace.ts";
 import { defaultSettings, type ThreadSettings } from "../settings/settings.ts";
@@ -10,6 +9,7 @@ import type { IndexEntry } from "../vault/index.ts";
 import type { IndexSnapshot, ProjectRequest } from "./contracts.ts";
 import type { VaultReader } from "./vault-reader.ts";
 import type { EvidenceIndex } from "./evidence-index.ts";
+import { projectedSource } from "./evidence-index.ts";
 import type { DesktopProjects } from "./projects.ts";
 import type { DesktopStorage } from "./storage.ts";
 import type { DesktopChanges } from "./changes.ts";
@@ -65,7 +65,7 @@ export class DesktopKnowledge {
   private guard(c: Context, epoch: number, revision: unknown): void { if (epoch !== this.epoch || this.active(c.value.id, revision) !== c) throw new DesktopError("Knowledge inputs changed or were canceled. Generate again."); }
   private async verify(c: Context, hashes: Record<string, string>, states: Record<string, DestinationState>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(c.index);
-    for (const [path, hash] of Object.entries(hashes)) { const note = await this.reader.read(path, revision); current(); if (hashText(note.text) !== hash) throw new DesktopError("Knowledge source or target changed. Refresh and generate again."); }
+    for (const [path, hash] of Object.entries(hashes)) { const actual = await this.reader.currentHash(path, revision, current); current(); if (actual !== hash) throw new DesktopError("Knowledge source or target changed. Refresh and generate again."); }
     for (const [path, state] of Object.entries(states)) { const actual = await this.writer.inspect(path, revision); current(); if (JSON.stringify(actual) !== JSON.stringify(state)) throw new DesktopError("Knowledge destination changed. Preserve newer work and generate again."); }
     await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(c.index);
   }
@@ -96,7 +96,7 @@ export class DesktopKnowledge {
         const entry = c.entries.find(entry => entry.path === selected)!, state = graph.assess(selected);
         if (!state.usable) throw new DesktopError("Selected evidence needs freshness review.");
         const note = await this.reader.read(selected, revision); current(); if (hashText(note.text) !== entry.hash) throw new DesktopError("Selected evidence changed. Refresh sources.");
-        notes.push({ ...note, text: outputProjection(note.text, entry.metadata).text, metadata: entry.metadata, fullHash: entry.hash }); Object.assign(sourceHashes, state.dependencies, { [selected]: entry.hash });
+        notes.push({ ...note, ...await projectedSource(note.text, entry), metadata: entry.metadata, fullHash: entry.hash }); Object.assign(sourceHashes, state.dependencies, { [selected]: entry.hash });
       }
       if (Object.keys(states).some(target => Object.hasOwn(sourceHashes, target) || Object.hasOwn(dependencies, target))) throw new DesktopError("Keep changed targets separate from selected evidence and supporting dependencies.");
       const identity = c.value.project ? overviewIdentity(this.evidence.index, c.settings, c.value.project) : { id: "", hashes: {}, reason: "" }; if (c.value.project && !identity.id) throw new DesktopError(identity.reason);

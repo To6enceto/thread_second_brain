@@ -1,3 +1,4 @@
+import { READ_LIMITS } from "./vault-reader.ts";
 import { randomUUID } from "node:crypto";
 import { conversationContext, conversationPrompt, snapshotTurn, MAX_CONVERSATION_TURNS, type ConversationTurn } from "../intelligence/conversation.ts";
 import { createAnswerRecord, reviewedAnswerMarkdown, validateCorrection } from "../vault/answer-record.ts";
@@ -10,7 +11,6 @@ import { filterEntries, normalizeFilters, searchEntries, type SearchResult } fro
 import { SemanticSearch, semanticCandidates } from "../retrieval/semantic.ts";
 import { buildEvidence, type EvidenceBundle } from "../vault/evidence.ts";
 import { hitsToNotes, identityFromIndex, type IndexEntry } from "../vault/index.ts";
-import { contentHash } from "../vault/scope.ts";
 import { selectContext, type EvidenceChoice } from "../vault/workbench.ts";
 import type { AskAnswer, AskContext, AskRequest, AskSnapshot, IndexSnapshot } from "./contracts.ts";
 import type { DesktopAI } from "./local-ai.ts";
@@ -63,8 +63,8 @@ export class DesktopAsk {
     current(); await this.evidence.refresh(snapshot.revision); current(); this.evidence.assertCurrent(snapshot);
     for (const [path, hash] of Object.entries(hashes)) {
       current(); this.evidence.assertCurrent(snapshot);
-      const file = snapshot.listing.files[path];
-      if (!file || await contentHash((await this.reader.read(path, snapshot.revision, file.bytes)).text) !== hash) throw new DesktopError("Ask sources changed. Retrieve evidence again.");
+      const file = snapshot.listing.files[path] ?? snapshot.listing.pdfs[path];
+      if (!file || await this.reader.currentHash(path, snapshot.revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Ask sources changed. Retrieve evidence again.");
     }
     await this.evidence.refresh(snapshot.revision); current(); this.evidence.assertCurrent(snapshot);
   }

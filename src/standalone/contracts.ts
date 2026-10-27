@@ -1,6 +1,6 @@
 export interface ReadScope { roots: string[]; excluded: string[]; }
-export interface VaultInfo { name: string; path: string; revision: number; scope: ReadScope; }
-export interface NoteList { revision: number; paths: string[]; files: Record<string, { stamp: string; bytes: number }>; omitted: number; omittedMarkdown: number; identityIncomplete: boolean; limited: boolean; }
+export interface VaultInfo { name: string; path: string; revision: number; scope: ReadScope; pdfs: string[]; }
+export interface NoteList { revision: number; paths: string[]; files: Record<string, { stamp: string; bytes: number }>; omitted: number; omittedMarkdown: number; identityIncomplete: boolean; limited: boolean; pdfs: Record<string, { stamp: string; bytes: number }>; pdfLimited: boolean; }
 export interface NoteSnapshot { revision: number; path: string; text: string; modifiedAt: number; stamp: string; }
 export type DesktopResult<T> = { ok: true; value: T } | { ok: false; message: string };
 export interface DesktopBridge {
@@ -77,10 +77,15 @@ export interface DesktopBridge {
   prepareKnowledge(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   researchDraftChanged(keepClip: boolean): Promise<DesktopResult<null>>;
   cancelResearch(): Promise<DesktopResult<null>>;
+  readPdfAsset(path: string): Promise<DesktopResult<Uint8Array>>;
+  loadPdfs(revision: number): Promise<DesktopResult<import("./pdf.ts").PdfSnapshot>>;
+  consentPdf(path: string, granted: boolean, revision: number): Promise<DesktopResult<VaultInfo>>;
+  readPdf(id: string, path: string, revision: number): Promise<DesktopResult<import("./pdf.ts").PdfOriginalSnapshot>>;
+  preparePdf(id: string, token: string, extraction: import("../pdf/record.ts").PdfExtraction, name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
-export interface IndexSnapshot { revision: number; generation: number; listing: NoteList; coverage: IndexCoverage; invalid: number; reused: number; }
+export interface IndexSnapshot { revision: number; generation: number; listing: NoteList; coverage: IndexCoverage; invalid: number; reused: number; pdfChecks?: string; }
 export interface SearchSnapshot extends IndexSnapshot { hits: { path: string; hash: string; heading: string; excerpt: string }[]; coverageText: string; }
 export interface IndexEvent { revision: number; generation: number; kind: "invalidated" | "progress" | "ready"; message: string; snapshot?: IndexSnapshot; }
 

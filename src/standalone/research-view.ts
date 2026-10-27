@@ -2,9 +2,13 @@ import type { CollectionChoices, CollectionHandoff, DesktopBridge, DesktopResult
 import type { IntakeSnapshot, IntakeFile, ClipSnapshot, CaptureInput } from "./intake.ts";
 import type { CollectionsSnapshot, CollectionReview } from "./collections.ts";
 import type { KnowledgeSnapshot, KnowledgeDraft } from "./knowledge.ts";
+import type { PdfSnapshot } from "./pdf.ts";
+import { extractPdf } from "../pdf/parser.ts";
+import { PDF_LIMITS, type PdfExtraction } from "../pdf/record.ts";
 import { localDay } from "../vault/workspace.ts";
 import { contextCoverageText } from "../vault/evidence.ts";
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
+const buffer = (bytes: Uint8Array): ArrayBuffer => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 function add<K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K, text = "", cls = ""): HTMLElementTagNameMap[K] { const node = document.createElement(tag); node.textContent = text; node.className = cls; parent.append(node); return node; }
 function value<T>(result: DesktopResult<T>): T { if (!result.ok) throw Error(result.message); return result.value; }
 type Access = { revision: number; generation: number; selection: ProjectRequest };
@@ -15,12 +19,16 @@ export class ResearchView {
   private review: () => void;
   private source: (path: string, heading: string, hash: string) => void;
   private handoff: (value: CollectionHandoff) => void;
+  private extract: typeof extractPdf;
   private epoch = 0;
   private busy = false;
   private clip: ClipSnapshot | null = null;
   private draft: KnowledgeDraft | null = null;
-  constructor(bridge: DesktopBridge, access: () => Access | null, show: () => void, review: () => void, source: (path: string, heading: string, hash: string) => void, handoff: (value: CollectionHandoff) => void) {
-    this.bridge = bridge; this.access = access; this.show = show; this.review = review; this.source = source; this.handoff = handoff;
+  private extracted: { token: string; extraction: PdfExtraction } | null = null;
+  private controller: AbortController | null = null;
+  private reloadAfterIndex = false;
+  constructor(bridge: DesktopBridge, access: () => Access | null, show: () => void, review: () => void, source: (path: string, heading: string, hash: string) => void, handoff: (value: CollectionHandoff) => void, extract: typeof extractPdf = extractPdf) {
+    this.bridge = bridge; this.access = access; this.show = show; this.review = review; this.source = source; this.handoff = handoff; this.extract = extract;
     el("open-research").addEventListener("click", () => this.open()); el("ask-open-collections").addEventListener("click", () => this.open("collections"));
     for (const id of ["research-mode", "research-scope"]) el(id).addEventListener("change", () => { void this.refresh(); });
     el("research-refresh").addEventListener("click", () => { void this.refresh(); });
@@ -28,11 +36,11 @@ export class ResearchView {
     el("research-close").addEventListener("click", () => { this.hide(); el("source-pane").hidden = false; }); this.invalidate();
   }
   private message(text: string): void { el("research-status").textContent = text; }
-  invalidate(message = "Refresh research for current permitted sources."): void { this.epoch++; this.clip = null; this.draft = null; el("research-content").replaceChildren(); this.setBusy(false); this.message(message); void this.bridge.cancelResearch(); }
+  invalidate(message = "Refresh research for current permitted sources."): void { this.epoch++; this.clip = null; this.draft = null; this.extracted = null; this.controller?.abort(); this.controller = null; el("research-content").replaceChildren(); this.setBusy(false); this.message(message); void this.bridge.cancelResearch(); }
   hide(): void { el("research-panel").hidden = true; this.invalidate(); }
   open(mode?: string): void { if (mode) el<HTMLSelectElement>("research-mode").value = mode; this.show(); el("research-panel").hidden = false; el("research-panel").focus(); void this.refresh(); }
   private setBusy(busy: boolean): void { this.busy = busy; el<HTMLButtonElement>("research-refresh").disabled = busy;
-    for (const button of el("research-content").querySelectorAll<HTMLButtonElement>("[data-research-work]")) button.disabled = busy || button.dataset.needsClip === "true" && !this.clip || button.dataset.needsDraft === "true" && !this.draft;
+    for (const button of el("research-content").querySelectorAll<HTMLButtonElement>("[data-research-work]")) button.disabled = busy || button.dataset.needsClip === "true" && !this.clip || button.dataset.needsDraft === "true" && !this.draft || button.dataset.needsExtraction === "true" && !this.extracted;
   }
   private async run(work: (access: Access, current: () => boolean) => Promise<void>): Promise<void> {
     const access = this.access(); if (!access) { this.message("Choose a vault and explicitly grant read access first."); return; } if (this.busy) return;
@@ -47,10 +55,13 @@ export class ResearchView {
       const area = el("research-content");
       if (mode === "capture" || mode === "clips") { const snapshot = value(await this.bridge.loadIntake(access.selection, access.revision)); if (!current()) return; add(area, "p", snapshot.coverage, "thread-muted"); if (mode === "capture") this.capture(area, snapshot); else this.clips(area, snapshot); }
       else if (mode === "collections") { const snapshot = value(await this.bridge.loadCollections(access.selection, el<HTMLSelectElement>("research-scope").value as "project" | "allowed", access.revision)); if (!current()) return; this.collections(area, snapshot); }
+      else if (mode === "pdfs") { const snapshot = value(await this.bridge.loadPdfs(access.revision)); if (!current()) return; this.pdfs(area, snapshot); }
       else { const snapshot = value(await this.bridge.loadKnowledge(access.selection, access.revision)); if (!current()) return; this.knowledge(area, snapshot); }
       this.message("Context ready. Choose inputs explicitly; nothing is saved automatically.");
     });
   }
+  /** After a PDF consent change, main rebuilds evidence; reload the PDF list once the new index is ready. */
+  indexReady(): void { if (this.reloadAfterIndex && !el("research-panel").hidden) { this.reloadAfterIndex = false; void this.refresh(); } }
   private changed(keepClip = false): void { this.epoch++; this.draft = null; if (!keepClip) { this.clip = null; el("research-clip-review")?.replaceChildren(); } el("research-knowledge-draft")?.replaceChildren(); el("research-suggestion")?.replaceChildren(); this.setBusy(false); void this.bridge.researchDraftChanged(keepClip); this.message("Inputs changed. Review or generate again; notes remain unchanged."); }
   private button(parent: HTMLElement, label: string, click: () => void, work = false): HTMLButtonElement { const button = add(parent, "button", label); if (work) button.dataset.researchWork = "true"; button.addEventListener("click", click); return button; }
   private input(parent: HTMLElement, label: string, initial: string, max: number, multiline = max > 200): HTMLInputElement | HTMLTextAreaElement { const wrapper = add(parent, "label", label), input = multiline ? add(wrapper, "textarea") : add(wrapper, "input"); input.setAttribute("aria-label", label); input.value = initial; input.maxLength = max; if (input.tagName === "TEXTAREA") (input as HTMLTextAreaElement).rows = 4; input.addEventListener("input", () => this.changed()); return input; }
@@ -106,5 +117,30 @@ export class ResearchView {
     }); }, true);
     add(form, "div", "", "thread-ai-card").id = "research-knowledge-draft";
     const prepare = this.button(form, "Preview knowledge changes", () => { const draft = this.draft; if (!draft) return; void this.run(async (access, current) => { value(await this.bridge.prepareKnowledge(draft.id, access.revision)); if (current()) this.review(); }); }, true); prepare.dataset.needsDraft = "true"; prepare.disabled = true; prepare.className = "thread-primary";
+  }
+  private pdfs(area: HTMLElement, snapshot: PdfSnapshot): void {
+    add(area, "p", snapshot.coverage, "thread-muted"); if (!snapshot.files.length) add(area, "p", "No PDFs inside the approved read roots. Add a local PDF to a permitted folder, then refresh.", "thread-empty");
+    const grants = add(area, "section", "", "thread-record-form thread-research-form"); add(grants, "h3", "Exact PDF read grants");
+    add(grants, "p", "Grant binary reads one file at a time for this session. Granting reads only that file; changing read access clears every PDF grant.", "thread-muted");
+    for (const file of snapshot.files) {
+      const row = add(grants, "div", "", "thread-controls"); add(row, "span", `${file.path} - ${Math.ceil(file.bytes / 1024)} KiB - ${file.consented ? "granted" : "not granted"}`, "thread-path");
+      this.button(row, `${file.consented ? "Revoke" : "Grant"} PDF read: ${file.path}`, () => { this.reloadAfterIndex = true; void this.run(async access => { try { value(await this.bridge.consentPdf(file.path, !file.consented, access.revision)); this.message("PDF grant changed. Rebuilding evidence; the list reloads when ready."); } catch (error) { this.reloadAfterIndex = false; throw error; } }); }, true);
+    }
+    const form = this.form(area, "Extract selectable text"), granted = snapshot.files.filter(file => file.consented);
+    const pick = this.select(form, "PDF to extract", [["", granted.length ? "Choose a granted PDF" : "Grant a PDF first"], ...granted.map(file => [file.path, file.path] as [string, string])], () => { this.extracted = null; this.controller?.abort(); this.controller = null; el("research-pdf-preview").replaceChildren(); this.changed(); });
+    const name = add(add(form, "label", "New PDF source name"), "input"); name.setAttribute("aria-label", "New PDF source name"); name.maxLength = 100; name.value = `${localDay()} PDF`;
+    add(form, "p", `Text is extracted locally from the original; scanned or image-only pages need OCR, which Thread does not provide. Limits: 16 MiB, ${PDF_LIMITS.totalPages} pages, ${PDF_LIMITS.pages} examined pages and ${PDF_LIMITS.chars} characters. Saving creates a new source in the mapped Sources folder; the PDF and earlier extractions stay unchanged.`, "thread-muted");
+    this.button(form, "Extract selected PDF", () => { const path = pick.value; this.extracted = null; el("research-pdf-preview").replaceChildren(); if (!path) { this.message("Choose a granted PDF first."); return; } void this.run(async (access, current) => {
+      const original = value(await this.bridge.readPdf(snapshot.id, path, access.revision)); if (!current()) return;
+      const controller = new AbortController(); this.controller = controller; this.message("Extracting selectable text locally...");
+      const extraction = await this.extract(buffer(original.bytes), async asset => buffer(value(await this.bridge.readPdfAsset(asset))), controller.signal, (page, total) => { if (current()) this.message(`Extracting page ${page} of ${total} locally...`); });
+      if (!current() || this.controller !== controller) return; this.controller = null; this.extracted = { token: original.token, extraction }; const preview = el("research-pdf-preview");
+      add(preview, "h3", "Extracted text - not saved"); add(preview, "p", `${extraction.pages.length} of ${extraction.totalPages} pages examined; ${extraction.pages.filter(page => page.shortened).length} shortened; ${extraction.pages.filter(page => !page.text.trim()).length} empty. Text order and missing fonts can omit or reorder content.`, "thread-muted");
+      for (const page of extraction.pages) this.exact(preview, `PDF page ${page.page}${page.shortened ? " (shortened)" : ""}`, page.text || "No selectable text on this page.");
+      this.message("Extraction ready. Inspect each page, then preview the new source.");
+    }); }, true).className = "thread-primary";
+    add(form, "div", "", "thread-ai-card").id = "research-pdf-preview";
+    const save = this.button(form, "Preview PDF source", () => { const extracted = this.extracted; if (!extracted) return; const title = name.value; void this.run(async (access, current) => { value(await this.bridge.preparePdf(snapshot.id, extracted.token, extracted.extraction, title, access.revision)); if (current()) this.review(); }); }, true);
+    save.dataset.needsExtraction = "true"; save.disabled = true;
   }
 }

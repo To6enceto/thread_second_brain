@@ -79,6 +79,11 @@ const bridge: DesktopBridge = {
   prepareKnowledge: (id, revision) => ipcRenderer.invoke("thread:prepare-knowledge", id, revision),
   researchDraftChanged: keepClip => ipcRenderer.invoke("thread:research-draft-changed", keepClip),
   cancelResearch: () => ipcRenderer.invoke("thread:cancel-research"),
+  readPdfAsset: path => ipcRenderer.invoke("thread:read-pdf-asset", path),
+  loadPdfs: revision => ipcRenderer.invoke("thread:load-pdfs", revision),
+  consentPdf: (path, granted, revision) => ipcRenderer.invoke("thread:consent-pdf", path, granted, revision),
+  readPdf: (id, path, revision) => ipcRenderer.invoke("thread:read-pdf", id, path, revision),
+  preparePdf: (id, token, extraction, name, revision) => ipcRenderer.invoke("thread:prepare-pdf", id, token, extraction, name, revision),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);
