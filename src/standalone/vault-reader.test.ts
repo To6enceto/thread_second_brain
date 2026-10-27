@@ -22,7 +22,7 @@ async function fixture(run: (reader: VaultReader, root: string, base: string) =>
 test("desktop selection grants nothing; approved scope excludes private and plugin data and preserves bytes", async () => fixture(async (reader, root) => {
   let info = await reader.select(root);
   assert.deepEqual((await reader.list(info.revision)).paths, []);
-  await assert.rejects(reader.read("Projects/Overview.md", info.revision), /not allowed to read|outside/);
+  await assert.rejects(reader.read("Projects/Overview.md", info.revision), /not allowed to read/);
   info = reader.grant({ roots: ["Projects", "Projects/Private"], excluded: ["Projects/Private"] }, info.revision);
   assert.deepEqual((await reader.list(info.revision)).paths, ["Projects/Overview.md"]);
   const note = await reader.read("Projects/Overview.md", info.revision);
@@ -126,14 +126,14 @@ test("desktop PDF consent is exact, volatile and scoped; binary reads refuse lin
   let info = await reader.select(root); info = reader.grant({ roots: ["Projects"], excluded: ["Projects/Private"] }, info.revision);
   const listing = await reader.list(info.revision);
   assert.deepEqual(Object.keys(listing.pdfs), ["Projects/Paper.pdf"]); assert.equal(listing.pdfs["Projects/Paper.pdf"]!.bytes, bytes.length); assert.ok(!listing.paths.some(path => path.endsWith(".pdf")));
-  await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /consent/);
+  await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /permission or access changed/);
   for (const path of ["Projects/Private/Hidden.pdf", "Projects/Linked.pdf", "Projects/Hard.pdf", "Projects/Overview.md", "../Outside.pdf", "/tmp/Outside.pdf"]) await assert.rejects(reader.consentPdf(path, true, info.revision));
   info = await reader.consentPdf("Projects/Paper.pdf", true, info.revision); assert.deepEqual(info.pdfs, ["Projects/Paper.pdf"]);
   const original = await reader.readPdf("Projects/Paper.pdf", info.revision); assert.deepEqual(Buffer.from(original.bytes), bytes); assert.match(original.hash, /^[a-f0-9]{64}$/);
   await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision, () => { throw Error("canceled"); }), /canceled/);
-  info = await reader.consentPdf("Projects/Paper.pdf", false, info.revision); assert.deepEqual(info.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /consent/);
+  info = await reader.consentPdf("Projects/Paper.pdf", false, info.revision); assert.deepEqual(info.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /permission or access changed/);
   info = await reader.consentPdf("Projects/Paper.pdf", true, info.revision); const regranted = reader.grant({ roots: ["Projects"], excluded: ["Projects/Private"] }, info.revision);
-  assert.deepEqual(regranted.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", regranted.revision), /consent/);
+  assert.deepEqual(regranted.pdfs, []); await assert.rejects(reader.readPdf("Projects/Paper.pdf", regranted.revision), /permission or access changed/);
   info = await reader.consentPdf("Projects/Paper.pdf", true, regranted.revision); await writeFile(join(root, "Projects", "Paper.pdf"), Buffer.alloc(16 * 1048576 + 1));
   await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /16 MiB/);
   await rm(join(root, "Projects", "Paper.pdf")); await assert.rejects(reader.readPdf("Projects/Paper.pdf", info.revision), /missing/);
@@ -155,7 +155,7 @@ test("desktop PDF reads refuse a file changed during reading and concurrent cons
   await writeFile(join(root, "Projects", "A.pdf"), bytes); await writeFile(join(root, "Projects", "B.pdf"), bytes);
   let info = await reader.select(root); info = reader.grant({ roots: ["Projects"], excluded: [] }, info.revision); info = await reader.consentPdf("Projects/A.pdf", true, info.revision);
   let calls = 0; const original = await reader.readPdf("Projects/A.pdf", info.revision); assert.equal(original.bytes.buffer.byteLength, bytes.length);
-  await assert.rejects(reader.readPdf("Projects/A.pdf", info.revision, () => { if (++calls === 3) appendFileSync(join(root, "Projects", "A.pdf"), "% appended mid-read\n"); }), /moved or changed during reading/);
+  await assert.rejects(reader.readPdf("Projects/A.pdf", info.revision, () => { if (++calls === 3) appendFileSync(join(root, "Projects", "A.pdf"), "% appended mid-read\n"); }), /moved or changed while Thread was reading/);
   info = await reader.consentPdf("Projects/B.pdf", true, info.revision);
   const grant = reader.consentPdf("Projects/A.pdf", true, info.revision), revoke = reader.consentPdf("Projects/B.pdf", false, info.revision);
   await Promise.all([grant, revoke]); assert.deepEqual(reader.getInfo()!.pdfs, ["Projects/A.pdf"]);

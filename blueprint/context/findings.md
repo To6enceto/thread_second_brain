@@ -7,42 +7,26 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-22 [P3] open - Two buttons now share the accessible name "Refresh"
+### F-27 [P3] open - Coverage text calls notes left out of the index "could not be read"
 
-**File:** src/standalone/app.html:58
+**File:** src/standalone/collections.ts:67
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** `storage-refresh` was renamed from "Refresh desktop state" to "Refresh", the same accessible name as the notes `refresh` button at app.html:112. Both are visible at the same time when Saving notes is open (`64a-saving-dark.png`). A screen-reader button list shows two "Refresh" entries with no context. Several rewritten messages tell the user to "Choose Refresh" without saying which one (`evidence-index.ts:53,58,68,81`, `vault-reader.ts:78`, and the cancel-index status in `renderer.ts:264`). All of these mean the notes Refresh; the Saving notes Refresh only reloads saving status. The behavior is unchanged, but the distinct name was lost and the next action became ambiguous.
-**Suggested fix:** Give `storage-refresh` a distinct visible label or `aria-label`, for example "Refresh saving status". Optionally say "choose Refresh next to Your notes" in the index messages. No requirement would be lost.
+**Why it matters:** The collections coverage ("... ${omittedFiles} notes could not be read") and the summary-note coverage at `knowledge.ts:61` ("... ${omittedFiles} could not be read") replace "omitted from indexing". `omittedFiles` is `availableFiles - indexed entries` (`src/vault/index-coverage.ts:23`), which counts notes left out by the index limits, not unreadable files. Unreadable notes are counted separately as `invalid`, which `intake.ts:54` shows as "unreadable" next to "skipped" for the same number. The main window also says "skipped" (`renderer.ts:178`). So the same count gets two different names, and "could not be read" points the user at broken files rather than at the index limits. The rule to keep the same meaning is not met. No safeguard is affected.
+**Suggested fix:** Use the same word as the main window and capture screen, for example "${omittedFiles} skipped (not indexed)" in `collections.ts:67` and `knowledge.ts:61`. No requirement would be lost.
 **Resolution:**
 
-### F-23 [P3] open - AI setup messages lost exact limits
+### F-28 [P3] open - Shared messages shown in the desktop still use renamed labels and repeat the new advice
 
-**File:** src/standalone/model-setup.ts:31
+**File:** src/standalone/ask.ts:88
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** (1) The discovery result says models were skipped because they are "online-only, unsuitable or too large to check". In `src/intelligence/ollama.ts:82-96`, `omitted` counts remote models, models that fail inspection, and every entry beyond the first 40 listed (`tags.models.slice(0, 40)`). No size check exists, so "too large" names a cause that does not exist and drops the 40-model limit (the plugin text says "beyond the 40-model limit"). A user with more than 40 models whose model is missing would look for the wrong fix. The spec says "Keep exact numbers and limits". (2) `local-ai.ts:14` replaces "Use an HTTP loopback URL ..., without paths or credentials" with "... with nothing after the port". `localEndpoint` also rejects `https:` and `user@` credentials, which the new text no longer mentions. Neither change affects the loopback-only safeguard itself.
-**Suggested fix:** Say, for example, "... skipped because they are online-only, could not be checked, or come after the first 40 listed"; for the address, add "starting with http:// and without a user name". No requirement would be lost.
+**Why it matters:** The desktop Ask shows `hybridCoverageText` from the shared `src/retrieval/semantic.ts:18`, which wraps the reason as "Keyword fallback: <reason> Choose a compatible downloaded embedding model in settings, or use Keyword. ...". 64b rewrote the desktop reasons (`ask.ts:88` and `ask.ts:92`) to carry their own next action ("... Choose one under Optional local AI, or search by keywords."). The window now gives the advice twice, in two vocabularies, and names "Keyword", an option renamed "Keywords" in this feature. The shared `src/vault/collection-record.ts:55` error "A passage is no longer locatable in the current index. Retrieve evidence again." is still forwarded verbatim from `collections.ts:109,124` into the Ask status when a collection preview fails, so it names the removed "Retrieve evidence" button. `docs/desktop.md:210` also still says "Keyword works without any model". The shared files are out of scope for 64b, and these paths are uncommon. The spec's scan covered only `src/standalone` literals, so it missed this stale text, which users can still see.
+**Suggested fix:** Keep the desktop reasons to the cause only ("No search model chosen." and "The search model is not available or does not work.") so the shared sentence supplies the single next action. Or, when shared wording is next in scope, update `semantic.ts:18` and `collection-record.ts:55` to the new labels. Change the docs to "Keywords works without any model". No requirement would be lost.
 **Resolution:**
 
-### F-24 [P3] open - Save-history text understates that a full history blocks saving
+### F-29 [P3] open - Empty collections message says none exist when the scope hides some
 
-**File:** src/standalone/app.html:70
+**File:** src/standalone/research-view.ts:95
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** The text now says Thread "keeps at most five copies and twenty save records, and stops adding new ones when full." Save receipts are never pruned (`saves.ts:55,57,84`), and `saves.ts:25` refuses every new-note save once 20 records exist. The base said "full history blocks new entries". The new wording reads as if saving continues without a record, so it understates the consequence of the limit. The numbers are unchanged and no write safeguard is weakened.
-**Suggested fix:** Say, for example, "Thread keeps at most five history copies and twenty save records; when either is full, it does not copy or save any more." No requirement would be lost.
-**Resolution:**
-
-### F-25 [P3] open - Some in-scope text keeps the old wording
-
-**File:** src/standalone/saved-access-view.ts:56
-**Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** (1) The saved-access card still lists "Embedding model: <name>". The control it refers to was renamed "Search model (optional)", and the model-setup messages now say "search model". This is a stale reference to a renamed label in `src/standalone`, which step 3 was meant to remove. (2) `evidence-index.ts:155` still appends "Markdown enumeration is incomplete; ... Stable-ID uniqueness is unproven and identity-dependent output cannot be reused." to the search coverage text. The renderer's equivalent coverage sentence was rewritten in plain language, so the same window now states one fact in two styles. The text is desktop-owned, not shared plugin text, and it sits inside the "What this search covered" Details. No meaning is wrong.
-**Suggested fix:** Change the card line to "Search model: <name>". Reuse the renderer's sentence ("Not every note could be listed, so these counts cover only the notes Thread found, and saved results that depend on note IDs are not reused.") in `evidence-index.ts:155`. No requirement would be lost.
-**Resolution:**
-
-### F-26 [P3] open - Changed test patterns keep alternatives that can no longer match
-
-**File:** src/standalone/vault-reader.test.ts:25
-**Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** This is the same pattern as F-21, in other files. `vault-reader.test.ts:25` accepts `/not allowed to read|outside/`, but `VaultReader.read` now throws only "Thread is not allowed to read this note...". `storage.test.ts:75` accepts `/changed|out of date/`, but after `release()` both the inspect and enable phases fail through the epoch check with "The check is out of date." `projects.test.ts:82` accepts `/canceled|stopped/`, where `assertCurrent` now throws "...reading was stopped...". In each case the old alternative cannot match, and keeping it lets an unrelated failure satisfy the assertion. The assertions still pass for the right reason today.
-**Suggested fix:** Narrow the three patterns to `/not allowed to read/`, `/out of date/` and `/stopped/`. No requirement would be lost.
+**Why it matters:** The empty state changed from "No matching collections." to "No saved collections yet. In Ask, ... save them as a collection." `collections.ts` lists only collections whose recorded scope and project identity match the chosen "Collections from" value, so a user who has saved collections under the other scope sees "yet" and is sent to create a new one. The coverage line above it does say "Collections from other scopes are not shown". So the risk is a misleading next action, not data loss.
+**Suggested fix:** Say, for example, "No saved collections for this choice. Try the other Collections from option, or in Ask choose Find passages, pick passages and save them as a collection." No requirement would be lost.
 **Resolution:**

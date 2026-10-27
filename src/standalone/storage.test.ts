@@ -72,7 +72,7 @@ test("releasing writing invalidates delayed compatibility and enable operations"
     const started = new Promise<void>(resolve => { enter = resolve; }), gate = new Promise<void>(resolve => { resume = resolve; });
     f.reader.pluginFiles = async (...args) => { enter(); await gate; return read(...args); };
     const pending = phase === "inspect" ? f.storage.inspect(".obsidian", f.info.revision) : f.storage.enable(preview.id, f.info.revision);
-    await started; await f.storage.release(); resume(); await assert.rejects(pending, /changed|out of date/);
+    await started; await f.storage.release(); resume(); await assert.rejects(pending, /out of date/);
     assert.equal(f.storage.status(f.info.revision).writing, false);
     const owner = await WriterOwnership.acquire(await f.reader.identity(f.info.revision)); await owner.release();
   }

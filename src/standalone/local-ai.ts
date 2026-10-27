@@ -11,7 +11,7 @@ import { DesktopError } from "./security.ts";
 const RESPONSE_LIMIT = 2 * 1024 * 1024;
 function endpoint(value: unknown): string {
   if (typeof value !== "string" || value.length > 200) throw new DesktopError("Enter the Ollama address on this computer.");
-  try { return localEndpoint(value); } catch { throw new DesktopError("Enter an address on this computer such as http://127.0.0.1:11434, with nothing after the port."); }
+  try { return localEndpoint(value); } catch { throw new DesktopError("Enter an address on this computer such as http://127.0.0.1:11434: starting with http://, without a user name and with nothing after the port."); }
 }
 function config(value: unknown): AIConfig {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Check the AI settings.");

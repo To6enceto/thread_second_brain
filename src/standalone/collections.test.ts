@@ -37,7 +37,7 @@ test("Ask collections save retained references and choices through exact review 
   // Renderer copies are never trusted back as evidence.
   review.rows[0]!.source!.excerpt = "FORGED_RENDERER"; result.bundle.sources[0]!.excerpt = "FORGED_ASK";
   const reused = await f.collections.reuse(list.id, review.id, { choices: {}, confirmed: [] }, "What is the research budget?", f.info.revision); assert.ok(reused.context.bundle.sources.some(s => s.path === "Sources/A.md")); assert.ok(!JSON.stringify(reused.context).includes("BETA_CANARY")); assert.ok(!JSON.stringify(reused).includes("FORGED")); assert.equal(reused.context.bundle.noteHashes[path], hashText(raw)); assert.equal(f.calls.length, 0);
-  await assert.rejects(f.ask.generate(reused.context.id, f.info.revision), /downloaded text model/); assert.equal(f.calls.length, 0);
+  await assert.rejects(f.ask.generate(reused.context.id, f.info.revision), /set up a model under Optional local AI/); assert.equal(f.calls.length, 0);
   await f.collections.saveEdited(list.id, review.id, { choices: { "1": "exclude" }, confirmed: [] }, "Edited copy", f.info.revision); const preview = await f.apply(); assert.equal(await f.read("Projects/Demo/Collections/Edited copy.md"), preview.operations[0]!.after); assert.equal(await f.read(path), raw);
   const next = await f.collections.load(selection, "project", f.info.revision), opened = await f.collections.open(next.id, path, f.info.revision); await assert.rejects(f.collections.saveEdited(next.id, opened.id, { choices: {}, confirmed: [] }, "Research", f.info.revision), /changed|Target/); assert.equal(await f.read(path), raw);
 });

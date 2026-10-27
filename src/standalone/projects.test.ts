@@ -79,5 +79,5 @@ test("desktop Resume omits stale derived records and rejects edits/cancellation 
   await assert.rejects(f.projects.resume(f.selection, f.info.revision), /changed/);
   f.reader.read = original; await f.index.refresh(f.info.revision);
   f.reader.read = async (...args) => { const result = await original(...args); f.index.cancel(f.info.revision); return result; };
-  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /canceled|stopped/);
+  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /stopped/);
 });

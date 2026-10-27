@@ -23,6 +23,6 @@ test("native intake refuses unsupported, empty, invalid UTF-8, oversized, linked
 test("native text reader rejects cancellation and a replaced source instead of publishing obsolete bytes", async t => {
   const root = await mkdtemp(join(tmpdir(), "thread-picked-")); t.after(() => rm(root, { recursive: true, force: true })); const path = join(root, "Source.md"); await writeFile(path, "old source");
   let calls = 0; await assert.rejects(readPickedText(path, () => { if (++calls === 3) throw Error("Canceled selection"); }), /Canceled selection/);
-  calls = 0; await assert.rejects(readPickedText(path, () => { if (++calls === 3) execFileSync(process.execPath, ["-e", "require('fs').writeFileSync(process.argv[1], 'replacement source')", path]); }), /changed while reading/);
+  calls = 0; await assert.rejects(readPickedText(path, () => { if (++calls === 3) execFileSync(process.execPath, ["-e", "require('fs').writeFileSync(process.argv[1], 'replacement source')", path]); }), /changed while Thread was reading/);
   assert.equal(await readFile(path, "utf8"), "replacement source");
 });

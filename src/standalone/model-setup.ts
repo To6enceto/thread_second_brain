@@ -28,7 +28,7 @@ export class ModelSetup {
       this.dirty = true;
       const result = this.value(await this.bridge.discoverModels(this.endpoint.value)); if (!current()) return;
       const textModels = this.populate(result.models);
-      this.feedback.textContent = `Found ${textModels.length} text models you can use (${result.omitted} of ${result.total} listed were skipped because they are online-only, unsuitable or too large to check). Pick one, then choose Use this model. Working does not guarantee good answers.`;
+      this.feedback.textContent = `Found ${textModels.length} text models you can use (${result.omitted} of ${result.total} listed were skipped because they are online-only, could not be checked, or come after the first 40 listed). Pick one, then choose Use this model. Working does not guarantee good answers.`;
     }, "Looking for downloaded models on this computer..."); });
     this.apply.addEventListener("click", () => { void this.run(async current => {
       this.configurations++; this.unconfirmed = null;

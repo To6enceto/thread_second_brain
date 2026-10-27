@@ -5,7 +5,7 @@ import { pdfInventory, type PdfAsset } from "../pdf/parser.ts";
 import { DesktopError } from "./security.ts";
 
 const MANIFEST = "pdf-assets.json";
-const unavailable = "Local PDF assets are unavailable or changed. Rebuild the desktop app with npm run desktop:build.";
+const unavailable = "Thread's built-in PDF reader is missing or changed. Rebuild the app with npm run desktop:build.";
 
 /** Serves only hash-inventoried packaged PDF files from the desktop build folder. */
 export class DesktopPdfAssets {

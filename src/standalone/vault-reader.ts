@@ -57,13 +57,13 @@ export class VaultReader {
   /** Volatile exact-file binary consent inside the current read scope; Markdown grants never imply it. */
   async consentPdf(input: unknown, granted: unknown, revision: unknown): Promise<VaultInfo> {
     const selected = this.current(revision); let path: string;
-    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("Choose an exact listed PDF inside the approved read scope."); }
-    if (typeof granted !== "boolean" || !permitted(path, selected.scope)) throw new DesktopError("Choose an exact listed PDF inside the approved read scope.");
+    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("Choose a PDF from the list, inside the folders Thread may read."); }
+    if (typeof granted !== "boolean" || !permitted(path, selected.scope)) throw new DesktopError("Choose a PDF from the list, inside the folders Thread may read.");
     const limit = (pdfs: string[]): void => { if (pdfs.filter(item => item !== path).length >= READ_LIMITS.pdfConsent) throw new DesktopError(`Grant at most ${READ_LIMITS.pdfConsent} PDFs. Revoke one first.`); };
     if (granted) {
       limit(selected.pdfs);
       const handle = await this.openPath(selected, path);
-      try { const stat = await handle.stat(); if (!stat.isFile() || stat.nlink !== 1) throw new DesktopError("Only ordinary single-link PDF files can be granted."); }
+      try { const stat = await handle.stat(); if (!stat.isFile() || stat.nlink !== 1) throw new DesktopError("Only ordinary PDF files can be allowed."); }
       finally { await handle.close(); }
     }
     // Recompute from the live selection so a concurrent revoke or grant is never lost or undone.
@@ -236,20 +236,20 @@ export class VaultReader {
   /** Main only: bytes of an explicitly consented PDF; the renderer never names an absolute path. */
   async readPdf(input: unknown, revision: unknown, current: () => void = () => {}): Promise<PdfOriginal> {
     const selected = this.current(revision); let path: string;
-    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("PDF consent or scope changed. Select the current PDF and grant access explicitly."); }
-    const allowed = (): void => { current(); const now = this.current(revision); if (!now.pdfs.includes(path) || !permitted(path, now.scope)) throw new DesktopError("PDF consent or scope changed. Select the current PDF and grant access explicitly."); };
+    try { path = pdfPath(relativePath(input)); } catch { throw new DesktopError("The PDF's permission or access changed. Choose the PDF and allow it again."); }
+    const allowed = (): void => { current(); const now = this.current(revision); if (!now.pdfs.includes(path) || !permitted(path, now.scope)) throw new DesktopError("The PDF's permission or access changed. Choose the PDF and allow it again."); };
     allowed();
     let handle: FileHandle;
-    try { handle = await this.openPath(selected, path); } catch { allowed(); throw new DesktopError("The selected PDF is missing or uses a link. Select an existing ordinary vault PDF."); }
+    try { handle = await this.openPath(selected, path); } catch { allowed(); throw new DesktopError("The chosen PDF is missing or is a link. Choose an ordinary PDF in your notes folder."); }
     try {
       const before = await handle.stat(); allowed();
-      if (!before.isFile() || before.nlink !== 1) throw new DesktopError("Only ordinary single-link PDF files can be read.");
-      if (before.size > PDF_LIMITS.bytes) throw new DesktopError("PDF exceeds the 16 MiB input limit.");
+      if (!before.isFile() || before.nlink !== 1) throw new DesktopError("Only ordinary PDF files can be read.");
+      if (before.size > PDF_LIMITS.bytes) throw new DesktopError("This PDF is larger than the 16 MiB limit.");
       const buffer = Buffer.alloc(before.size + 1); let count = 0;
       while (count < buffer.length) { allowed(); const part = await handle.read(buffer, count, buffer.length - count, count); if (!part.bytesRead) break; count += part.bytesRead; }
       const after = await handle.stat(), fresh = await this.openPath(selected, path);
       let actual; try { actual = await fresh.stat(); } finally { await fresh.close(); }
-      if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("PDF moved or changed during reading. Select it again.");
+      if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("The PDF moved or changed while Thread was reading it. Choose it again.");
       allowed();
       // Exactly sized copy: budgets charge the backing buffer length.
       const bytes = new Uint8Array(buffer.subarray(0, count));

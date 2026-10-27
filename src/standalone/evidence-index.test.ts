@@ -100,7 +100,7 @@ test("desktop omitted Markdown never establishes stable-ID uniqueness; ordinary 
   assert.equal(omitted.listing.limited, false); assert.equal(omitted.listing.omittedMarkdown, 1);
   assert.equal(omitted.coverage.availableFiles, 3); assert.equal(omitted.coverage.omittedFiles, 1);
   assert.equal(f.index.index.identityComplete, false); assert.equal(omitted.hits.length, 0);
-  assert.match(omitted.coverageText, /Stable-ID uniqueness is unproven/);
+  assert.match(omitted.coverageText, /saved results that depend on note IDs are not reused/);
   await rm(join(f.root, "P/Oversized.md"));
   assert.equal((await f.index.search("derivedorchid", f.info.revision)).hits.length, 1);
   // A refused directory path can conceal an unknown number of IDs. Counts stay

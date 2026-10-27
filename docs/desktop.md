@@ -202,18 +202,18 @@ account, subscription or hosted API cost.
 ## Ask evidence workbench
 
 1. Choose **Ask your vault**, enter a question (up to 1000 characters) and choose
-   **Selected project** or **All permitted notes**. All permitted notes still
+   **Selected project** or **All notes Thread may read**. That choice still
    respects the explicit read roots and exclusions; it grants no additional access.
-2. Optionally expand **Search filters** for type, status, relative path and date
+2. Optionally expand **Filters** for type, status, relative path and date
    range. Dates use recorded fields with a file-modification fallback, not verified
-   events. **Search budget** explicitly chooses 20, 35 or 50 result passages.
-3. Choose **Retrieve evidence**. Keyword works without any model or running Ollama.
+   events. **How many passages** explicitly chooses 20, 35 or 50 result passages.
+3. Choose **Find passages**. Keyword works without any model or running Ollama.
    Read the coverage limits and inspect source chips. Include, Pin first or Exclude
    passages; each change renews the exact context and discards the old answer.
-4. Expand **Exact source context sent to the model**. It shows the exact chosen
+4. Expand **The exact passages sent to the AI**. It shows the exact chosen
    evidence JSON used in the answer prompt, bounded to 16,000 characters. Pins
    go first inside that bound; excluded passages are not sent for answer generation.
-5. With an applied local text model, choose **Generate from chosen evidence**.
+5. With an applied local text model, choose **Ask the AI using these passages**.
    The separate AI card gives model/time, classified claims, supporting excerpts
    and gaps. Classification and valid citations do not establish semantic truth.
    Open citations inside Thread and use **Back to Ask** without regenerating.
@@ -222,9 +222,9 @@ account, subscription or hosted API cost.
    edits invalidate old results. Source/dependency bytes are rechecked after model
    metadata calls immediately before transmission, and after generation.
 
-For optional hybrid search, use **Find downloaded models**, explicitly select an
-**Search model (optional)**, then **Use this model**. Choose **Hybrid (local
-embeddings)** in Ask. Text and embedding models are separate choices; the tested
+For optional hybrid search, use **Find downloaded models**, explicitly select a
+**Search model (optional)**, then **Use this model**. Choose **Keywords and
+meaning (search model)** under **Search by** in Ask. Text and embedding models are separate choices; the tested
 local embedding model is `qwen3-embedding:0.6b`. Model discovery never selects or
 downloads one automatically. Hybrid sends a bounded set of current permitted
 candidate passages to the local embedding model before you choose answer context.
@@ -247,10 +247,10 @@ The original model output, model name, generation time and citations remain inta
 Corrections express your judgment, not independently verified truth. Unapplied
 correction drafts block saving and continuing; apply or explicitly revert them.
 
-Enter a **Follow-up question** and choose **Continue with current evidence**.
+Enter a **Follow-up question** and choose **Continue with these passages**.
 This explicitly reuses the retrieval; review Include/Pin/Exclude again and choose
-**Generate from chosen evidence**. Inspect **Exact earlier conversation context
-(not evidence)** for included/omitted turns. Earlier output is never new evidence.
+**Ask the AI using these passages**. Inspect **The earlier conversation sent to
+the AI (not facts from your notes)** for included/omitted turns. Earlier output is never new evidence.
 The shared bounds are six turns, 4000 earlier-context characters and 24000 total
 prompt characters. Excluding a prior turn's supporting passages omits that turn
 from model context. **New conversation** or a new retrieval resets the conversation.
@@ -509,18 +509,18 @@ truth; inspect current source excerpts and reported limits.
 
 ## Capture and research
 
-Choose **Capture and research** and a **Research workflow**. Saving needs desktop
+Choose **Capture and research** and pick **What do you want to do?**. Saving needs desktop
 writing and explicit folder roles: Inbox for typed thoughts, Sources for imported
 files and clip copies, and Knowledge for synthesis notes and all-permitted
-collections. Roles never grant reads. **Refresh research context** rebuilds the
-snapshot; **Cancel research work**, edited inputs, model changes, source changes
+collections. Roles never grant reads. **Refresh research** rebuilds the
+snapshot; **Cancel research**, edited inputs, model changes, source changes
 and revoked access discard obsolete work. Websites, images and attachments are
 never fetched, and original files and notes are never modified.
 
 - **Capture a thought or local file:** type a thought, or choose **Choose local
   text file** to pick one ordinary UTF-8 `.md` or `.txt` file up to 2 MiB in the
   system dialog. The picked file is read once into a read-only snapshot; Thread
-  keeps no path, watch or later access to it. **Suggest project association**
+  keeps no path, watch or later access to it. **Suggest a project**
   only proposes a project; choose **Use suggested project** or pick one yourself.
   An optional original URL is recorded, not fetched. **Preview captured note**
   opens exact change review. Importing the same exact text again is refused and
@@ -538,21 +538,21 @@ never fetched, and original files and notes are never modified.
   collection**. Collections store references, headings, hashes and your
   Include/Pin/Exclude choices, not excerpts. Selected-project collections go to
   the project's `Collections` folder; all-permitted ones go to
-  `Knowledge/Collections`. Under **Saved collections**, choose a **Collection
-  scope** and **Open collection**. Current passages are reread. Changed passages
-  need **I reviewed this changed passage** before they can enter Ask; unconfirmed
+  `Knowledge/Collections`. Under **Saved collections**, choose **Collections
+  from** and **Open collection**. Current passages are reread. Changed passages
+  need **I checked this changed passage** before they can enter Ask; unconfirmed
   ones are left out. References that are no longer permitted show only their
-  number and state. **Use chosen references in Ask** hands the current passages
-  to Ask without running the model; choose Generate there. **Preview collection
+  number and state. **Use these passages in Ask** hands the current passages
+  to Ask without running the model; choose Ask the AI there. **Preview collection
   copy** saves edited choices as a new note containing only currently available
   and reconfirmed references; the original collection is unchanged.
-- **Knowledge synthesis:** enter a title and focus, choose Concept or Comparison,
+- **Write a summary note:** enter a title and focus, choose Concept or Comparison,
   and select one to five current sources with Ctrl/Shift. Choose **Create a new
   Knowledge note** or append to an existing eligible Knowledge note, and
   optionally pick a project note to receive a link. Sources cannot also be
-  targets. With an applied local text model, choose **Generate knowledge
-  proposal**, inspect the cited claims and every affected note, then **Preview
-  knowledge changes**. Appends keep existing properties and text.
+  targets. With an applied local text model, choose **Write a draft with
+  AI**, inspect the cited claims and every affected note, then **Preview the
+  notes**. Appends keep existing properties and text.
 
 All saves use **Review changes**, **Preview pending change** and **Apply exact
 change**. New notes refuse existing destinations. A source, target or catalog
@@ -570,7 +570,7 @@ text came from; it does not prove the claim is true.
 
 ## Local PDFs and page citations
 
-Choose **Capture and research**, then **Extract a local PDF**. The list shows
+Choose **Capture and research**, then **Turn a local PDF into a note**. The list shows
 up to 200 ordinary PDFs inside your approved read roots; exclusions still win.
 Approving read access to notes never allows reading PDFs.
 
@@ -583,7 +583,7 @@ Approving read access to notes never allows reading PDFs.
    and choose **Extract selected PDF**. Text is extracted locally by the bundled
    PDF.js worker, checked against its packaged hash inventory. No website, CDN,
    linked URL, remote font or document script is used. Progress shows the page
-   being read; **Cancel research work** stops it.
+   being read; **Cancel research** stops it.
 3. Inspect each extracted page, then **Preview PDF source**. Review changes shows
    the exact new note in the mapped Sources folder with the original path, hash,
    page mapping and limitations. Existing names are refused; extract again under

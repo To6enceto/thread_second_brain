@@ -55,7 +55,7 @@
           <label for="plugin-config">Obsidian settings folder</label><input id="plugin-config" value=".obsidian" maxlength="101">
           <button id="storage-inspect">Check the Obsidian plugin's files</button>
           <div id="storage-compatibility"></div>
-          <div class="thread-controls"><button id="storage-enable" disabled>Allow saving notes</button><button id="storage-release">Stop saving notes</button><button id="storage-refresh">Refresh</button></div>
+          <div class="thread-controls"><button id="storage-enable" disabled>Allow saving notes</button><button id="storage-release">Stop saving notes</button><button id="storage-refresh">Refresh saving status</button></div>
           <details><summary>Details</summary>
             <p class="thread-muted">Thread's own settings and recovery history stay in its profile, outside your notes. PDF permissions are never restored or imported, and read access returns only from saved access you chose to remember.</p>
             <p class="thread-muted">The check reads only Thread's manifest.json, data.json, changes.json and project-imports.json in this settings folder (up to 40 MiB) and changes nothing. That history may contain earlier copies of notes; it is never searched or sent to AI.</p>
@@ -67,7 +67,7 @@
           <details open><summary>Settings that would be copied from the plugin (replaces saved settings)</summary><pre id="storage-import-preferences" tabindex="0"></pre></details>
           <button id="storage-import" disabled>Copy settings and history from the plugin</button>
           <details><summary>History that would be copied</summary><pre id="storage-history-preview"></pre></details>
-          <p class="thread-muted">Copying keeps a separate read-only snapshot of the plugin's history; the plugin's own files are never changed or shared. Thread keeps at most five copies and twenty save records, and stops adding new ones when full.</p>
+          <p class="thread-muted">Copying keeps a separate read-only snapshot of the plugin's history; the plugin's own files are never changed or shared. Thread keeps at most five history copies and twenty save records; when either is full, it does not copy or save any more.</p>
           <div id="storage-recovery"></div>
         </details>
         <button id="close" class="thread-quiet">Close this folder and clear access</button>
@@ -127,12 +127,12 @@
     <section class="thread-reader" aria-label="Source reader">
       <section id="research-panel" tabindex="-1" aria-label="Capture and research" hidden>
         <h2>Capture and research</h2>
-        <p class="thread-muted">Keep original sources. Every save goes through exact change review; websites and attachments are never fetched.</p>
+        <p class="thread-muted">Save thoughts, files, web clips and PDFs as new notes. Originals are never changed, websites are never opened, and you review every note before it is saved.</p>
         <div class="thread-review-controls">
-          <label>Research workflow<select id="research-mode" aria-label="Research workflow"><option value="capture">Capture a thought or local file</option><option value="clips">Review a saved clip</option><option value="collections">Saved collections</option><option value="knowledge">Knowledge synthesis</option><option value="pdfs">Extract a local PDF</option></select></label>
-          <label id="research-scope-label">Collection scope<select id="research-scope" aria-label="Collection scope"><option value="project">Selected project</option><option value="allowed">All permitted notes</option></select></label>
+          <label>What do you want to do?<select id="research-mode" aria-label="What do you want to do?"><option value="capture">Capture a thought or local file</option><option value="clips">Review a saved clip</option><option value="collections">Saved collections</option><option value="knowledge">Write a summary note</option><option value="pdfs">Turn a local PDF into a note</option></select></label>
+          <label id="research-scope-label">Collections from<select id="research-scope" aria-label="Collections from"><option value="project">Selected project</option><option value="allowed">All notes Thread may read</option></select></label>
         </div>
-        <div class="thread-controls"><button id="research-refresh">Refresh research context</button><button id="research-cancel">Cancel research work</button><button id="research-close">Close research</button></div>
+        <div class="thread-controls"><button id="research-refresh">Refresh research</button><button id="research-cancel">Cancel research</button><button id="research-close">Close research</button></div>
         <p id="research-status" role="status" aria-live="polite"></p>
         <div id="research-content"></div>
       </section>
@@ -180,22 +180,22 @@
       </section>
       <section id="ask-panel" tabindex="-1" aria-label="Ask evidence workbench" hidden>
         <h2>Ask your vault</h2>
-        <p class="thread-muted">Choose evidence before generating. Answers never change your notes.</p>
+        <p class="thread-muted">Thread first finds passages in your notes, and you choose which ones the AI may use. Answers never change your notes.</p>
         <label for="ask-question">Question</label><textarea id="ask-question" maxlength="1000" rows="3" placeholder="What do these notes establish?"></textarea>
         <div class="thread-ask-controls">
-          <label>Answer scope<select id="ask-scope" aria-label="Answer scope"><option value="project">Selected project</option><option value="vault">All permitted notes</option></select></label>
-          <label>Search method<select id="ask-method" aria-label="Search method"><option value="keyword">Keyword</option><option value="hybrid">Hybrid (local embeddings)</option></select></label>
-          <label>Search budget<select id="ask-level" aria-label="Search budget"><option value="standard">Standard (20 results)</option><option value="broader">Broader (35 results)</option><option value="maximum">Maximum (50 results)</option></select></label>
+          <label>Search in<select id="ask-scope" aria-label="Search in"><option value="project">Selected project</option><option value="vault">All notes Thread may read</option></select></label>
+          <label>Search by<select id="ask-method" aria-label="Search by"><option value="keyword">Keywords</option><option value="hybrid">Keywords and meaning (search model)</option></select></label>
+          <label>How many passages<select id="ask-level" aria-label="How many passages"><option value="standard">Standard (20 results)</option><option value="broader">Broader (35 results)</option><option value="maximum">Maximum (50 results)</option></select></label>
         </div>
-        <details id="ask-filters"><summary>Search filters</summary><div class="thread-ask-controls">
+        <details id="ask-filters"><summary>Filters</summary><div class="thread-ask-controls">
           <label>Note type<input id="ask-type" maxlength="100" placeholder="decision"></label>
           <label>Status<input id="ask-status-filter" maxlength="100" placeholder="proposed"></label>
           <label>Path<input id="ask-path" maxlength="512" placeholder="Projects/Demo"></label>
           <label>From record date<input id="ask-from" type="date"></label>
           <label>Through record date<input id="ask-through" type="date"></label>
-        </div><p class="thread-muted">Dates use recorded fields, falling back to file modification dates; they do not verify events.</p></details>
-        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button><button id="ask-new-conversation">New conversation</button><button id="ask-open-collections">Open saved collections</button></div>
-        <p id="ask-status" role="status" aria-live="polite" class="thread-muted">Enter a question and retrieve current permitted evidence.</p>
+        </div><p class="thread-muted">Dates come from the notes' own date fields, or else from file dates; they do not prove when things happened.</p></details>
+        <div class="thread-controls"><button id="ask-retrieve">Find passages</button><button id="ask-cancel" disabled>Cancel Ask</button><button id="ask-new-conversation">New conversation</button><button id="ask-open-collections">Open saved collections</button></div>
+        <p id="ask-status" role="status" aria-live="polite" class="thread-muted">Type a question, then choose Find passages.</p>
         <div id="ask-results"></div>
       </section>
       <section id="project-panel" tabindex="-1" aria-label="Project home and recorded Resume" hidden></section>

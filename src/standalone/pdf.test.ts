@@ -45,9 +45,9 @@ test("PDF extraction saves an exact derived source bound to the consented origin
 test("PDF saves refuse forged extractions, stale tokens, changed originals and revoked consent before and after proposal", async t => {
   const f = await fixture(t); await f.consent(); let snapshot = await f.pdf.load(f.info.revision), original = await f.pdf.read(snapshot.id, "Papers/Study.pdf", f.info.revision);
   for (const forged of [{ ...extraction, extra: true }, { totalPages: 1, pages: extraction.pages }, { totalPages: 2, pages: [{ page: 1, text: "x".repeat(8001), shortened: false }] }, { totalPages: 2, pages: [{ page: 2, text: "Out of order", shortened: false }] }, "text"]) await assert.rejects(f.pdf.prepare(snapshot.id, original.token, forged, "Forged", f.info.revision));
-  await assert.rejects(f.pdf.prepare(snapshot.id, "forged-token", extraction, "Forged", f.info.revision), /Extract/);
+  await assert.rejects(f.pdf.prepare(snapshot.id, "forged-token", extraction, "Forged", f.info.revision), /text again/);
   for (const name of ["../Escape", "a".repeat(101), 7]) await assert.rejects(f.pdf.prepare(snapshot.id, original.token, extraction, name, f.info.revision));
-  original = await f.pdf.read(snapshot.id, "Papers/Study.pdf", f.info.revision); f.pdf.draftChanged(); await assert.rejects(f.pdf.prepare(snapshot.id, original.token, extraction, "Canceled", f.info.revision), /Extract/);
+  original = await f.pdf.read(snapshot.id, "Papers/Study.pdf", f.info.revision); f.pdf.draftChanged(); await assert.rejects(f.pdf.prepare(snapshot.id, original.token, extraction, "Canceled", f.info.revision), /text again/);
   original = await f.pdf.read(snapshot.id, "Papers/Study.pdf", f.info.revision); await writeFile(join(f.vault, "Papers/Study.pdf"), Buffer.concat([f.bytes, Buffer.from("% appended\n")]));
   await assert.rejects(f.pdf.prepare(snapshot.id, original.token, extraction, "Changed", f.info.revision), /changed|Refresh/i);
   await writeFile(join(f.vault, "Papers/Study.pdf"), f.bytes); snapshot = await f.pdf.load(f.info.revision); original = await f.pdf.read(snapshot.id, "Papers/Study.pdf", f.info.revision);

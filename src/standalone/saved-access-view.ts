@@ -53,7 +53,7 @@ export class SavedAccessView {
       `Kept private: ${saved.scope.excluded.length ? saved.scope.excluded.join(", ") : "none"}`,
       `Projects folder: ${saved.projectsFolder || "not saved"}`,
       `Local AI: ${saved.ai.model ? `${saved.ai.model} at ${saved.ai.endpoint}, checked again when you continue` : "not used"}`,
-      ...(saved.ai.embeddingModel ? [`Embedding model: ${saved.ai.embeddingModel}`] : []),
+      ...(saved.ai.embeddingModel ? [`Search model: ${saved.ai.embeddingModel}`] : []),
       `Saved: ${new Date(saved.savedAt).toLocaleString()}`,
       "Never remembered: PDF permissions and saving."
     ] : [];

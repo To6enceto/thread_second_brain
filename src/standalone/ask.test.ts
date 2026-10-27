@@ -70,7 +70,7 @@ test("desktop exact contexts bind current passage choices and exclude text from 
   const first = await f.ask.choose(result.id, {}, f.info.revision);
   const selected = await f.ask.choose(result.id, { [excluded.id]: "exclude", [pinned.id]: "pin" }, f.info.revision);
   assert.equal(selected.bundle.sources[0]!.id, pinned.id); assert.ok(!selected.bundle.sources.some(s => s.id === excluded.id));
-  await assert.rejects(f.ask.generate(first.id, f.info.revision), /context changed/);
+  await assert.rejects(f.ask.generate(first.id, f.info.revision), /will see changed/);
   // A renderer-side mutation must not change the main-owned prompt.
   selected.bundle.sources[0]!.excerpt = "forged renderer text";
   const answer = await f.ask.generate(selected.id, f.info.revision); assert.equal(answer.answer.supported, true);
@@ -127,8 +127,8 @@ test("desktop Ask suppresses replies after cancel, model change, source edit, ch
 
 test("desktop Ask invalid citations/malformed answers fail safely and missing text model leaves retrieval usable", async t => {
   const f = await fixture(t); let found = await f.ask.retrieve(options, f.info.revision), chosen = await f.ask.choose(found.id, {}, f.info.revision);
-  await assert.rejects(f.ask.generate(chosen.id, f.info.revision), /downloaded text model/);
-  f.configure(); await assert.rejects(f.ask.choose(found.id, {}, f.info.revision), /context changed/);
+  await assert.rejects(f.ask.generate(chosen.id, f.info.revision), /set up a model under Optional local AI/);
+  f.configure(); await assert.rejects(f.ask.choose(found.id, {}, f.info.revision), /passages changed/);
   found = await f.ask.retrieve(options, f.info.revision); chosen = await f.ask.choose(found.id, {}, f.info.revision);
   f.p.hook(async path => path === "/api/chat" ? new Response(JSON.stringify({ message: { content: JSON.stringify({ supported: true, answer: [{ text: "Made up", kind: "fact", sourceIds: ["X99"] }], gaps: [] }) } })) : undefined);
   const result = await f.ask.generate(chosen.id, f.info.revision); assert.equal(result.answer.supported, false); assert.deepEqual(result.answer.answer, []);
@@ -140,12 +140,12 @@ test("desktop IPC rejects non-string scope, method, budget and evidence choice e
   const f = await fixture(t);
   for (const [key, valid] of [["scope", "project"], ["method", "keyword"], ["level", "standard"]]) {
     for (const invalid of [[valid], { value: valid }, null, 1, true]) {
-      await assert.rejects(f.ask.retrieve({ ...options, [key!]: invalid, selection: { folder: "Projects", project: "" } }, f.info.revision), /Review the question/);
+      await assert.rejects(f.ask.retrieve({ ...options, [key!]: invalid, selection: { folder: "Projects", project: "" } }, f.info.revision), /Check the question/);
     }
   }
   const found = await f.ask.retrieve(options, f.info.revision), id = found.bundle.sources[0]!.id;
   for (const valid of ["include", "exclude", "pin"]) {
-    for (const invalid of [[valid], { value: valid }, null, 1, true]) await assert.rejects(f.ask.choose(found.id, { [id]: invalid }, f.info.revision), /Invalid evidence choices/);
+    for (const invalid of [[valid], { value: valid }, null, 1, true]) await assert.rejects(f.ask.choose(found.id, { [id]: invalid }, f.info.revision), /Passage choices are not valid/);
   }
   const excluded = await f.ask.choose(found.id, { [id]: "exclude" }, f.info.revision);
   assert.ok(!excluded.bundle.sources.some(source => source.id === id));
@@ -158,7 +158,7 @@ test("desktop follow-ups preserve original provenance and corrected context, usi
   const corrected = await f.ask.correct(original.id, 0, "Treat the recorded budget as a proposed limit.", "suggestion", f.info.revision);
   assert.notEqual(corrected.id, original.id); assert.deepEqual(corrected.answer, original.answer); assert.equal(corrected.generatedAt, original.generatedAt); assert.equal(corrected.model, original.model);
   assert.equal(corrected.corrections[0]!.kind, "suggestion");
-  await assert.rejects(f.ask.continue(original.id, "What does that mean?", f.info.revision), /Answer or correction changed/);
+  await assert.rejects(f.ask.continue(original.id, "What does that mean?", f.info.revision), /answer or a correction changed/);
   found = await f.ask.continue(corrected.id, "What does that mean?", f.info.revision);
   assert.equal(found.history.length, 1); found.history[0]!.corrections[0]!.text = "FORGED RENDERER HISTORY";
   const next = await f.ask.choose(found.id, {}, f.info.revision);
@@ -184,7 +184,7 @@ test("desktop evidence exclusions omit earlier response text, and six-turn limit
     context = await f.ask.choose(found.id, { [excluded]: "exclude" }, f.info.revision);
     answer = await f.ask.generate(context.id, f.info.revision); assert.equal(answer.turnNumber, number);
   }
-  const count = f.p.calls.length; await assert.rejects(f.ask.continue(answer.id, "Turn seven", f.info.revision), /Six-turn/); assert.equal(f.p.calls.length, count);
+  const count = f.p.calls.length; await assert.rejects(f.ask.continue(answer.id, "Turn seven", f.info.revision), /six-question limit/); assert.equal(f.p.calls.length, count);
   const reset = await f.ask.retrieve(options, f.info.revision); assert.deepEqual(reset.history, []);
 });
 
@@ -196,7 +196,7 @@ test("desktop correction and follow-up identities reject invalid input and stale
   await writeFile(join(f.root, "Projects/Demo/Overview.md"), f.notes["Projects/Demo/Overview.md"] + "\nExternal edit");
   const requestsBeforeEdit = f.p.calls.length;
   await assert.rejects(f.ask.correct(answer.id, 0, "changed", "interpretation", f.info.revision), /AI canceled/);
-  await assert.rejects(f.ask.continue(answer.id, "Next", f.info.revision), /Answer or correction changed/);
+  await assert.rejects(f.ask.continue(answer.id, "Next", f.info.revision), /answer or a correction changed/);
   assert.equal(f.p.calls.length, requestsBeforeEdit);
   const second = await f.ask.retrieve(options, f.info.revision), chosen = await f.ask.choose(second.id, {}, f.info.revision), fresh = await f.ask.generate(chosen.id, f.info.revision);
   f.configure(); await assert.rejects(f.ask.continue(fresh.id, "Next", f.info.revision), /changed/);

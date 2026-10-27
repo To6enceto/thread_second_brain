@@ -37,7 +37,7 @@ const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButto
 function clearAI(): void {
   aiEpoch++; element("project-panel").querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
 }
-const modelSetup = new ModelSetup(bridge, () => { researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("AI settings changed. Refresh actions."); recordsView?.invalidate("AI settings changed. Refresh to continue."); clearAI(); askView?.invalidate("AI settings changed. Retrieve evidence again."); });
+const modelSetup = new ModelSetup(bridge, () => { researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("AI settings changed. Refresh actions."); recordsView?.invalidate("AI settings changed. Refresh to continue."); clearAI(); askView?.invalidate("AI settings changed. Find passages again."); });
 function cancelAI(): void { clearAI(); void bridge.cancelAI(); }
 function clearProjects(): void {
   researchView?.invalidate(); portabilityView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("The project or its notes changed. Refresh actions.");
@@ -293,7 +293,7 @@ async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
   researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide();
-  askView.invalidate("Project changed. Retrieve evidence again."); askView.hide();
+  askView.invalidate("Project changed. Find passages again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };
   const panel = element("project-panel"); panel.replaceChildren(); panel.hidden = false; element("source-pane").hidden = true;

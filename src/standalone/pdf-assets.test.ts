@@ -24,15 +24,15 @@ test("desktop PDF assets serve only inventoried packaged files with matching siz
   assert.match(Buffer.from(await assets.read("pdf-assets.json")).toString(), /pdfjs-dist/);
   for (const path of ["outside.txt", "../outside.txt", "/etc/passwd", "pdf-resources/cmaps/missing.bcmap", 42, null]) await assert.rejects(assets.read(path), /Only packaged/);
   await writeFile(join(base, "pdf-resources/cmaps/LICENSE"), "cmap licenSE");
-  await assert.rejects(assets.read("pdf-resources/cmaps/LICENSE"), /unavailable or changed/);
+  await assert.rejects(assets.read("pdf-resources/cmaps/LICENSE"), /missing or changed/);
   await writeFile(join(base, "pdf-extract-worker.js"), "postMessage('worker') plus injected code");
-  await assert.rejects(assets.read("pdf-extract-worker.js"), /unavailable or changed/);
+  await assert.rejects(assets.read("pdf-extract-worker.js"), /missing or changed/);
 });
 
 test("desktop PDF assets refuse a malformed or missing inventory without serving files", async t => {
   const { base, assets } = await fixture(t);
   await writeFile(join(base, "pdf-assets.json"), JSON.stringify({ schemaVersion: 1, parser: "other", files: [] }));
-  await assert.rejects(assets.read("pdf-extract-worker.js"), /unavailable or changed/);
+  await assert.rejects(assets.read("pdf-extract-worker.js"), /missing or changed/);
   await rm(join(base, "pdf-assets.json"));
-  await assert.rejects(new DesktopPdfAssets(base).read("pdf-extract-worker.js"), /unavailable or changed/);
+  await assert.rejects(new DesktopPdfAssets(base).read("pdf-extract-worker.js"), /missing or changed/);
 });

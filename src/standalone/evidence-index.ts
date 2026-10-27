@@ -152,14 +152,14 @@ export class EvidenceIndex {
     if (generation !== this.generation) throw new DesktopError("Notes changed. Search again.");
     return { ...snapshot, hits: result.hits.map(hit => ({ path: hit.entry.path, hash: hit.entry.hash, heading: hit.heading, excerpt: hit.excerpt })),
       coverageText: searchCoverageText({ ...result.coverage, indexOmittedNotes: snapshot.coverage.omittedFiles }) +
-        (snapshot.listing.identityIncomplete ? " Markdown enumeration is incomplete; these file counts cover known files only. Stable-ID uniqueness is unproven and identity-dependent output cannot be reused." : "") };
+        (snapshot.listing.identityIncomplete ? " Not every note could be listed, so these counts cover only the notes Thread found, and saved results that depend on note IDs are not reused." : "") };
   }
   async source(path: unknown, revision: unknown, expectedHash: unknown): Promise<NoteSnapshot & { generation: number }> {
     if (expectedHash !== undefined && (typeof expectedHash !== "string" || !/^[a-f0-9]{64}$/.test(expectedHash))) throw new DesktopError("This result is no longer valid. Search again.");
     await this.refresh(revision); const generation = this.generation;
     // Evidence and page citations into extracted PDF text require the consented original to match the extraction.
     const pdf = expectedHash === undefined ? undefined : this.index.entries.find(entry => entry.path === path)?.pdf;
-    if (pdf && (this.index.binaries.get(pdf.path) !== pdf.hash || await this.reader.currentHash(pdf.path, revision).catch(() => "") !== pdf.hash)) throw new DesktopError("The original PDF changed, moved or is no longer granted. Grant it again or extract a new source; the saved extraction is unchanged.");
+    if (pdf && (this.index.binaries.get(pdf.path) !== pdf.hash || await this.reader.currentHash(pdf.path, revision).catch(() => "") !== pdf.hash)) throw new DesktopError("The original PDF changed, moved or is no longer allowed. Allow it again or read it into a new note; the saved note is unchanged.");
     const note = await this.reader.read(path, revision);
     const hash = await contentHash(note.text); this.requireRevision(revision);
     if (generation !== this.generation || expectedHash !== undefined && hash !== expectedHash) throw new DesktopError("This note changed since the search. Search again to open it.");

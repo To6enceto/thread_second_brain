@@ -38,7 +38,7 @@ test("extracted PDF pages are evidence only while the consented original matches
   assert.match((await f.index.refresh(f.info.revision)).pdfChecks!, /1 have a changed original/);
   assert.equal((await f.index.source("Sources/Study.md", f.info.revision, undefined)).text, f.derived);
   await writeFile(join(f.root, "Papers/Study.pdf"), f.bytes); assert.deepEqual((await f.pages()).sort(), ["PDF page 1", "PDF page 2"]);
-  await f.consent(false); assert.deepEqual(await f.pages(), []); await assert.rejects(f.reader.currentHash("Papers/Study.pdf", f.info.revision), /consent/);
+  await f.consent(false); assert.deepEqual(await f.pages(), []); await assert.rejects(f.reader.currentHash("Papers/Study.pdf", f.info.revision), /permission or access changed/);
   await f.consent(true); f.info = f.reader.grant({ roots: ["Papers", "Sources"], excluded: ["Papers"] }, f.info.revision); f.index.reset();
   assert.deepEqual(f.info.pdfs, []); assert.deepEqual(await f.pages(), []); assert.deepEqual(f.index.scope().pdfPaths, []);
 });

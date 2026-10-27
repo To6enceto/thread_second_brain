@@ -20,7 +20,7 @@ import type { VaultReader } from "./vault-reader.ts";
 import { DesktopError } from "./security.ts";
 
 function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Invalid Ask options. Retrieve evidence again.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Ask settings are not valid. Choose Find passages again.");
   return value as Record<string, unknown>;
 }
 function request(value: unknown): AskRequest {
@@ -31,10 +31,10 @@ function request(value: unknown): AskRequest {
     typeof input.level !== "string" || !searchLevels.includes(input.level as AskRequest["level"]) || typeof input.embeddingModel !== "string" || input.embeddingModel.length > 200 ||
     /[\s\u0000-\u001f]/.test(input.embeddingModel) || /(?:[:/-])cloud(?:$|[:/])/i.test(input.embeddingModel) ||
     Object.entries(filters).some(([key, value]) => !["type", "status", "path", "from", "through"].includes(key) || typeof value !== "string" || value.length > 512)) {
-    throw new DesktopError("Review the question (1-1000 characters), search filters, budget and local model selection.");
+    throw new DesktopError("Check the question (1 to 1000 characters), filters, number of passages and AI model.");
   }
   try { return { ...input, question: input.question.trim(), filters: normalizeFilters(filters) } as unknown as AskRequest; }
-  catch { throw new DesktopError("Review filter paths and YYYY-MM-DD date range. Type/status filters allow 100 characters."); }
+  catch { throw new DesktopError("Check the filters: folder paths, dates as YYYY-MM-DD, and type or status of up to 100 characters."); }
 }
 
 /** One volatile workbench. All prompts and contexts are assembled in main. */
@@ -64,16 +64,16 @@ export class DesktopAsk {
     for (const [path, hash] of Object.entries(hashes)) {
       current(); this.evidence.assertCurrent(snapshot);
       const file = snapshot.listing.files[path] ?? snapshot.listing.pdfs[path];
-      if (!file || await this.reader.currentHash(path, snapshot.revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Ask sources changed. Retrieve evidence again.");
+      if (!file || await this.reader.currentHash(path, snapshot.revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Your notes changed. Choose Find passages again.");
     }
     await this.evidence.refresh(snapshot.revision); current(); this.evidence.assertCurrent(snapshot);
   }
   async retrieve(input: unknown, revision: unknown): Promise<AskSnapshot> {
     const options = request(input); this.forget(); const epoch = this.epoch, version = this.ai.version;
     return this.ai.run(async (_settings, signal, current, client) => {
-      const guard = (): void => { current(); if (epoch !== this.epoch || version !== this.ai.version) throw new DesktopError("Ask changed. Retrieve again."); };
+      const guard = (): void => { current(); if (epoch !== this.epoch || version !== this.ai.version) throw new DesktopError("Something changed. Choose Find passages again."); };
       const home = await this.projects.home(options.selection, revision); guard();
-      if (options.scope === "project" && !home.home) throw new DesktopError("Choose a permitted project, or explicitly select all permitted notes.");
+      if (options.scope === "project" && !home.home) throw new DesktopError("Choose a project, or choose to search all notes Thread may read.");
       const snapshot = home.index, entries = this.evidence.index.projectEntries(this.evidence.scope(), options.scope === "vault" ? null : options.selection.project);
       const budget = searchBudget(options.level); let search: SearchResult;
       if (options.method === "hybrid" && options.embeddingModel) {
@@ -85,12 +85,12 @@ export class DesktopAsk {
           () => { guard(); this.evidence.assertCurrent(snapshot); return true; }, options.level, selection);
         await verify();
         // Provider JSON parser errors can contain response fragments. Never echo them.
-        if (search.hybrid?.mode === "keyword-fallback") search.hybrid.reason = "Local embeddings unavailable or incompatible. Check the downloaded embedding model and local connection.";
+        if (search.hybrid?.mode === "keyword-fallback") search.hybrid.reason = "The search model is not available or does not work. Check the model and that Ollama is running, or search by keywords.";
       } else {
         try { search = searchEntries(entries, options.question, options.filters, budget.results); }
-        catch { throw new DesktopError("Invalid search. Close quoted phrases and use at most eight phrases."); }
+        catch { throw new DesktopError("Check the search: close each quoted phrase, and use at most eight."); }
         if (options.method === "hybrid") search.hybrid = { mode: "keyword-fallback", model: "", candidatePassages: 0, availablePassages: 0, semanticMatches: 0,
-          returnedPassages: search.hits.length, level: options.level, reason: "No embedding model selected." };
+          returnedPassages: search.hits.length, level: options.level, reason: "No search model chosen. Choose one under Optional local AI, or search by keywords." };
       }
       search.coverage = { ...search.coverage, level: options.level, indexOmittedNotes: snapshot.coverage.omittedFiles };
       const hashes = this.hashes([...new Map(search.hits.map(hit => [hit.entry.path, hit.entry])).values()]);
@@ -103,16 +103,16 @@ export class DesktopAsk {
   }
   private active(identity: unknown, revision: unknown) {
     const prepared = this.prepared;
-    if (!prepared || typeof identity !== "string" || identity !== prepared.value.id || revision !== prepared.value.index.revision || prepared.version !== this.ai.version) throw new DesktopError("Ask context changed. Retrieve evidence again.");
+    if (!prepared || typeof identity !== "string" || identity !== prepared.value.id || revision !== prepared.value.index.revision || prepared.version !== this.ai.version) throw new DesktopError("The passages changed. Choose Find passages again.");
     this.evidence.assertCurrent(prepared.value.index); return prepared;
   }
   async choose(identity: unknown, input: unknown, revision: unknown): Promise<AskContext> {
     const prepared = this.active(identity, revision), choices = record(input);
     if (Object.keys(choices).length > prepared.value.bundle.sources.length || Object.entries(choices).some(([id, choice]) =>
-      !prepared.value.bundle.sources.some(s => s.id === id) || typeof choice !== "string" || !["include", "exclude", "pin"].includes(choice))) throw new DesktopError("Invalid evidence choices. Use current passage IDs and Include, Pin first or Exclude.");
+      !prepared.value.bundle.sources.some(s => s.id === id) || typeof choice !== "string" || !["include", "exclude", "pin"].includes(choice))) throw new DesktopError("Passage choices are not valid. Choose Include, Pin first or Exclude for the current passages.");
     this.context = null; this.answer = null; const epoch = ++this.epoch;
     return this.ai.run(async (_settings, _signal, current) => {
-      const guard = (): void => { current(); if (epoch !== this.epoch || this.active(identity, revision) !== prepared) throw new DesktopError("Ask choices changed. Preview again."); };
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.active(identity, revision) !== prepared) throw new DesktopError("Passage choices changed. Preview again."); };
       await this.verify(prepared.value.index, prepared.hashes, guard);
       const bundle = selectContext(prepared.value.bundle, choices as Record<string, EvidenceChoice>);
       Object.assign(bundle.noteHashes, prepared.collectionHashes);
@@ -122,11 +122,11 @@ export class DesktopAsk {
   }
   async generate(identity: unknown, revision: unknown): Promise<AskAnswer> {
     const context = this.context;
-    if (!context || typeof identity !== "string" || identity !== context.id) throw new DesktopError("Exact context changed. Review the renewed source context before generating.");
+    if (!context || typeof identity !== "string" || identity !== context.id) throw new DesktopError("What the AI will see changed. Check it again before asking.");
     const prepared = this.active(context.retrievalId, revision), epoch = this.epoch; this.answer = null;
     return this.ai.run(async (settings, signal, current, client) => {
-      const guard = (): void => { current(); if (epoch !== this.epoch || this.context !== context || this.active(context.retrievalId, revision) !== prepared) throw new DesktopError("Ask context changed. Retrieve again."); };
-      if (!settings.model) throw new DesktopError("Apply a downloaded text model in Optional local AI to generate an answer. Keyword retrieval remains available.");
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.context !== context || this.active(context.retrievalId, revision) !== prepared) throw new DesktopError("The passages changed. Choose Find passages again."); };
+      if (!settings.model) throw new DesktopError("To get an AI answer, set up a model under Optional local AI. Finding passages works without one.");
       if (!context.bundle.sources.length) throw new DesktopError("Include at least one passage before generating.");
       const verify = () => this.verify(prepared.value.index, prepared.hashes, guard);
       await verify();
@@ -138,7 +138,7 @@ export class DesktopAsk {
   }
   private answered(identity: unknown, revision: unknown): { answer: AskAnswer; context: AskContext; prepared: NonNullable<DesktopAsk["prepared"]> } {
     const answer = this.answer, context = this.context;
-    if (!answer || typeof identity !== "string" || answer.id !== identity || !context || answer.contextId !== context.id) throw new DesktopError("Answer or correction changed. Review the current answer again.");
+    if (!answer || typeof identity !== "string" || answer.id !== identity || !context || answer.contextId !== context.id) throw new DesktopError("The answer or a correction changed. Check the current answer again.");
     return { answer, context, prepared: this.active(context.retrievalId, revision) };
   }
   private turn(answer: AskAnswer, context: AskContext, prepared: NonNullable<DesktopAsk["prepared"]>): ConversationTurn {
@@ -151,13 +151,13 @@ export class DesktopAsk {
   }
   async correct(identity: unknown, index: unknown, text: unknown, kind: unknown, revision: unknown): Promise<AskAnswer> {
     const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
-    if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= answer.answer.answer.length || !answer.answer.supported) throw new DesktopError("Choose a current supported claim to correct.");
+    if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= answer.answer.answer.length || !answer.answer.supported) throw new DesktopError("Choose a point from the current answer to correct.");
     let correction;
     try { correction = validateCorrection({ text, kind, correctedAt: new Date().toISOString() }); }
-    catch { throw new DesktopError("Use a nonempty correction of up to 1200 characters and a known classification. Sources remain unchanged."); }
+    catch { throw new DesktopError("Write a correction of 1 to 1200 characters and choose its type. Your notes are unchanged."); }
     const corrections = { ...answer.corrections, [index as number]: correction };
     return this.ai.run(async (_settings, _signal, current) => {
-      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer changed. Review again."); };
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("The answer changed. Check it again."); };
       await this.verify(prepared.value.index, prepared.hashes, guard);
       createAnswerRecord(prepared.value.request.question, answer.answer, context.bundle, answer.model, new Date(answer.generatedAt).toISOString(), corrections);
       guard(); this.answer = { ...answer, id: randomUUID(), corrections }; return structuredClone(this.answer);
@@ -165,10 +165,10 @@ export class DesktopAsk {
   }
   async continue(identity: unknown, question: unknown, revision: unknown): Promise<AskSnapshot> {
     const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
-    if (typeof question !== "string" || !question.trim() || question.length > 1000) throw new DesktopError("Enter a follow-up question of 1-1000 characters.");
-    if (this.turns.length >= MAX_CONVERSATION_TURNS - 1) throw new DesktopError("Six-turn conversation limit reached. Start a new conversation.");
+    if (typeof question !== "string" || !question.trim() || question.length > 1000) throw new DesktopError("Enter a follow-up question of 1 to 1000 characters.");
+    if (this.turns.length >= MAX_CONVERSATION_TURNS - 1) throw new DesktopError("This conversation reached its six-question limit. Start a new conversation.");
     return this.ai.run(async (_settings, _signal, current) => {
-      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer changed. Start again."); };
+      const guard = (): void => { current(); if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("The answer changed. Start again."); };
       await this.verify(prepared.value.index, prepared.hashes, guard);
       const turn = this.turn(answer, context, prepared); guard(); this.turns.push(turn);
       const value: AskSnapshot = { ...prepared.value, id: randomUUID(), request: { ...prepared.value.request, question: question.trim() },
@@ -180,14 +180,14 @@ export class DesktopAsk {
   /** Main-only collection capture: renderer can choose intents but never supply evidence. */
   collectionSource(identity: unknown, revision: unknown) {
     const prepared = this.active(identity, revision), context = this.context, epoch = this.epoch;
-    if (!context || context.retrievalId !== identity) throw new DesktopError("Review evidence choices before saving a collection.");
-    const assert = () => { if (epoch !== this.epoch || this.active(identity, revision) !== prepared || this.context !== context) throw new DesktopError("Ask choices changed. Prepare a new collection preview."); };
+    if (!context || context.retrievalId !== identity) throw new DesktopError("Check your passage choices before saving a collection.");
+    const assert = () => { if (epoch !== this.epoch || this.active(identity, revision) !== prepared || this.context !== context) throw new DesktopError("Passage choices changed. Preview the collection again."); };
     return { snapshot: structuredClone(prepared.value), choices: { ...this.choices }, hashes: { ...prepared.hashes }, assert, validate: () => this.verify(prepared.value.index, prepared.hashes, assert) };
   }
   /** Trusted main-process handoff only. No inference runs until Generate is chosen. */
   async useCollection(input: AskRequest, index: IndexSnapshot, bundle: EvidenceBundle, choices: Record<string, EvidenceChoice>, hashes: Record<string, string>, collectionHashes: Record<string, string>, current: () => void): Promise<{ snapshot: AskSnapshot; context: AskContext; choices: Record<string, EvidenceChoice> }> {
     const options = request(input); this.forget(); const epoch = this.epoch, version = this.ai.version;
-    const guard = () => { current(); if (epoch !== this.epoch || version !== this.ai.version) throw new DesktopError("Collection handoff canceled. Open and review it again."); this.evidence.assertCurrent(index); };
+    const guard = () => { current(); if (epoch !== this.epoch || version !== this.ai.version) throw new DesktopError("Canceled. Open the collection and check it again."); this.evidence.assertCurrent(index); };
     await this.verify(index, hashes, guard); guard();
     const value: AskSnapshot = { id: randomUUID(), request: options, index, bundle: structuredClone(bundle), history: [] }, chosen = selectContext(bundle, choices); Object.assign(chosen.noteHashes, collectionHashes);
     const context: AskContext = { id: randomUUID(), retrievalId: value.id, bundle: chosen, conversation: conversationContext([], chosen) };
@@ -198,7 +198,7 @@ export class DesktopAsk {
   artifact(identity: unknown, kind: unknown, title: unknown, selected: unknown, revision: unknown): { content: string; project: string; assert: () => void; validate: () => Promise<void> } {
     const { answer, context, prepared } = this.answered(identity, revision), epoch = this.epoch;
     if (kind !== "answer" && kind !== "conversation" || typeof title !== "string" || title !== noteName(title) || !Array.isArray(selected)
-      || selected.length > 6 || selected.some(n => typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > answer.turnNumber) || new Set(selected).size !== selected.length) throw new DesktopError("Choose a valid new note name and current completed turns.");
+      || selected.length > 6 || selected.some(n => typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > answer.turnNumber) || new Set(selected).size !== selected.length) throw new DesktopError("Choose a valid name for the new note and which answers to save.");
     const turn = this.turn(answer, context, prepared), turns = [...this.turns, turn];
     const content = kind === "answer"
       ? reviewedAnswerMarkdown(createAnswerRecord(turn.question, turn.answer, turn.bundle, answer.model, turn.generatedAt, answer.corrections), turn.bundle, turn.projectIdentity)
@@ -206,7 +206,7 @@ export class DesktopAsk {
     const hashes = { ...prepared.hashes };
     // A saved transcript may contain earlier evidence omitted from the latest prompt.
     if (kind === "conversation") for (const n of selected as number[]) Object.assign(hashes, turns[n - 1]!.bundle.noteHashes);
-    const assert = (): void => { if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("Answer or evidence changed. Renew the exact save preview."); };
+    const assert = (): void => { if (epoch !== this.epoch || this.answered(identity, revision).answer !== answer) throw new DesktopError("The answer or passages changed. Preview the note again."); };
     return { content, project: turn.vault ? "" : turn.settings.selectedProject, assert,
       validate: () => this.verify(prepared.value.index, hashes, assert) };
   }
