@@ -1,6 +1,6 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash 56740df5b97df8468e887bc97b533f14eaaffc63ae40fb4ab846674062ca20c4 -->
+<!-- blueprint:source-hash beaeedce4f6f17a2099b702b7a830be09dcf2b653bcec09703cdea362ef6287b -->
 
 > Local project memory and sourced research, available as an Obsidian plugin
 > and an approved independent Electron desktop application sharing Markdown.
@@ -14,8 +14,8 @@ multiple projects, one active vault per instance. No account, backend or paid AP
 
 ## Current implementation and build order
 
-Plugin features 1-48 are complete (private 0.4.1); archives contain exact schemas,
-verification and limits. Desktop 49-62 is approved, not yet equivalent to the plugin.
+Plugin features 1-48 are complete (private 0.4.2); archives contain exact schemas,
+verification and limits. Desktop 49-62 is complete; 63-65 improve everyday desktop use.
 Preserve prior archive bytes and all notes/history. Implement one feature at a time.
 
 1. **Local project briefings**
@@ -80,6 +80,9 @@ Preserve prior archive bytes and all notes/history. Implement one feature at a t
 60. **Desktop local PDFs and page citations**
 61. **Desktop project portability**
 62. **Desktop packaging and offline acceptance**
+63. **Remembered desktop access**
+64. **Plain-language desktop interface**
+65. **Desktop first run and new projects**
 
 ## Data and safety
 
@@ -142,6 +145,16 @@ Resume (51), model setup/AI Resume (52), Ask/hybrid search (53), conversations a
 reviewed new saves (54), changes/recovery (55), records/actions/reviews/research
 (56-59), PDFs (60), portability (61), and distribution/offline acceptance (62).
 
+Everyday use (63-65): opt-in remembered access for one vault (folder + identity,
+roots, exclusions, project mapping, AI selection) in the profile outside the vault;
+launch shows it and reads nothing until one click, then revalidates vault, paths and
+loopback cloud-disabled model (no AI if unavailable). Moved/replaced vaults refused;
+PDF consent and writing stay per-session; Forget clears it. 64 rewrites desktop text
+plainly (detail behind Details; Resume/Ask/Capture first) without removing actions,
+limits or safety. 65 adds a skippable welcome (folder, access, Ollama commands +
+connection test, synthetic sample) and New project via shared starter notes, all
+exact reviewed new-note saves after explicit writing enablement.
+
 Keep desktop profile settings/caches/history outside vault/repository by default;
 explicit ignored local profiles are allowed for development/tests. Before writes,
 freeze compatible versioned persistence and cross-process ownership policy. Never
@@ -171,13 +184,13 @@ public license/distribution deferred. Obsidian is free, not open source. Model a
 dependency licenses remain separate. No mobile AI, team/collaboration, autonomous
 agent, OCR/audio, automatic web fetching, billing or cloud service scope.
 
-Plugin package dist/thread-0.4.1.zip has 192 inventoried files including PDF resources;
+Plugin package dist/thread-0.4.2.zip has 192 inventoried files including PDF resources;
 install into a separate test vault's .obsidian/plugins/thread. npm run dev only
 rebuilds the plugin. Verify = npm run verify (typecheck, tests, production build).
-Separate desktop build/start commands arrive with 49; shipping package arrives62.
+Separate desktop build/start commands arrive with 49; shipping package arrives in 62.
 Do not substitute artifact success for runtime acceptance. No CI configured.
 
-Known verified plugin environment: Linux, Obsidian1.14.4, Ollama0.40.4,
+Known verified plugin environment: Linux, Obsidian 1.14.4, Ollama 0.40.4,
 qwen3:4b-instruct. No universal scale/model-quality promises; live evaluation38
 retains14/15 with one proposed-decision paraphrase conservatively interpreted.
 Normal pushes to existing origin are separately authorized; no force push,

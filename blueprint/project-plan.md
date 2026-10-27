@@ -868,3 +868,34 @@ There are no mandatory hosting/subscription/API fees. Models and runtime are loc
 downloads, storage, RAM, electricity and development time remain real resources.
 Do not install system-wide software, modify everyday installations or personal
 notes, publish releases or deploy services as part of this approval.
+
+## Approved improvements - everyday desktop use (63-65)
+
+Approved on 2026-10-27 after the completed desktop milestone. These features
+reduce repeated setup and make the desktop window understandable to non-technical
+users. They change no note format, plugin behavior, cost boundary or write-safety
+rule, and add no hosted service.
+
+Remembered access (63) supersedes, for the desktop app only and only when the user
+opts in, the rule that desktop read grants are volatile. The saved scope covers one
+vault: its folder location and filesystem identity, read roots, exclusions, project
+folder mapping and local AI endpoint/model selection. It lives in the desktop
+profile outside the vault and repository. A launch shows the saved scope and reads
+nothing until the user chooses to continue. Continuing revalidates the vault
+identity, every path under the existing scope rules, and the local model's
+loopback and cloud-disabled status; an unavailable model leaves Thread usable
+without AI. A moved, replaced or invalid vault is refused and asks for a fresh
+selection. PDF consent and desktop writing stay per-session and explicit; plugin
+grants are still never imported. Forget saved access removes the saved scope.
+
+The plain-language pass (64) covers the desktop window: everyday labels and
+messages, technical detail behind expandable Details, Resume/Ask/Capture first and
+advanced tools grouped. It removes no action, limit, coverage report or
+accessibility path. The first-run flow (65) is skippable and reopenable. It guides
+folder choice, read approval, optional Ollama setup by showing commands and testing
+the connection (never installing services or downloading models), an optional
+synthetic sample project and a New project action reusing the shared starter-note
+contract. Every created note goes through exact reviewed new-note saves that refuse
+collisions; desktop writing must be enabled explicitly first. Prove each feature in
+the actual Electron window with an isolated profile and synthetic vault.
+

@@ -125,6 +125,12 @@ verifiable boundaries; no earlier feature is renumbered.
 
 - [x] 62. **Desktop packaging and offline acceptance** - Produce a separately versioned local Fedora desktop artifact and launcher instructions, with bundled licenses/assets and clear update compatibility. Verify the full desktop workflow offline, plugin regressions, data preservation and real local inference. Keep installation/publication explicit; do not reuse the plugin updater for desktop binaries. Depends on 49-61.
 
+## Milestone S - Everyday desktop use
+
+- [ ] 63. **Remembered desktop access** - Offer an explicit opt-in to remember one vault's folder, read roots, exclusions, project folder mapping and local AI selection in the desktop profile outside the vault. On launch, show exactly what was saved and continue only after one click, rechecking vault identity, paths and the cloud-disabled local model; open without AI when the model is unavailable. Never remember PDF consent or desktop writing; provide Forget saved access and refuse a moved or replaced vault instead of guessing. Depends on 62.
+- [ ] 64. **Plain-language desktop interface** - Rewrite desktop labels, help, coverage and error text in everyday language, with technical detail behind expandable Details. Put Resume, Ask and Capture first and group advanced tools without removing any action or keyboard path. Permissions, limits, invalidation and write safety stay unchanged. Prove the actual window in light and dark themes. Depends on 63.
+- [ ] 65. **Desktop first run and new projects** - Add a skippable, reopenable welcome flow for choosing a folder, granting read access, optional local AI (copyable commands and a connection check, never installing or downloading) and an optional synthetic sample project, plus a New project action that creates the shared starter notes. All notes are exact reviewed new-note saves that refuse collisions. Depends on 64.
+
 ## Desktop build discipline
 
 Approved on 2026-10-21: implement the three-stage Thread Desktop proposal alongside
