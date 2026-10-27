@@ -93,6 +93,10 @@ export interface DesktopBridge {
   readPdf(id: string, path: string, revision: number): Promise<DesktopResult<import("./pdf.ts").PdfOriginalSnapshot>>;
   preparePdf(id: string, token: string, extraction: import("../pdf/record.ts").PdfExtraction, name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   closeVault(): Promise<DesktopResult<null>>;
+  savedAccess(): Promise<DesktopResult<SavedAccessStatus>>;
+  rememberAccess(projectsFolder: string, embeddingModel: string, revision: number): Promise<DesktopResult<SavedAccessStatus>>;
+  forgetSavedAccess(): Promise<DesktopResult<SavedAccessStatus>>;
+  continueSavedAccess(): Promise<DesktopResult<ContinuedAccess>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
 export interface IndexSnapshot { revision: number; generation: number; listing: NoteList; coverage: IndexCoverage; invalid: number; reused: number; pdfChecks?: string; }
@@ -112,6 +116,9 @@ export interface RecordedSnapshot extends ProjectSnapshot {
 }
 
 export interface AIConfig { endpoint: string; model: string; }
+export interface SavedAccessSummary { name: string; path: string; scope: ReadScope; projectsFolder: string; ai: { endpoint: string; model: string; embeddingModel: string }; savedAt: string; }
+export interface SavedAccessStatus { saved: SavedAccessSummary | null; warning: string; }
+export interface ContinuedAccess { vault: VaultInfo; projectsFolder: string; ai: { endpoint: string; model: string; embeddingModel: string }; }
 export interface PreparedResume extends RecordedSnapshot { briefingId: string; }
 export interface AIInterpretation {
   briefingId: string; revision: number; generation: number; model: string; generatedAt: number;

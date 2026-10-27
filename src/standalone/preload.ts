@@ -94,6 +94,10 @@ const bridge: DesktopBridge = {
   consentPdf: (path, granted, revision) => ipcRenderer.invoke("thread:consent-pdf", path, granted, revision),
   readPdf: (id, path, revision) => ipcRenderer.invoke("thread:read-pdf", id, path, revision),
   preparePdf: (id, token, extraction, name, revision) => ipcRenderer.invoke("thread:prepare-pdf", id, token, extraction, name, revision),
-  closeVault: () => ipcRenderer.invoke("thread:close-vault")
+  closeVault: () => ipcRenderer.invoke("thread:close-vault"),
+  savedAccess: () => ipcRenderer.invoke("thread:saved-access"),
+  rememberAccess: (projectsFolder, embeddingModel, revision) => ipcRenderer.invoke("thread:remember-access", projectsFolder, embeddingModel, revision),
+  forgetSavedAccess: () => ipcRenderer.invoke("thread:forget-saved-access"),
+  continueSavedAccess: () => ipcRenderer.invoke("thread:continue-saved-access")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

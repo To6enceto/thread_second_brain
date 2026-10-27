@@ -29,9 +29,10 @@ launch Obsidian, Ollama or a web server, and does not download missing runtimes.
 No sudo, system-wide installation or desktop shortcut is needed.
 
 The development profile lives at `.thread-local/desktop/profile`, separate from
-your vault and the plugin's settings/history. Access grants are held only in memory.
-Closing/restarting or reloading Thread clears them. To use Thread without this
-checkout, build the packaged desktop folder described below.
+your vault and the plugin's settings/history. Access grants are held only in memory
+unless you choose **Remember this access on this computer** (see **Remembered
+access**). To use Thread without this checkout, build the packaged desktop folder
+described below.
 
 ## Try it now
 
@@ -59,6 +60,28 @@ checkout, build the packaged desktop folder described below.
 
 Use **Appearance** for light/dark/system. All controls support keyboard navigation;
 source text can receive keyboard focus for scrolling and selection.
+
+## Remembered access
+
+After approving read access, you can choose **Remember this access on this
+computer**. Thread saves, for one vault: the folder and its filesystem identity,
+the approved allowed and excluded paths, the projects folder and the applied local
+AI model (plus an optional embedding model). It is stored as `access.json` in the
+private `thread-v1/` folder of your desktop profile, never in the vault. Remembering
+again replaces it. PDF permissions and desktop saving are never remembered.
+
+On the next launch a **Saved access** card lists exactly what was saved. Thread
+reads nothing until you choose **Continue with saved access**. Continuing closes any
+open vault, then reopens the saved folder only if it is the same directory,
+approves the saved paths, lists notes and projects, and checks the saved model
+again: it must still be a downloaded local model, and the connection test must
+confirm cloud features are disabled. If Ollama is not running, Thread opens your
+notes without AI and says so.
+
+If the folder is missing, moved or replaced by another folder at the same path,
+Thread opens nothing and keeps the card: reconnect it and continue, choose the
+folder again, or choose **Forget saved access**. Forget removes only the saved file.
+An unreadable saved file is never used; Thread shows a warning and Forget removes it.
 
 ## Limits and troubleshooting
 

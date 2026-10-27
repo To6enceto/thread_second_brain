@@ -18,6 +18,13 @@
       <p class="thread-eyebrow">YOUR KNOWLEDGE, LOCALLY</p>
       <h1>A space to pick up the thread.</h1>
       <p class="thread-muted">Open the same notes you use in Obsidian. This window runs independently.</p>
+      <section id="saved-access" class="thread-saved-access" aria-labelledby="saved-access-title" hidden>
+        <h2 id="saved-access-title">Saved access</h2>
+        <p class="thread-muted">Thread remembered this on your request. Nothing is read until you continue.</p>
+        <ul id="saved-access-details" class="thread-saved-list"></ul>
+        <p id="saved-access-warning" class="thread-empty" hidden></p>
+        <div class="thread-controls"><button id="saved-continue" class="thread-primary" disabled>Continue with saved access</button><button id="saved-forget" class="thread-quiet">Forget saved access</button></div>
+      </section>
       <button id="choose" class="thread-primary">Choose vault folder</button>
       <section id="vault-details" hidden>
         <h2 id="vault-name"></h2><p id="vault-path" class="thread-path"></p>
@@ -32,6 +39,10 @@
           <div class="thread-scope-preview"><span class="thread-eyebrow">ACCESS AFTER APPROVAL</span><p id="scope-preview"></p></div>
           <button id="grant" class="thread-primary">Approve read access</button>
         </details>
+        <div class="thread-remember">
+          <button id="remember-access" aria-describedby="remember-help" disabled>Remember this access on this computer</button>
+          <p id="remember-help" class="thread-muted">Saves this folder, the approved paths, the projects folder and the applied AI model in your desktop profile, outside the vault. PDF permissions and saving are never remembered. Next time Thread shows them and reads nothing until you continue.</p>
+        </div>
         <details id="storage-setup">
           <summary>Desktop storage and writing</summary>
           <p class="thread-muted">Preferences and recovery stay in this app profile. Read access and PDF consent are never restored or imported. Writing is optional and each note still needs an exact preview.</p>

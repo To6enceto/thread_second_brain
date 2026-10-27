@@ -5,6 +5,7 @@ import { ActionsView } from "./actions-view.ts";
 import { RecordsView } from "./records-view.ts";
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
 import { StorageView } from "./storage-view.ts";
+import { SavedAccessView, continueSteps } from "./saved-access-view.ts";
 import { ChangesView } from "./changes-view.ts";
 import { AskView } from "./ask-view.ts";
 import { ModelSetup } from "./model-setup.ts";
@@ -29,6 +30,7 @@ let actionsView: ActionsView;
 let reviewsView: ReviewsView;
 let researchView: ResearchView;
 let portabilityView: PortabilityView;
+let savedAccess: SavedAccessView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
@@ -70,7 +72,7 @@ function clearContent(invalidate = true): void {
   listing = null; clearProjects(); clearReader(); element("notes").replaceChildren();
   element("search-results").replaceChildren(); element("search-coverage").textContent = "";
   element("coverage-summary").textContent = "No current index."; element("search-summary").textContent = ""; element("search-details").hidden = true;
-  search.disabled = true; query.disabled = true; askView?.update();
+  search.disabled = true; query.disabled = true; askView?.update(); savedAccess?.update();
   filter.value = ""; filter.disabled = true;
   element("coverage").textContent = "No source content is loaded.";
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
@@ -172,7 +174,7 @@ function renderNotes(): void {
 }
 function applyIndex(result: IndexSnapshot): void {
   if (!vault || result.revision !== vault.revision || result.generation < generation) return;
-  generation = result.generation; listing = result.listing; askView.update(); loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes(); researchView?.indexReady();
+  generation = result.generation; listing = result.listing; askView.update(); savedAccess.update(); loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes(); researchView?.indexReady();
   element("coverage-summary").textContent = `${result.coverage.indexedFiles} indexed notes · ${result.coverage.omittedFiles} known omissions · ${result.coverage.shortenedNotes} shortened.${result.listing.identityIncomplete ? " Incomplete Markdown enumeration." : ""}`;
   element("coverage").textContent = `${result.listing.identityIncomplete ? "Markdown enumeration is incomplete: counts below cover known files only. Uninspected paths may contain additional notes; stable-ID uniqueness is unproven and identity-dependent outputs cannot be reused. " : ""}${indexCoverageText(result.coverage)} ${result.invalid} unreadable or invalid-metadata notes omitted. ${result.listing.omitted} encountered entries unavailable/unsupported. ${result.listing.limited ? "Traversal limit reached; additional files may be unlisted." : "Within the bounded listed scope."} ${result.reused} unchanged entries reused. Filter applies to paths; Search evidence searches indexed content.${result.pdfChecks ? ` ${result.pdfChecks}` : ""}`;
 }
@@ -230,11 +232,7 @@ choose.addEventListener("click", () => { void (async () => {
   try {
     const selected = value(await bridge.selectVault());
     if (!selected) { announce("Folder selection canceled. Existing access is unchanged."); return; }
-    clearContent(); vault = selected; generation = 0;
-    roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); scopePreview();
-    element("vault-details").hidden = false;
-    element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
-    refresh.disabled = false;
+    showVault(selected);
     announce("Vault selected. No read access granted. Review the allowed paths and exclusions, then approve.");
     roots.focus(); await storageView.refresh();
   } catch (error) { report(error); } finally { choose.disabled = false; }
@@ -254,9 +252,32 @@ grant.addEventListener("click", () => { void (async () => {
   finally { requests.finishScope(ticket); scoping = false; projectFolder.disabled = false; grant.disabled = false; refresh.disabled = !vault; }
   if (approved && requests.current(ticket)) { await storageView.refresh(); await loadNotes(); }
 })(); });
-close.addEventListener("click", () => { void (async () => {
+function showVault(selected: VaultInfo): void {
+  clearContent(); vault = selected; generation = 0;
+  roots.value = selected.scope.roots.join("\n"); exclusions.value = selected.scope.excluded.join("\n"); projectFolder.value = ""; modelSetup.reset(); scopePreview();
+  element("vault-details").hidden = false;
+  element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
+  refresh.disabled = false;
+}
+function resetVault(): void {
   clearContent(); vault = null; storageView.reset(); generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
   roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); element("vault-name").textContent = ""; element("vault-path").textContent = "";
+}
+savedAccess = new SavedAccessView(bridge,
+  () => vault && listing && !scoping && !paused && vault.scope.roots.length ? { revision: vault.revision, projectsFolder: projectFolder.value.trim(), embeddingModel: modelSetup.embeddingModel() } : null,
+  resetVault,
+  async result => {
+    showVault(result.vault); projectFolder.value = result.projectsFolder;
+    // Close, Choose or a new approval during these steps must not receive the saved projects or model.
+    return continueSteps(result.vault.revision, () => vault?.revision ?? null, [
+      () => storageView.refresh(), () => loadNotes(),
+      async () => { if (result.projectsFolder && listing) await loadProject(false, true); },
+      async () => { if (result.ai.model || result.ai.embeddingModel) void modelSetup.restore(result.ai); }
+    ]);
+  }, announce);
+void savedAccess.load();
+close.addEventListener("click", () => { void (async () => {
+  resetVault();
   try { value(await bridge.closeVault()); announce("Vault closed. All session read access is cleared."); choose.focus(); }
   catch (error) { report(error); }
 })(); });

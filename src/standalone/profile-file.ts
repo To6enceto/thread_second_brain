@@ -15,7 +15,7 @@ export class ProfileFile<T> {
   private validate: (input: unknown) => T | Promise<T>;
   private maxBytes: number;
   constructor(profileDirectory: string, filename: string, initial: T, validate: (input: unknown) => T | Promise<T>, maxBytes: number) {
-    if (!/^(?:vault|changes|imports)-[a-f0-9]{64}\.json$/.test(filename)) throw new DesktopError("Invalid vault identity.");
+    if (!/^(?:(?:vault|changes|imports)-[a-f0-9]{64}|access)\.json$/.test(filename)) throw new DesktopError("Invalid vault identity.");
     this.directory = profileDirectory; this.filename = filename; this.state = initial; this.validate = validate; this.maxBytes = maxBytes;
   }
   private async folder(): Promise<FileHandle> {
@@ -74,5 +74,14 @@ export class ProfileFile<T> {
       this.before = raw; this.state = next;
     } catch (error) { this.loaded = false; throw error; }
     finally { if (folder) { if (temporary) await unlink(fdPath(folder, temporary)).catch(() => {}); await folder.close(); } this.busy = false; }
+  }
+  /** Removes this one file when the user explicitly forgets convenience state; never used for history. */
+  async remove(initial: T): Promise<void> {
+    if (this.busy) throw new DesktopError("Desktop state is busy. Try again.");
+    this.busy = true; const folder = await this.folder().catch(error => { this.busy = false; throw error; });
+    try {
+      try { await unlink(fdPath(folder, this.filename)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+      await folder.sync(); this.before = null; this.state = initial; this.loaded = true;
+    } finally { await folder.close(); this.busy = false; }
   }
 }

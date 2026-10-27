@@ -39,6 +39,8 @@ export class DesktopAI {
   cancel(): void { this.epoch++; this.controller?.abort(); this.controller = null; }
   forget(): void { this.cancel(); this.prepared = null; }
   reset(): void { this.forget(); this.configurationVersion++; this.configuration = { endpoint: defaultSettings().endpoint, model: "" }; }
+  /** The applied session configuration, for explicitly remembered access only. */
+  settings(): AIConfig { return { ...this.configuration }; }
   configure(input: unknown): AIConfig { const next = config(input); this.cancel(); this.configurationVersion++; this.configuration = next; return { ...next }; }
   /** Main-process workflows share the bounded, cancelable local transport. Never exposed over IPC. */
   async run<T>(work: (settings: AIConfig, signal: AbortSignal, current: () => void, client: (verify: () => Promise<void>) => OllamaClient) => Promise<T>): Promise<T> {

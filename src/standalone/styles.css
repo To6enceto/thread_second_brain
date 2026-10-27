@@ -47,6 +47,11 @@
 .thread-desktop details { margin-top: 20px; }
 .thread-desktop summary { cursor: pointer; min-height: 32px; }
 .thread-scope-preview { border-left: 2px solid var(--thread-recorded); padding-left: 12px; margin: 18px 0; font-size: 12px; overflow-wrap: anywhere; }
+.thread-saved-access { border: 1px solid var(--thread-border); border-left: 3px solid var(--thread-recorded); border-radius: 8px; padding: 12px 14px; margin: 0 0 18px; }
+.thread-saved-access h2 { margin-top: 0; }
+.thread-saved-list { margin: 8px 0 12px; padding-left: 18px; font-size: 12px; overflow-wrap: anywhere; }
+.thread-saved-access[hidden], .thread-saved-access p[hidden] { display: none; }
+.thread-remember { margin: 14px 0; }
 .thread-library { padding: 24px 20px; border-right: 1px solid var(--thread-border); }
 .thread-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .thread-note-list { list-style: none; padding: 0; margin: 20px 0; }

@@ -5,6 +5,7 @@ import { DesktopPdfAssets } from "./pdf-assets.ts";
 import { DesktopPdf } from "./pdf.ts";
 import { DesktopPortability } from "./portability.ts";
 import { VaultFiles } from "./vault-files.ts";
+import { RememberedAccess } from "./remembered-access.ts";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
@@ -37,6 +38,7 @@ let collections: DesktopCollections;
 let knowledge: DesktopKnowledge;
 let pdf: DesktopPdf;
 let portability: DesktopPortability;
+let remembered: RememberedAccess;
 function cancelResearchWork(): void { intake?.invalidate(); collections?.invalidate(); knowledge?.invalidate(); pdf?.invalidate(); }
 // Scope, vault, writer and evidence changes also discard portability tokens and previews.
 function invalidateResearch(): void { cancelResearchWork(); portability?.invalidate(); }
@@ -75,6 +77,7 @@ async function start(): Promise<void> {
   knowledge = new DesktopKnowledge(reader, evidence, projects, storage, changes, ai);
   pdf = new DesktopPdf(reader, evidence, storage, changes);
   portability = new DesktopPortability(reader, evidence, storage, new VaultFiles(reader));
+  remembered = new RememberedAccess(app.getPath("userData")); await remembered.load();
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -104,7 +107,8 @@ async function start(): Promise<void> {
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
       invalidateResearch(); reviews.invalidate(); records.invalidate(); await storage.close();
-      const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); await storage.initialize(selected.revision); return selected;
+      // AI is reset again after the awaits: a configuration arriving during them belongs to the previous session.
+      const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); await storage.initialize(selected.revision); ai.reset(); return selected;
     } finally { choosing = false; }
   });
   handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); invalidateResearch(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
@@ -203,6 +207,18 @@ async function start(): Promise<void> {
   handle("thread:cancel-portability", 0, () => { portability.draftChanged(); return null; });
   handle("thread:prepare-pdf", 5, (id, token, extraction, name, revision) => pdf.prepare(id, token, extraction, name, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
+  handle("thread:saved-access", 0, () => remembered.status());
+  handle("thread:remember-access", 3, (folder, embeddingModel, revision) => remembered.remember(reader, ai.settings(), folder, embeddingModel, revision));
+  handle("thread:forget-saved-access", 0, () => remembered.forget());
+  // Continuing always closes the current vault first, so a refusal leaves no access open.
+  handle("thread:continue-saved-access", 0, async () => {
+    if (choosing || !window) throw new DesktopError("Finish the open folder dialog first.");
+    choosing = true;
+    try {
+      clearVault(); await storage.close();
+      const continued = await remembered.open(reader); await storage.initialize(continued.vault.revision); ai.reset(); return continued;
+    } finally { choosing = false; }
+  });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();
     if (selected?.scope.roots.length && !saves.applying && !changes.applying) void evidence.refresh(selected.revision).catch(() => { /* Safe failure is announced by the index; explicit Refresh resumes. */ });
