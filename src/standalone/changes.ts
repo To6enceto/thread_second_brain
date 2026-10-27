@@ -32,24 +32,24 @@ export class DesktopChanges {
   draftChanged(id: unknown): void { const approval = this.approval; if (approval && approval.value.id === id) { approval.dirty = true; this.epoch++; } }
   private settings(revision: unknown): string {
     const info = this.reader.getInfo();
-    if (!info || info.revision !== revision) throw new DesktopError("Vault or access changed. Open Review changes again.");
+    if (!info || info.revision !== revision) throw new DesktopError("The folder or access changed. Open Review changes again.");
     return JSON.stringify({ scope: info.scope, roles: this.storage.status(revision).preferences.roles });
   }
   private check(input: string, revision: unknown): string {
     const path = relativePath(input), info = this.reader.getInfo(); this.settings(revision);
     const roles = this.storage.status(revision).preferences.roles;
-    if (!path.endsWith(".md") || !permitted(path, info!.scope) || !Object.values(roles).some(folder => folder && within(path, folder))) throw new DesktopError("The note is outside permitted writable folders. Review read access, exclusions and folder roles explicitly.");
+    if (!path.endsWith(".md") || !permitted(path, info!.scope) || !Object.values(roles).some(folder => folder && within(path, folder))) throw new DesktopError("Thread may not change this note: it is outside the folders Thread may read or save in, or kept private. Check What Thread may read and, under Saving notes, Where Thread saves each kind of note.");
     return path;
   }
   private context(batch: ChangeBatch, revision: unknown, requireScope = true): ChangeContext {
     let data: ChangeContext;
-    try { data = JSON.parse(batch.context) as ChangeContext; } catch { throw new DesktopError("Unsupported desktop change context. Preserve the journal."); }
-    if (!data || ![1, 2].includes(data.schemaVersion) || !Array.isArray(data.sources) || data.sources.length > 100 || !data.targets || typeof data.targets !== "object") throw new DesktopError("Unsupported desktop change context. Preserve the journal.");
-    if (data.schemaVersion === 2 && (Object.keys(data).sort().join(",") !== "catalog,roles,schemaVersion,scope,sources,targets" || typeof data.catalog !== "string" || !/^[a-f0-9]{64}$/.test(data.catalog))) throw new DesktopError("Unsupported guarded review context. Preserve the journal.");
-    if (requireScope && JSON.stringify({ scope: data.scope, roles: data.roles }) !== this.settings(revision)) throw new DesktopError("Read scope or writable folders changed. Restore explicit access or reject and regenerate.");
+    try { data = JSON.parse(batch.context) as ChangeContext; } catch { throw new DesktopError("Thread cannot use this saved change. Keep its history as it is."); }
+    if (!data || ![1, 2].includes(data.schemaVersion) || !Array.isArray(data.sources) || data.sources.length > 100 || !data.targets || typeof data.targets !== "object") throw new DesktopError("Thread cannot use this saved change. Keep its history as it is.");
+    if (data.schemaVersion === 2 && (Object.keys(data).sort().join(",") !== "catalog,roles,schemaVersion,scope,sources,targets" || typeof data.catalog !== "string" || !/^[a-f0-9]{64}$/.test(data.catalog))) throw new DesktopError("Thread cannot use this saved review. Keep its history as it is.");
+    if (requireScope && JSON.stringify({ scope: data.scope, roles: data.roles }) !== this.settings(revision)) throw new DesktopError("What Thread may read or save changed. Restore that access, or reject the change and make it again.");
     for (const op of batch.operations) this.check(op.path, revision);
     for (const source of data.sources) {
-      if (!source || typeof source.path !== "string" || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/.test(source.hash) || !permitted(relativePath(source.path), this.reader.getInfo()!.scope)) throw new DesktopError("Supporting sources are unavailable under current access. No retained text was shown.");
+      if (!source || typeof source.path !== "string" || typeof source.hash !== "string" || !/^[a-f0-9]{64}$/.test(source.hash) || !permitted(relativePath(source.path), this.reader.getInfo()!.scope)) throw new DesktopError("Supporting notes are not available with the current access, so their saved text is not shown.");
     }
     return data;
   }
@@ -57,7 +57,7 @@ export class DesktopChanges {
     const state = this.storage.changeState(revision);
     const summary = (batch: ChangeBatch, status: string): ChangeSummary => {
       let available = true; try { this.context(batch, revision, false); } catch { available = false; }
-      return { id: batch.id, createdAt: batch.createdAt, paths: available ? batch.operations.map(op => op.path) : ["Unavailable under current read access or folder roles"], status, available };
+      return { id: batch.id, createdAt: batch.createdAt, paths: available ? batch.operations.map(op => op.path) : ["Not available with the current access or folder settings"], status, available };
     };
     return { pending: state.pending ? summary(state.pending, state.pending.status) : null, recovery: state.recovery ? summary(state.recovery.batch, `recovery-${state.recovery.action}`) : null, history: state.history.map(batch => summary(batch, batch.undone ? "undone" : "applied")) };
   }
@@ -67,17 +67,17 @@ export class DesktopChanges {
     this.check(path, revision); const settings = this.settings(revision), note = await this.reader.read(path, revision, 1048576);
     if (note.stamp !== stamp) throw new DesktopError("Note changed. Open it again before editing.");
     const state = await this.writer.inspect(path, revision);
-    if (epoch !== this.epoch || settings !== this.settings(revision) || state.file?.stamp !== stamp) throw new DesktopError("Note or access changed. Open it again.");
+    if (epoch !== this.epoch || settings !== this.settings(revision) || state.file?.stamp !== stamp) throw new DesktopError("The note or access changed. Open it again.");
     const value = { id: randomUUID(), path, body: editableBody(note.text).body };
     this.edit = { value, before: note.text, state, revision, settings }; return value;
   }
   async proposeEdit(id: unknown, body: unknown, revision: unknown): Promise<ChangesSnapshot> {
     const edit = this.edit, epoch = this.epoch;
-    if (!edit || id !== edit.value.id || revision !== edit.revision || typeof body !== "string" || Buffer.byteLength(body) > 1048576 || edit.settings !== this.settings(revision)) throw new DesktopError("The edit draft changed or exceeds 1 MiB. Open the note again.");
-    if (JSON.stringify(await this.writer.inspect(edit.value.path, revision)) !== JSON.stringify(edit.state)) throw new DesktopError("Target changed. Reopen it; newer edits were preserved.");
+    if (!edit || id !== edit.value.id || revision !== edit.revision || typeof body !== "string" || Buffer.byteLength(body) > 1048576 || edit.settings !== this.settings(revision)) throw new DesktopError("The draft changed or is larger than 1 MiB. Open the note again.");
+    if (JSON.stringify(await this.writer.inspect(edit.value.path, revision)) !== JSON.stringify(edit.state)) throw new DesktopError("The note changed. Open it again; the newer edits were kept.");
     if (epoch !== this.epoch || this.edit !== edit) throw new DesktopError("Edit draft changed. Open the note again.");
     let after: string;
-    try { after = draftContent(edit.before, body); } catch (error) { throw new DesktopError(error instanceof Error ? error.message : "Keep note properties and provenance unchanged."); }
+    try { after = draftContent(edit.before, body); } catch (error) { throw new DesktopError(error instanceof Error ? error.message : "Leave the note's properties and Thread's source markers unchanged."); }
     return this.propose([{ path: edit.value.path, before: edit.before, after }], [], revision);
   }
   private async sources(context: ChangeContext, revision: unknown): Promise<boolean> {
@@ -90,14 +90,14 @@ export class DesktopChanges {
     return true;
   }
   private async run<T>(revision: unknown, work: (manager: ChangeManager, current: () => void) => Promise<T>, states: Record<string, DestinationState> = {}): Promise<T> {
-    if (this.applying) throw new DesktopError("A change operation is running. Wait for its result.");
+    if (this.applying) throw new DesktopError("A change is being applied. Wait for it to finish.");
     const epoch = this.epoch, settings = this.settings(revision); this.applying = true;
     try {
       return await this.storage.changeWork(revision, async (journal, owned) => {
-        const current = (): void => { owned(); if (epoch !== this.epoch || settings !== this.settings(revision)) throw new DesktopError("Change approval or access changed. Inspect recovery before retrying."); };
+        const current = (): void => { owned(); if (epoch !== this.epoch || settings !== this.settings(revision)) throw new DesktopError("The approval or access changed. Choose Inspect recovery before trying again."); };
         const currentState = async (path: string): Promise<DestinationState> => {
           current(); this.check(path, revision); const actual = await this.writer.inspect(path, revision); current();
-          if (states[path] && JSON.stringify(states[path]) !== JSON.stringify(actual)) throw new DesktopError("Target identity or bytes changed. Preserve newer work and inspect recovery.");
+          if (states[path] && JSON.stringify(states[path]) !== JSON.stringify(actual)) throw new DesktopError("The note changed. Keep the newer work and choose Inspect recovery.");
           states[path] = actual; return actual;
         };
         const port: ChangePort = {
@@ -105,34 +105,34 @@ export class DesktopChanges {
           read: async path => { const state = await currentState(path); return state.file ? (await this.reader.read(path, revision, 1048576)).text : null; },
           prepare: async path => { await currentState(path); },
           create: async (path, content) => { await this.writer.create(path, content, await currentState(path), revision, async () => { current(); }, current); states[path] = await this.writer.inspect(path, revision); },
-          replace: async (path, before, after, contextCurrent) => { await this.writer.replace(path, before, after, await currentState(path), revision, () => { current(); if (contextCurrent && !contextCurrent()) throw new DesktopError("Source context changed before writing."); }); states[path] = await this.writer.inspect(path, revision); },
+          replace: async (path, before, after, contextCurrent) => { await this.writer.replace(path, before, after, await currentState(path), revision, () => { current(); if (contextCurrent && !contextCurrent()) throw new DesktopError("A supporting note changed before writing."); }); states[path] = await this.writer.inspect(path, revision); },
           removeCreated: async (path, before) => { await this.writer.removeCreated(path, before, await currentState(path), revision, current); states[path] = await this.writer.inspect(path, revision); },
-          persist: async (raw, isCurrent) => { current(); await journal.store(JSON.parse(raw), () => { current(); if (isCurrent && !isCurrent()) throw new DesktopError("Proposal canceled."); }); },
+          persist: async (raw, isCurrent) => { current(); await journal.store(JSON.parse(raw), () => { current(); if (isCurrent && !isCurrent()) throw new DesktopError("Change canceled."); }); },
           validateContext: async raw => { current(); const context = this.context({ id: "", createdAt: "", context: raw, operations: [] }, revision); const valid = await this.sources(context, revision); current(); return valid; },
           contextCurrent: () => { try { current(); return true; } catch { return false; } }
         };
         const manager = new ChangeManager(port); await manager.load(journal.state); current(); return work(manager, current);
       });
     } catch (error) {
-      if (this.reader.getInfo()?.revision !== revision) throw new DesktopError("Read access or vault changed. Recovery was preserved; approve access and inspect it explicitly.");
-      throw new DesktopError(error instanceof Error ? error.message : "Change operation failed. Preserve the journal and inspect recovery.");
+      if (this.reader.getInfo()?.revision !== revision) throw new DesktopError("The folder or access changed. Recovery was kept; approve access and choose Inspect recovery.");
+      throw new DesktopError(error instanceof Error ? error.message : "The change did not finish. Keep Thread's history as it is and choose Inspect recovery.");
     } finally { this.applying = false; this.approval = null; }
   }
   /** Called by trusted main-process record generators; never exposed as generic IPC. */
   async propose(inputs: Inputs, sources: ChangeContext["sources"], revision: unknown, catalog?: string): Promise<ChangesSnapshot> {
     this.approval = null; const settings = this.settings(revision), targets: ChangeContext["targets"] = {};
-    if (!inputs.length || inputs.length > 10 || sources.length > 100) throw new DesktopError("Keep proposals within ten notes and one hundred source references.");
+    if (!inputs.length || inputs.length > 10 || sources.length > 100) throw new DesktopError("A change can cover at most ten notes and one hundred supporting references.");
     await this.run(revision, async (manager, current) => {
       for (const input of inputs) {
         this.check(input.path, revision); targets[input.path] = await this.writer.inspect(input.path, revision); current();
-        if (targets[input.path]!.file?.hash !== (input.before === null ? undefined : hashText(input.before))) throw new DesktopError("Target changed before proposal. Reopen the source.");
+        if (targets[input.path]!.file?.hash !== (input.before === null ? undefined : hashText(input.before))) throw new DesktopError("The note changed before the change was prepared. Open it again.");
       }
       const context: ChangeContext = { schemaVersion: catalog === undefined ? 1 : 2, ...JSON.parse(settings), sources: structuredClone(sources), targets, ...(catalog === undefined ? {} : { catalog }) };
       // A target has its own before/after checks; separate supporting sources
       // must remain unchanged throughout a multi-note application.
-      if (sources.some(source => inputs.some(input => input.path === source.path))) throw new DesktopError("Keep supporting references separate from changed targets.");
+      if (sources.some(source => inputs.some(input => input.path === source.path))) throw new DesktopError("Supporting notes must be different from the notes being changed.");
       this.context({ id: "", createdAt: "", operations: inputs as ChangeBatch["operations"], context: JSON.stringify(context) }, revision);
-      if (!await this.sources(context, revision)) throw new DesktopError("Supporting sources changed. Regenerate the proposal.");
+      if (!await this.sources(context, revision)) throw new DesktopError("Supporting notes changed. Prepare the change again.");
       await manager.propose(inputs, JSON.stringify(context), () => { current(); return true; });
     });
     this.edit = null; return this.snapshot(revision);
@@ -140,11 +140,11 @@ export class DesktopChanges {
   private batch(action: ChangeAction, id: unknown, revision: unknown): ChangeBatch {
     const state = this.storage.changeState(revision);
     const batch = action === "apply" ? state.pending : action === "recover" ? state.recovery?.batch : state.history.find(batch => batch.id === id && !batch.undone);
-    if (!batch || batch.id !== id) throw new DesktopError("The selected change is no longer current. Refresh Review changes.");
+    if (!batch || batch.id !== id) throw new DesktopError("This change is out of date. Choose Refresh changes.");
     return batch;
   }
   async preview(action: unknown, id: unknown, revision: unknown): Promise<ChangePreview> {
-    if (typeof action !== "string" || !["apply", "undo", "recover"].includes(action) || this.applying) throw new DesktopError("Choose a current change action.");
+    if (typeof action !== "string" || !["apply", "undo", "recover"].includes(action) || this.applying) throw new DesktopError("Choose an action from the list.");
     this.approval = null; const epoch = ++this.epoch, batch = this.batch(action as ChangeAction, id, revision), context = this.context(batch, revision, action === "apply"), settings = this.settings(revision);
     const state = this.storage.changeState(revision), journal = JSON.stringify(state), states: Record<string, DestinationState> = {};
     let ready = action === "apply" ? state.pending?.status === "pending" && !state.recovery : action === "undo" ? !state.pending && !state.recovery : !!state.recovery;
@@ -159,8 +159,8 @@ export class DesktopChanges {
       operations.push({ path: op.path, before: expected, after: op[side], current });
     }
     if (action === "apply" && !await this.sources(context, revision)) ready = false;
-    if (epoch !== this.epoch || settings !== this.settings(revision) || journal !== JSON.stringify(this.storage.changeState(revision))) throw new DesktopError("Review changed while loading. Preview again.");
-    const value: ChangePreview = { id: randomUUID(), batchId: batch.id, action: action as ChangeAction, ready, message: ready ? "Inspect every exact change before confirming. Keep other editors closed." : "Stale or conflicting state. Later edits are preserved; compare originals, then resolve or reject explicitly.", operations };
+    if (epoch !== this.epoch || settings !== this.settings(revision) || journal !== JSON.stringify(this.storage.changeState(revision))) throw new DesktopError("Something changed while loading. Preview again.");
+    const value: ChangePreview = { id: randomUUID(), batchId: batch.id, action: action as ChangeAction, ready, message: ready ? "Check every change before confirming. Keep other editors closed." : "The notes no longer match this change. Your later edits are kept; compare with the originals, then resolve or reject it.", operations };
     this.approval = { value, revision, states, journal, settings, dirty: false }; return structuredClone(value);
   }
   private approved(id: unknown, revision: unknown, editing = false): NonNullable<DesktopChanges["approval"]> {
@@ -175,12 +175,12 @@ export class DesktopChanges {
   }
   async revise(id: unknown, bodies: unknown, revision: unknown): Promise<ChangesSnapshot> {
     const approval = this.approved(id, revision, true);
-    if (approval.value.action !== "apply" || !Array.isArray(bodies) || bodies.length !== approval.value.operations.length || bodies.some(body => typeof body !== "string" || Buffer.byteLength(body) > 1048576)) throw new DesktopError("Edit the complete proposed body group within its text limit.");
+    if (approval.value.action !== "apply" || !Array.isArray(bodies) || bodies.length !== approval.value.operations.length || bodies.some(body => typeof body !== "string" || Buffer.byteLength(body) > 1048576)) throw new DesktopError("Keep the edited text within its size limit.");
     await this.run(revision, (manager, current) => manager.revise(approval.value.batchId, bodies, () => { current(); return true; }), structuredClone(approval.states));
     return this.snapshot(revision);
   }
   async reject(id: unknown, revision: unknown): Promise<ChangesSnapshot> {
-    if (typeof id !== "string" || this.storage.changeState(revision).pending?.id !== id) throw new DesktopError("Pending proposal changed. Refresh before rejecting.");
+    if (typeof id !== "string" || this.storage.changeState(revision).pending?.id !== id) throw new DesktopError("The waiting change changed. Choose Refresh changes before rejecting it.");
     this.approval = null; await this.run(revision, manager => manager.reject(id)); return this.snapshot(revision);
   }
 }

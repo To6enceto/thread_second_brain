@@ -74,14 +74,14 @@ test("inputs and the workflow selector are locked while an import runs, so edits
   f.button("Choose package file").fire("click"); f.picked.resolve({ ok: true, value: summary }); await flush(); f.button("Preview import").fire("click");
   f.importPreview.resolve({ ok: true, value: { id: "i1", root: "Thread Import X", entries: [], warnings: [], recovery: false, adopted: [] } }); await flush();
   (f as unknown as { calls: { applies: string[] } }).calls.applies.length = 0; const bridge = (f.view as unknown as { bridge: DesktopBridge }).bridge as unknown as Record<string, unknown>; bridge.applyImport = () => applied.promise;
-  f.button("Import as new copies").fire("click"); assert.equal(f.label("New top-level import folder (outside read access)").disabled, true); assert.equal(f.el("portability-mode").disabled, true);
-  applied.resolve({ ok: true, value: { pending: null, completed: 1 } }); await flush(); assert.equal(f.label("New top-level import folder (outside read access)").disabled, false); assert.match(f.el("portability-status").textContent, /Imported/);
+  f.button("Import as new copies").fire("click"); assert.equal(f.label("New folder for the copies (at the top, not one Thread may read)").disabled, true); assert.equal(f.el("portability-mode").disabled, true);
+  applied.resolve({ ok: true, value: { pending: null, completed: 1 } }); await flush(); assert.equal(f.label("New folder for the copies (at the top, not one Thread may read)").disabled, false); assert.match(f.el("portability-status").textContent, /Imported/);
 });
 test("a save confirmation survives the panel refresh caused by the new package file", async t => {
   const f = fixture(t); await f.view.refresh(); f.previewed.resolve({ ok: true, value: { id: "p1", path: "Projects/Demo/Checkpoints/C.thread-project.json", bytes: 10, manifest, texts: ["NOTES_TEXT"] } });
   f.button("Preview checkpoint").fire("click"); await flush(); f.button("Save previewed checkpoint").fire("click"); await flush();
   f.view.invalidate(); assert.match(f.el("portability-status").textContent, /Saved checkpoint Projects\/Demo\/Checkpoints\/C\.thread-project\.json\..*refreshed after the vault changed/);
-  await f.view.refresh(); assert.equal(f.el("portability-status").textContent, "Context ready. Choose inputs explicitly; nothing is written automatically.");
+  await f.view.refresh(); assert.equal(f.el("portability-status").textContent, "Ready. Nothing is written until you choose it.");
 });
 test("a write confirmation is shown once, survives a refresh that lands first, and never replaces a cancel message", async t => {
   const f = fixture(t), saved = deferred<DesktopResult<string>>(); await f.view.refresh();
@@ -89,9 +89,9 @@ test("a write confirmation is shown once, survives a refresh that lands first, a
   const bridge = (f.view as unknown as { bridge: Record<string, unknown> }).bridge; bridge.writeExport = () => saved.promise;
   f.button("Save previewed checkpoint").fire("click"); f.view.invalidate(); saved.resolve({ ok: true, value: "Projects/Demo/Checkpoints/C.thread-project.json" }); await flush();
   assert.match(f.el("portability-status").textContent, /^Saved checkpoint Projects\/Demo\/Checkpoints\/C\.thread-project\.json\./);
-  f.view.invalidate(); assert.equal(f.el("portability-status").textContent, "Refresh portability for the current permitted project.");
+  f.view.invalidate(); assert.equal(f.el("portability-status").textContent, "Choose Refresh portability for the selected project.");
   await f.view.refresh(); f.button("Preview checkpoint").fire("click"); await flush(); bridge.writeExport = async () => ({ ok: true, value: "Projects/Demo/Checkpoints/D.thread-project.json" });
-  f.button("Save previewed checkpoint").fire("click"); await flush(); f.el("portability-cancel").fire("click"); assert.equal(f.el("portability-status").textContent, "Portability work canceled. Refresh to continue.");
+  f.button("Save previewed checkpoint").fire("click"); await flush(); f.el("portability-cancel").fire("click"); assert.equal(f.el("portability-status").textContent, "Canceled. Choose Refresh portability to continue.");
 });
 test("a late save reply leaves a newer preview built after a refresh intact and saveable", async t => {
   const f = fixture(t), saved = deferred<DesktopResult<string>>(); await f.view.refresh();

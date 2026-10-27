@@ -70,7 +70,7 @@ test("health reports concrete date, heading and identity issues with only eligib
 test("review requests reject unsupported selections and cancel late health reads after cancellation or revocation", async t => {
   const f = await fixture(t);
   for (const input of [{ selection: f.selection, mode: "remote", filter: "all" }, { selection: f.selection, mode: "overview", filter: "priority" }, { selection: { folder: "../Private", project: "" }, mode: "health", filter: "all" }, { selection: f.selection, mode: "queue", filter: "all", extra: true }]) await assert.rejects(f.reviews.load(input, f.info.revision));
-  await assert.rejects(f.reviews.load({ selection: { ...f.selection, project: "" }, mode: "queue", filter: "all" }, f.info.revision), /Choose a permitted project/);
+  await assert.rejects(f.reviews.load({ selection: { ...f.selection, project: "" }, mode: "queue", filter: "all" }, f.info.revision), /Choose a project to see its review queue/);
   for (const revoke of [false, true]) {
     const child = await fixture(t); await child.load("health");
     const read = child.reader.read.bind(child.reader); let entered!: () => void, release!: () => void; const started = new Promise<void>(r => { entered = r; }), gate = new Promise<void>(r => { release = r; });
@@ -86,7 +86,7 @@ test("desktop health discloses index omissions and preserves finite diagnostic c
   for (let i = 0; i < 501; i++) await f.put(`Sources/Note-${String(i).padStart(3, "0")}.md`, frontmatter({ created: "unknown" }) + "Source text");
   await f.put("Sources/Oversized.md", "x".repeat(1048577));
   const value = await f.load("health"), report = value.health!;
-  assert.ok(report.examined <= 500); assert.equal(report.issues.length, 200); assert.ok(report.counts["invalid-date"] > report.issues.length); assert.ok(report.bytes <= 8388608); assert.ok(f.index.index.coverage!.omittedFiles > 0); assert.match(value.coverage, /omitted from the index/);
+  assert.ok(report.examined <= 500); assert.equal(report.issues.length, 200); assert.ok(report.counts["invalid-date"] > report.issues.length); assert.ok(report.bytes <= 8388608); assert.ok(f.index.index.coverage!.omittedFiles > 0); assert.match(value.coverage, /skipped \(not indexed\)/);
 });
 
 test("explicit review acknowledges only its exact snapshot and changed sources return to the queue", async t => {
@@ -107,7 +107,7 @@ test("future snoozes and follow-up questions are separate non-overwriting record
   await f.put("Projects/Demo/Overview.md", f.original + "A changed snapshot.\n"); value = await f.load("queue");
   await f.reviews.prepare(value.id, { ...base, action: "question", name: "Follow-up", question: "Which citations need another check?" }, f.info.revision); await f.apply();
   const followup = await f.read("Projects/Demo/Questions/Follow-up.md"); assert.match(followup, /status: "open"/); assert.match(followup, /Review origin \(not supporting evidence\)/); assert.match(followup, /Need another comparison/);
-  value = await f.load("queue"); const row = value.queue!.pending.findIndex(r => r.item.path.endsWith("Overview.md")); await assert.rejects(f.reviews.prepare(value.id, { ...base, row, action: "question", name: "Follow-up", question: "Another question" }, f.info.revision), /Target changed/); assert.equal(await f.read("Projects/Demo/Questions/Follow-up.md"), followup);
+  value = await f.load("queue"); const row = value.queue!.pending.findIndex(r => r.item.path.endsWith("Overview.md")); await assert.rejects(f.reviews.prepare(value.id, { ...base, row, action: "question", name: "Follow-up", question: "Another question" }, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read("Projects/Demo/Questions/Follow-up.md"), followup);
 });
 
 test("milestones and explicit next actions preserve earlier records and require exact new-note Apply", async t => {
@@ -171,7 +171,7 @@ test("weekly drafts keep project scope and reported dates, save only exact revie
   const draft = await f.reviews.generate(value.id, weeklyInput, f.info.revision); assert.ok(p.prompts[0]!.evidence.every(s => s.path.startsWith("Projects/Demo/"))); assert.match(draft.markdown, /User-reported progress: I compared three citations/); assert.match(draft.markdown, /do not date the underlying events/);
   await assert.rejects(f.read(draft.path), { code: "ENOENT" }); assert.equal(await f.read("Projects/Demo/Overview.md"), f.original);
   await f.reviews.prepareDraft(draft.id, f.info.revision); const preview = await f.apply(); assert.equal(preview.operations[0]!.after, draft.markdown); assert.equal(await f.read(draft.path), draft.markdown);
-  value = await f.load("queue"); const next = await f.reviews.generate(value.id, weeklyInput, f.info.revision); await assert.rejects(f.reviews.prepareDraft(next.id, f.info.revision), /Target changed/); assert.equal(await f.read(draft.path), draft.markdown);
+  value = await f.load("queue"); const next = await f.reviews.generate(value.id, weeklyInput, f.info.revision); await assert.rejects(f.reviews.prepareDraft(next.id, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read(draft.path), draft.markdown);
   const batch = f.changes.snapshot(f.info.revision).history.at(-1)!, undo = await f.changes.preview("undo", batch.id, f.info.revision); await f.changes.confirm(undo.id, f.info.revision); await assert.rejects(f.read(draft.path), { code: "ENOENT" });
 });
 
@@ -179,7 +179,7 @@ test("all-permitted weekly scope is explicit, bounded to 80 notes and never incl
   const p = provider(), f = await weeklyFixture(t, p.fetcher);
   for (let i = 0; i < 82; i++) await f.put(`Sources/Record-${i}.md`, frontmatter({ captured_on: localDay() }) + `## Method\nRecorded source ${i}.\n`);
   const value = await f.reviews.load({ selection: { ...f.selection, project: "" }, mode: "overview", filter: "all" }, f.info.revision);
-  await assert.rejects(f.reviews.generate(value.id, weeklyInput, f.info.revision), /Select a permitted project/);
+  await assert.rejects(f.reviews.generate(value.id, weeklyInput, f.info.revision), /Choose a project, or choose all notes/);
   const draft = await f.reviews.generate(value.id, { ...weeklyInput, scope: "allowed" }, f.info.revision); assert.ok(Object.keys(draft.bundle.noteHashes).length <= 80); assert.match(draft.markdown, /Only the 80 most recently modified/); assert.ok(!JSON.stringify(p.prompts).includes("Private/Secret")); assert.ok(p.prompts[0]!.evidence.some(s => s.path.startsWith("Sources/")));
 });
 
@@ -187,7 +187,7 @@ test("refreshed versions use explicit current evidence, retain the stale origina
   const p = provider(), f = await fixture(t, p.fetcher), oldBundle = await sourceBundle("Sources/Research.md", await f.read("Sources/Research.md"));
   const original = answerMarkdown("Old answer", { supported: true, answer: [{ kind: "interpretation", text: "Old copied inference", sourceIds: ["S1"] }], gaps: [] }, oldBundle, "fixture", "demo"), path = "Projects/Demo/Old answer.md"; await f.put(path, original); await f.put("Sources/Research.md", "## Method\nA new source method.\n");
   f.ai.configure({ endpoint: "http://127.0.0.1:11434", model: "text:local" }); const value = await f.load("freshness"), input = { kind: "refresh", name: "Refreshed answer", path, sources: ["Sources/Research.md"] };
-  for (const sources of [[], [path], ["Private/Secret.md"], ["Sources/Research.md", "Sources/Research.md"]]) await assert.rejects(f.reviews.generate(value.id, { ...input, sources }, f.info.revision), /current sources/);
+  for (const sources of [[], [path], ["Private/Secret.md"], ["Sources/Research.md", "Sources/Research.md"]]) await assert.rejects(f.reviews.generate(value.id, { ...input, sources }, f.info.revision), /one to five different notes/);
   const draft = await f.reviews.generate(value.id, input, f.info.revision); assert.ok(p.prompts[0]!.evidence.every(s => s.path === "Sources/Research.md")); assert.ok(!JSON.stringify(p.prompts).includes("Old copied inference")); assert.match(draft.markdown, /Original output preserved/); assert.equal(await f.read(path), original);
   await f.reviews.prepareDraft(draft.id, f.info.revision); await f.apply(); assert.equal(await f.read(draft.path), draft.markdown); assert.equal(await f.read(path), original);
 });

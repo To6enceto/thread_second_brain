@@ -85,12 +85,12 @@ export class DesktopAsk {
           () => { guard(); this.evidence.assertCurrent(snapshot); return true; }, options.level, selection);
         await verify();
         // Provider JSON parser errors can contain response fragments. Never echo them.
-        if (search.hybrid?.mode === "keyword-fallback") search.hybrid.reason = "The search model is not available or does not work. Check the model and that Ollama is running, or search by keywords.";
+        if (search.hybrid?.mode === "keyword-fallback") search.hybrid.reason = "The search model is not available or does not work.";
       } else {
         try { search = searchEntries(entries, options.question, options.filters, budget.results); }
         catch { throw new DesktopError("Check the search: close each quoted phrase, and use at most eight."); }
         if (options.method === "hybrid") search.hybrid = { mode: "keyword-fallback", model: "", candidatePassages: 0, availablePassages: 0, semanticMatches: 0,
-          returnedPassages: search.hits.length, level: options.level, reason: "No search model chosen. Choose one under Optional local AI, or search by keywords." };
+          returnedPassages: search.hits.length, level: options.level, reason: "No search model chosen." };
       }
       search.coverage = { ...search.coverage, level: options.level, indexOmittedNotes: snapshot.coverage.omittedFiles };
       const hashes = this.hashes([...new Map(search.hits.map(hit => [hit.entry.path, hit.entry])).values()]);

@@ -135,7 +135,7 @@ test("explicit recovery restores a known applied write after interruption and ke
 
 test("guarded review contexts survive restart, refuse newly appearing notes and retain guarded Undo", async t => {
   const f = await fixture(t), target = "Projects/Review.md", inputs = [{ path: target, before: null, after: "Explicit reviewed snapshot" }];
-  await assert.rejects(f.changes.propose(inputs, [], f.info.revision, "invalid"), /guarded review context/); assert.equal(f.changes.snapshot(f.info.revision).pending, null);
+  await assert.rejects(f.changes.propose(inputs, [], f.info.revision, "invalid"), /saved review/); assert.equal(f.changes.snapshot(f.info.revision).pending, null);
   const catalog = catalogFingerprint(await f.reader.list(f.info.revision), [target]); await f.changes.propose(inputs, [], f.info.revision, catalog);
   const context = JSON.parse(f.storage.changeState(f.info.revision).pending!.context); assert.equal(context.schemaVersion, 2); assert.equal(context.catalog, catalog);
   await f.storage.close();

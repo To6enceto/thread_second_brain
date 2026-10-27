@@ -207,7 +207,7 @@ account, subscription or hosted API cost.
 2. Optionally expand **Filters** for type, status, relative path and date
    range. Dates use recorded fields with a file-modification fallback, not verified
    events. **How many passages** explicitly chooses 20, 35 or 50 result passages.
-3. Choose **Find passages**. Keyword works without any model or running Ollama.
+3. Choose **Find passages**. Searching by Keywords works without any model or running Ollama.
    Read the coverage limits and inspect source chips. Include, Pin first or Exclude
    passages; each change renews the exact context and discards the old answer.
 4. Expand **The exact passages sent to the AI**. It shows the exact chosen
@@ -383,18 +383,18 @@ and recovery rules apply to these records.
   is the default. Choose **Accepted - I accept this choice** only for your own
   explicit acceptance. The destination is the project's `Decisions` folder.
 - **Create open question:** enter a new name and question. Optionally select a
-  legacy question section and choose **Copy legacy section into new question**,
+  question from an older note and choose **Copy it into a new question**,
   then edit the copy. The original remains unchanged and is linked as evidence.
   The destination is the project's `Questions` folder; new questions start open.
-- **Update managed question:** select a version-1 question, choose Investigating,
+- **Update a question:** select a version-1 question, choose Investigating,
   Answered or Open/reopen, and record your reason and event date. Answered also
   requires your answer. Each event appends to the note; reopening preserves
   previous answers and reasons. Unsupported/ambiguous properties or duplicate
   IDs require manual resolution; Thread does not normalize them automatically.
 - **Review decision evidence:** select an accepted/proposed decision and one to
   four other evidence notes. Configure a downloaded local text model, then choose
-  **Assess selected decision evidence**. Inspect interpretations, gaps and cited
-  excerpts. Enter your reasoning and choose Retain, Annotate or Supersede.
+  **Ask the AI to compare the decision with these notes**. Inspect interpretations, gaps and cited
+  excerpts. Enter your reasoning and choose Retain, Annotate or Replace (supersede).
   Supersede also requires a distinct replacement name and fields with explicit
   Accepted status; its exact preview contains both the preserved original and
   new replacement. No existing destination is overwritten.
@@ -449,7 +449,7 @@ and revoked access discard obsolete work. A queue or timeline needs a selected
 permitted project. Overview, freshness and health can inspect the current granted
 scope without a selected project. Source chips open the original inside Thread.
 
-- **Review queue:** inspect pending categories and expand Handled snapshots.
+- **Review queue:** inspect pending categories and expand Already handled.
   Choose **Review item**, then Reviewed - no change, a future-date snooze or a
   follow-up question. Enter a reason and a new record name; **Preview review
   action** opens exact change review. Acknowledgements match the exact source

@@ -15,7 +15,7 @@ test("exclusive desktop writer preserves collisions, aliases, scope and exact UT
   const preview = await writer.inspect(path, info.revision); assert.equal(preview.file, null);
   await writer.create(path, content, preview, info.revision, async () => {}, () => {});
   assert.equal(await readFile(join(root, path), "utf8"), content);
-  await assert.rejects(writer.create(path, "overwrite", preview, info.revision, async () => {}, () => {}), /changed/);
+  await assert.rejects(writer.create(path, "overwrite", preview, info.revision, async () => {}, () => {}), /destination changed since the preview/);
   await assert.rejects(writer.inspect("Projects/Answers/cafe\u0301.md", info.revision), /already exists/);
   for (const bad of ["Projects/Private/X.md", "Elsewhere/X.md", "../X.md", "Projects/.obsidian/X.md", "Projects/X.js"]) await assert.rejects(writer.inspect(bad, info.revision));
   await symlink(join(root, "Projects/Answers"), join(root, "Projects/Linked")); await assert.rejects(writer.inspect("Projects/Linked/X.md", info.revision), /link/);

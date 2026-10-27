@@ -274,7 +274,7 @@ test("desktop interrupted receipt survives restart, blocks further saves and res
   assert.equal(recovery.present, false); assert.equal(recovery.content, preview.content);
   await assert.rejects(saves.resolveRecovery(recovery.id, "confirm", revision));
   await writeFile(join(f.root, preview.path), "later external note");
-  await assert.rejects(saves.resolveRecovery(recovery.id, "leave", revision), /target changed/);
+  await assert.rejects(saves.resolveRecovery(recovery.id, "leave", revision), /The note changed\. Look at it again; no files were changed/);
   const updated = await saves.inspectRecovery(pending.id, revision); await saves.resolveRecovery(updated.id, "leave", revision);
   assert.equal(restarted.status(revision).saves[0]!.status, "left"); assert.equal(await readFile(join(f.root, preview.path), "utf8"), "later external note");
 });
@@ -289,6 +289,6 @@ test("desktop reconciliation confirms exact intended bytes only and preserves du
   preview.content = "forged renderer content"; await f.saves.resolveRecovery(preview.id, "confirm", revision);
   assert.equal(await readFile(join(f.root, path), "utf8"), content); assert.equal(f.storage.status(revision).saves[0]!.status, "complete");
   await f.storage.owned(revision, (profile, current) => profile.store({ ...profile.state, saves: Array.from({ length: 20 }, (_, n) => ({ ...profile.state.saves[0]!, id: `retained-${n}` })) }, current));
-  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "More", [1], revision), /Twenty/);
+  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "More", [1], revision), /twenty save records/);
   assert.equal(f.storage.status(revision).saves.length, 20);
 });

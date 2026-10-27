@@ -25,7 +25,7 @@ export class ChangesView {
   }
   private message(message: string): void { el("changes-status").textContent = message; }
   setNote(note: NoteSnapshot | null): void { this.note = note; el<HTMLButtonElement>("propose-note").disabled = !note; }
-  invalidate(message = "Open Review changes to inspect retained proposals and recovery."): void {
+  invalidate(message = "Open Review changes to see waiting changes and anything to recover."): void {
     this.epoch++; this.dirty = false;
     el("changes-work").replaceChildren(); el("changes-list").replaceChildren(); this.message(message);
     this.busy(false);
@@ -34,10 +34,10 @@ export class ChangesView {
   hide(): void { el("changes-panel").hidden = true; this.invalidate(); }
   open(): void { this.showPanel(); el("changes-panel").hidden = false; el("changes-panel").focus(); void this.refresh(); }
   private async run(work: (revision: number, current: () => boolean) => Promise<void>): Promise<void> {
-    const revision = this.revision(); if (revision === null) { this.message("Choose a vault and approve access before reviewing note content."); return; }
+    const revision = this.revision(); if (revision === null) { this.message("Choose your notes folder and approve read access first."); return; }
     const epoch = ++this.epoch, current = (): boolean => epoch === this.epoch && revision === this.revision();
-    this.message("Checking current changes..."); this.busy(true);
-    try { await work(revision, current); } catch (error) { if (current()) this.message(error instanceof Error ? error.message : "Change unavailable. Preserve history and refresh."); }
+    this.message("Checking changes..."); this.busy(true);
+    try { await work(revision, current); } catch (error) { if (current()) this.message(error instanceof Error ? error.message : "This change is not available. Keep Thread's history as it is and choose Refresh changes."); }
     finally { if (current()) this.busy(false); }
   }
   private busy(active: boolean): void {
@@ -50,7 +50,7 @@ export class ChangesView {
   async refresh(): Promise<void> {
     this.dirty = false; el("changes-work").replaceChildren();
     void this.bridge.invalidateChangeView();
-    await this.run(async (revision, current) => { const snapshot = value(await this.bridge.changesSnapshot(revision)); if (!current()) return; this.show(snapshot); this.message("Review is explicit. Originals stay in this desktop profile; plugin history is separate."); });
+    await this.run(async (revision, current) => { const snapshot = value(await this.bridge.changesSnapshot(revision)); if (!current()) return; this.show(snapshot); this.message("Nothing changes until you approve it. Thread keeps copies of the originals in its own profile, separate from the Obsidian plugin's history."); });
   }
   private show(snapshot: ChangesSnapshot): void {
     const list = el("changes-list"); list.replaceChildren();
@@ -58,12 +58,12 @@ export class ChangesView {
       const card = document.createElement("section"); card.className = "thread-record-card"; list.append(card);
       text(card, "p", `${summary.status} · ${summary.createdAt}`, "thread-muted"); text(card, "p", summary.paths.join("\n"), "thread-path");
       this.action(card, action === "apply" ? "Preview pending change" : action === "undo" ? "Preview undo" : "Inspect recovery", () => { void this.loadPreview(action, summary.id); }, summary.available && summary.status !== "undone");
-      if (action === "apply" && !snapshot.recovery) this.action(card, "Reject proposal", () => { void this.run(async (revision, current) => { const result = value(await this.bridge.rejectChange(summary.id, revision)); if (current()) { this.clearPreview(); this.show(result); this.message("Proposal rejected. Notes were not changed."); } }); });
+      if (action === "apply" && !snapshot.recovery) this.action(card, "Reject proposal", () => { void this.run(async (revision, current) => { const result = value(await this.bridge.rejectChange(summary.id, revision)); if (current()) { this.clearPreview(); this.show(result); this.message("Change rejected. Your notes were not changed."); } }); });
     };
     if (snapshot.recovery) { text(list, "h3", "Recovery needs your review"); row(snapshot.recovery, "recover"); }
     if (snapshot.pending) row(snapshot.pending, "apply");
-    if (!snapshot.pending && !snapshot.recovery) text(list, "p", "No pending change. Open a permitted note to propose a body update.", "thread-muted");
-    text(list, "h3", `Applied history · ${snapshot.history.length} of 20 retained batches`);
+    if (!snapshot.pending && !snapshot.recovery) text(list, "p", "No changes waiting. Open a note to propose a change to its text.", "thread-muted");
+    text(list, "h3", `Applied changes · ${snapshot.history.length} of the last 20 kept`);
     for (const batch of [...snapshot.history].reverse()) row(batch, "undo");
   }
   private clearPreview(): void { this.dirty = false; el("changes-work").replaceChildren(); }
@@ -73,13 +73,13 @@ export class ChangesView {
     await this.run(async (revision, current) => {
       const draft = value(await this.bridge.beginNoteEdit(note.path, note.stamp, revision)); if (!current()) return;
       const area = el("changes-work"); text(area, "h3", "Propose a note body change"); text(area, "p", draft.path, "thread-path");
-      text(area, "p", "Note properties and Thread provenance stay protected. This draft is not saved to your note.", "thread-muted");
+      text(area, "p", "The note's properties and Thread's source markers cannot be changed here. This draft is not saved to your note.", "thread-muted");
       const label = text(area, "label", "Proposed body"), body = document.createElement("textarea"); body.value = draft.body; body.rows = 12; body.maxLength = 1048576; body.setAttribute("aria-label", "Proposed body"); label.append(body);
       this.action(area, "Preview proposed change", () => { const proposed = body.value; void this.run(async (revision, current) => {
         const snapshot = value(await this.bridge.proposeNoteEdit(draft.id, proposed, revision)); if (!current()) return;
         this.show(snapshot); if (snapshot.pending) await this.loadPreview("apply", snapshot.pending.id);
       }); });
-      this.message("Edit the body, then preview the exact change. Nothing has been written to the note."); body.focus();
+      this.message("Edit the text, then preview the change. Nothing has been written to the note."); body.focus();
     });
   }
   private async loadPreview(action: ChangeAction, id: string): Promise<void> {
@@ -104,14 +104,14 @@ export class ChangesView {
         text(row, "span", line.kind === "added" ? "" : String(beforeLine), "thread-line-number"); text(row, "span", line.kind === "removed" ? "" : String(afterLine), "thread-line-number");
         text(row, "span", line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " ", "thread-diff-marker"); text(row, "span", line.text);
       }
-      if (diff.lines.length > 500) text(card, "p", "Diff limited to 500 lines. Inspect the complete exact content below.", "thread-muted");
+      if (diff.lines.length > 500) text(card, "p", "The comparison shows at most 500 lines. The complete text is below.", "thread-muted");
       exact(card, "Exact before", op.before); exact(card, "Exact after", op.after);
-      if (op.current !== op.before) exact(card, "Current note differs from the expected version", op.current);
+      if (op.current !== op.before) exact(card, "The note on disk is different from what this change expects", op.current);
       if (preview.action === "apply" && preview.ready) {
         const details = document.createElement("details"); text(details, "summary", "Edit proposed body"); card.append(details);
         const label = text(details, "label", `Proposed body ${index + 1}`), body = document.createElement("textarea"); body.rows = 8; body.maxLength = 1048576; body.value = editableBody(op.after ?? "").body; body.setAttribute("aria-label", `Proposed body ${index + 1}`); label.append(body); bodies.push(body);
         body.addEventListener("input", () => {
-          this.dirty = true; this.epoch++; this.busy(false); this.message("Draft changed. Renew the exact preview before applying."); void this.bridge.changeDraftEdited(preview.id);
+          this.dirty = true; this.epoch++; this.busy(false); this.message("Draft changed. Choose Renew exact preview before applying."); void this.bridge.changeDraftEdited(preview.id);
         });
       }
     }
@@ -122,8 +122,8 @@ export class ChangesView {
     }); });
     const confirm = this.action(controls, preview.action === "apply" ? "Apply exact change" : preview.action === "undo" ? "Undo exact change" : "Restore reviewed recovery", () => { void this.run(async (revision, current) => {
       const snapshot = value(await this.bridge.confirmChange(preview.id, revision)); if (!current()) return;
-      this.clearPreview(); this.show(snapshot); this.message("Reviewed operation completed. Refresh sources to see current content.");
+      this.clearPreview(); this.show(snapshot); this.message("Done. Choose Refresh next to Your notes to see the current text.");
     }); }, preview.ready); confirm.dataset.confirm = "true"; confirm.className = "thread-primary";
-    text(area, "p", "Originals are retained before the first write. Every target is checked again. Later external edits block undo or recovery. Ordinary filesystem writes are not a multi-file transaction.", "thread-muted");
+    text(area, "p", "Thread keeps a copy of each original before it writes. Every note is checked again first. If you edit a note later, undo and recovery stop rather than overwrite your edit. Changes to several notes are not all-or-nothing.", "thread-muted");
   }
 }

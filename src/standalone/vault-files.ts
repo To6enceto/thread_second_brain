@@ -14,7 +14,7 @@ export class VaultFiles {
   constructor(reader: VaultReader) { this.reader = reader; }
   private async root(revision: unknown): Promise<FileHandle> {
     const expected = await this.reader.identity(revision), info = this.reader.getInfo()!, handle = await absoluteDirectory(info.path), stat = await handle.stat();
-    if (hashText(`${stat.dev}:${stat.ino}`) !== expected || this.reader.getInfo()?.revision !== revision) { await handle.close(); throw new DesktopError("Vault identity changed. Select it again."); }
+    if (hashText(`${stat.dev}:${stat.ino}`) !== expected || this.reader.getInfo()?.revision !== revision) { await handle.close(); throw new DesktopError("This notes folder was replaced. Choose it again."); }
     return handle;
   }
   /** Walks parent folders without following links; returns the parent handle or null when a parent is missing. */
@@ -39,12 +39,12 @@ export class VaultFiles {
   async pin(revision: unknown): Promise<void> { const handle = await this.root(revision); try { const stat = await handle.stat(); this.pinned = { revision, dev: stat.dev, ino: stat.ino, path: this.reader.getInfo()!.path }; } finally { await handle.close(); } }
   /** Synchronous descriptor-relative lookup for the shared importer; never follows links. */
   kindSync(path: string, revision: unknown): "file" | "folder" | null {
-    const pinned = this.pinned; if (!pinned || pinned.revision !== revision || this.reader.getInfo()?.revision !== revision) throw new DesktopError("Vault or access changed. Preview the import again.");
+    const pinned = this.pinned; if (!pinned || pinned.revision !== revision || this.reader.getInfo()?.revision !== revision) throw new DesktopError("The folder or access changed. Preview the import again.");
     const parts = relativePath(path).split("/"), fds: number[] = [];
     try {
       let fd = openSync("/", directoryFlags); fds.push(fd);
       for (const part of pinned.path.split("/").filter(Boolean)) { fd = openSync(`/proc/self/fd/${fd}/${part}`, directoryFlags); fds.push(fd); }
-      const root = fstatSync(fd); if (root.dev !== pinned.dev || root.ino !== pinned.ino) throw new DesktopError("Vault identity changed. Select it again.");
+      const root = fstatSync(fd); if (root.dev !== pinned.dev || root.ino !== pinned.ino) throw new DesktopError("This notes folder was replaced. Choose it again.");
       for (const [index, part] of parts.entries()) {
         try { fd = openSync(`/proc/self/fd/${fd}/${part}`, index === parts.length - 1 ? constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK : directoryFlags); }
         catch (error) { if (code(error) === "ENOENT") return null; throw new DesktopError("A destination is a link, a file blocking a folder or unavailable. Nothing was overwritten."); }
@@ -70,8 +70,8 @@ export class VaultFiles {
       for (const [index, part] of parts.entries()) {
         const directory = await opendir(fdPath(handle)); let count = 0;
         for await (const entry of directory) {
-          if (++count > 5000) throw new DesktopError("A destination folder exceeds the 5000-entry inspection limit. Choose a smaller folder.");
-          if (entry.name !== part && entry.name.normalize("NFC").toLowerCase() === part.normalize("NFC").toLowerCase()) throw new DesktopError("A destination collides by case or Unicode normalization. Choose a new name.");
+          if (++count > 5000) throw new DesktopError("A destination folder has more than 5000 entries for Thread to check. Choose a smaller folder.");
+          if (entry.name !== part && entry.name.normalize("NFC").toLowerCase() === part.normalize("NFC").toLowerCase()) throw new DesktopError("A file or folder with the same name but different capital letters or accents already exists. Choose a new name.");
         }
         if (index === parts.length - 1) break;
         let next: FileHandle; try { next = await open(fdPath(handle, part), directoryFlags); } catch (error) { if (code(error) === "ENOENT") break; throw new DesktopError("A destination folder is unavailable or a link."); }
@@ -82,7 +82,7 @@ export class VaultFiles {
   async folder(path: string, revision: unknown): Promise<void> {
     const found = await this.parent(path, revision, true);
     try { await mkdir(fdPath(found!.handle, found!.name)); await found!.handle.sync(); }
-    catch (error) { if (code(error) === "EEXIST") throw new DesktopError("A destination folder appeared concurrently. Nothing was overwritten."); throw error; }
+    catch (error) { if (code(error) === "EEXIST") throw new DesktopError("A folder appeared at the same time. Nothing was overwritten."); throw error; }
     finally { await found!.handle.close(); }
   }
   /** Create-only write; existing names are never replaced. */

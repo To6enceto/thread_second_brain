@@ -38,7 +38,7 @@ test("desktop records create explicit proposed/accepted decisions without writes
   await f.records.prepare(snapshot.id, command, f.info.revision);
   await assert.rejects(f.read("Projects/Demo/Decisions/Local choice.md"), { code: "ENOENT" });
   const preview = await f.apply(), text = await f.read(preview.operations[0]!.path); assert.equal(metadata(text).status, "proposed"); assert.equal(metadata(text).project, "demo"); assert.match(text, /Offline access/);
-  let next = await f.load(); await assert.rejects(f.records.prepare(next.id, command, f.info.revision), /Target changed/); assert.equal(await f.read(preview.operations[0]!.path), text);
+  let next = await f.load(); await assert.rejects(f.records.prepare(next.id, command, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read(preview.operations[0]!.path), text);
   next = await f.load(); await f.records.prepare(next.id, { ...command, name: "Accepted choice", decision: { ...fields, status: "accepted" } }, f.info.revision); await f.apply();
   assert.equal(metadata(await f.read("Projects/Demo/Decisions/Accepted choice.md")).status, "accepted"); assert.equal(await f.read("Projects/Demo/Overview.md"), f.original);
 });
@@ -73,7 +73,7 @@ test("duplicate question identities and unsupported metadata block updates witho
   await f.records.prepare(snapshot.id, { kind: "question", name: "Identity", question: "What changed?", day: "2026-10-22", sources: [], legacy: null }, f.info.revision); await f.apply();
   const path = "Projects/Demo/Questions/Identity.md", before = await f.read(path); await f.put("Projects/Demo/Duplicate.md", before);
   snapshot = await f.load(); const command = { kind: "question-update", path, update: { status: "answered", answer: "Answer", reason: "Reason", day: "2026-10-22" }, sources: [] };
-  await assert.rejects(f.records.prepare(snapshot.id, command, f.info.revision), /ambiguous/); assert.equal(await f.read(path), before);
+  await assert.rejects(f.records.prepare(snapshot.id, command, f.info.revision), /cannot tell which question/); assert.equal(await f.read(path), before);
   await f.put("Projects/Demo/Duplicate.md", "Ordinary note without duplicate ID"); await f.put(path, before.replace('thread_question_version: "1"', 'thread_question_version: "99"'));
   snapshot = await f.load(); await assert.rejects(f.records.prepare(snapshot.id, command, f.info.revision), /unsupported/);
   assert.equal(f.changes.snapshot(f.info.revision).pending, null);
@@ -139,13 +139,13 @@ test("supersession refuses replacement collision, forged assessment and non-expl
   const f = await fixture(t, provider().fetcher), path = await seedDecision(f), snapshot = await f.load(), before = await f.read(path);
   const assessment = await f.records.assess(snapshot.id, path, ["Sources/Research.md"], f.info.revision);
   const command = { kind: "decision-review", assessment: assessment.id, action: "supersede", reason: "Changed constraints", name: "Original", replacement: { ...fields, status: "accepted" } };
-  await assert.rejects(f.records.prepare(snapshot.id, { ...command, assessment: "forged" }, f.info.revision), /assessment changed/);
-  await assert.rejects(f.records.prepare(snapshot.id, { ...command, replacement: fields }, f.info.revision), /Explicitly accept/);
-  await assert.rejects(f.records.prepare(snapshot.id, command, f.info.revision), /distinct/);
+  await assert.rejects(f.records.prepare(snapshot.id, { ...command, assessment: "forged" }, f.info.revision), /comparison changed/);
+  await assert.rejects(f.records.prepare(snapshot.id, { ...command, replacement: fields }, f.info.revision), /Accept the new decision before replacing/);
+  await assert.rejects(f.records.prepare(snapshot.id, command, f.info.revision), /different name/);
   await f.put("Projects/Demo/Decisions/Foreign.md", "Do not overwrite"); const next = await f.load(), renewed = await f.records.assess(next.id, path, ["Sources/Research.md"], f.info.revision);
-  await assert.rejects(f.records.prepare(next.id, { ...command, assessment: renewed.id, name: "Foreign" }, f.info.revision), /Target changed/);
+  await assert.rejects(f.records.prepare(next.id, { ...command, assessment: renewed.id, name: "Foreign" }, f.info.revision), /The note changed before the change was prepared/);
   assert.equal(await f.read("Projects/Demo/Decisions/Foreign.md"), "Do not overwrite"); assert.equal(await f.read(path), before);
-  f.ai.configure({ endpoint: "http://localhost:11434", model: "" }); await assert.rejects(f.records.assess(next.id, path, ["Sources/Research.md"], f.info.revision), /downloaded local text model/);
+  f.ai.configure({ endpoint: "http://localhost:11434", model: "" }); await assert.rejects(f.records.assess(next.id, path, ["Sources/Research.md"], f.info.revision), /Set up an AI model under Optional local AI/);
   await f.records.prepare(next.id, { kind: "question", name: "Offline", question: "What now?", day: "2026-10-22", sources: [], legacy: null }, f.info.revision); await f.apply(); assert.equal(metadata(await f.read("Projects/Demo/Questions/Offline.md")).status, "open");
 });
 

@@ -7,26 +7,34 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
-### F-27 [P3] open - Coverage text calls notes left out of the index "could not be read"
+### F-39 [P3] open - Review queue headings read as if pending items are hidden
 
-**File:** src/standalone/collections.ts:67
+**File:** src/standalone/reviews-view.ts:84
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** The collections coverage ("... ${omittedFiles} notes could not be read") and the summary-note coverage at `knowledge.ts:61` ("... ${omittedFiles} could not be read") replace "omitted from indexing". `omittedFiles` is `availableFiles - indexed entries` (`src/vault/index-coverage.ts:23`), which counts notes left out by the index limits, not unreadable files. Unreadable notes are counted separately as `invalid`, which `intake.ts:54` shows as "unreadable" next to "skipped" for the same number. The main window also says "skipped" (`renderer.ts:178`). So the same count gets two different names, and "could not be read" points the user at broken files rather than at the index limits. The rule to keep the same meaning is not met. No safeguard is affected.
-**Suggested fix:** Use the same word as the main window and capture screen, for example "${omittedFiles} skipped (not indexed)" in `collections.ts:67` and `knowledge.ts:61`. No requirement would be lost.
+**Why it matters:** The category heading changed from "<kind> (N shown; M candidates)" to "<kind> (N shown of M)". `rows` holds only pending items. M is `queue.candidateCounts[kind]`, which comes from `queue.counts` before disposition (`src/vault/review-events.ts:87`), so it also counts items already reviewed or snoozed. Those items appear under "Already handled". For example, with one pending item and one handled item, the heading says "1 shown of 2", which suggests one pending item is hidden by a limit when none is. The plugin keeps the two counts apart ("N pending shown of P; M total candidates", `src/ui/review-queue-modal.ts:31`). This is user-visible drift in a count; no safeguard or behavior is affected.
+**Suggested fix:** Text-only, for example `${rows.length} to review; ${candidateCounts} found, including already handled`, or keep the old separation: `${rows.length} shown; ${candidateCounts} found`. No requirement would be lost.
 **Resolution:**
 
-### F-28 [P3] open - Shared messages shown in the desktop still use renamed labels and repeat the new advice
+### F-40 [P3] open - Portability intro says Thread never overwrites or restores notes, without limiting it to portability
 
-**File:** src/standalone/ask.ts:88
+**File:** src/standalone/app.html:141
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** The desktop Ask shows `hybridCoverageText` from the shared `src/retrieval/semantic.ts:18`, which wraps the reason as "Keyword fallback: <reason> Choose a compatible downloaded embedding model in settings, or use Keyword. ...". 64b rewrote the desktop reasons (`ask.ts:88` and `ask.ts:92`) to carry their own next action ("... Choose one under Optional local AI, or search by keywords."). The window now gives the advice twice, in two vocabularies, and names "Keyword", an option renamed "Keywords" in this feature. The shared `src/vault/collection-record.ts:55` error "A passage is no longer locatable in the current index. Retrieve evidence again." is still forwarded verbatim from `collections.ts:109,124` into the Ask status when a collection preview fails, so it names the removed "Retrieve evidence" button. `docs/desktop.md:210` also still says "Keyword works without any model". The shared files are out of scope for 64b, and these paths are uncommon. The spec's scan covered only `src/standalone` literals, so it missed this stale text, which users can still see.
-**Suggested fix:** Keep the desktop reasons to the cause only ("No search model chosen." and "The search model is not available or does not work.") so the shared sentence supplies the single next action. Or, when shared wording is next in scope, update `semantic.ts:18` and `collection-record.ts:55` to the new labels. Change the docs to "Keywords works without any model". No requirement would be lost.
+**Why it matters:** The repaired intro says "Thread never overwrites or restores notes, and never lets itself read a new folder unless you allow it." In the portability panel this is true of checkpoints. Taken literally, it is not true of Thread as a whole: after the user approves, Review changes replaces note text (`VaultWriter.replace` via `changes.ts:108`), undo writes the original back, and "Restore reviewed recovery" restores originals. The old wording ("Nothing is overwritten, restored or granted automatically.") did not make a global claim. The brief asks that "no overwrite or restore" wording is not overstated. The panel context limits the risk, so this is P3.
+**Suggested fix:** Limit the claim to portability, for example: "Exporting, comparing and importing never overwrite or restore your notes, and an imported folder stays unread until you allow it." No requirement would be lost.
 **Resolution:**
 
-### F-29 [P3] open - Empty collections message says none exist when the scope hides some
+### F-41 [P3] open - Import preview line still uses the old technical wording
 
-**File:** src/standalone/research-view.ts:95
+**File:** src/standalone/portability-view.ts:90
 **Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
-**Why it matters:** The empty state changed from "No matching collections." to "No saved collections yet. In Ask, ... save them as a collection." `collections.ts` lists only collections whose recorded scope and project identity match the chosen "Collections from" value, so a user who has saved collections under the other scope sees "yet" and is sent to create a new one. The coverage line above it does say "Collections from other scopes are not shown". So the risk is a misleading next action, not data loss.
-**Suggested fix:** Say, for example, "No saved collections for this choice. Try the other Collections from option, or in Ask choose Find passages, pick passages and save them as a collection." No requirement would be lost.
+**Why it matters:** `portability-view.ts` is in scope, and the import field above it was renamed to "New folder for the copies (at the top, not one Thread may read)". The preview summary below it still reads "${n} files. ${m} uncertain copies verified for adoption. Existing files are never overwritten and IDs are never rewritten. The imported folder stays outside read access until you grant it explicitly; links and PDF original paths may need manual review." So the same flow mixes the old "read access/grant" vocabulary with the new "folders Thread may read" one, and "verified for adoption" is unexplained. It also lacks the singular/plural choice added to the export preview ("1 files"). The meaning is correct and no safeguard is misstated.
+**Suggested fix:** Rewrite in the same style and keep every safeguard, for example: "${n} files. ${m} copies from the interrupted import match and will be kept. Existing files are never overwritten and IDs are never changed. Thread cannot read the new folder until you add it to Folders Thread may read; links and PDF paths may need checking by hand." No requirement would be lost.
+**Resolution:**
+
+### F-42 [P3] open - Two change-history errors name the wrong thing
+
+**File:** src/standalone/changes.ts:48
+**Found:** 2026-10-27, `/audit independent (scope: current; lens: quality, security, performance, tests)`
+**Why it matters:** "Thread cannot use this saved review. Keep its history as it is." replaces "Unsupported guarded review context." It fires for any schema-version-2 change context, and those come from both Project reviews (`reviews.ts:216,284`) and Research summary/knowledge notes (`knowledge.ts:123`). A user whose summary-note change is unusable is told about a "saved review". Separately, `change-journal.ts:7` now says "Thread's change history is from an unknown version." The check fails for any unexpected key set, including a damaged file, not only another version. Both messages keep the correct next action ("keep it as it is"), so no safeguard is affected.
+**Suggested fix:** Use "Thread cannot use this saved change. Keep its history as it is." at `changes.ts:48`, matching lines 46-47, and update the `/saved review/` expectation in `changes.test.ts`. At `change-journal.ts:7`, use for example "Thread does not recognize its change history. Keep it as it is and restore a known backup." No requirement would be lost.
 **Resolution:**

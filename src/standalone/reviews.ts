@@ -54,7 +54,7 @@ interface ReviewContext {
   roles: string; entries: IndexEntry[]; queue?: DisposedQueue;
 }
 function fields(value: unknown, keys: string[]): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw new DesktopError("Enter only the labeled review fields.");
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw new DesktopError("Use the fields shown.");
   return value as Record<string, unknown>;
 }
 function text(value: unknown, limit: number, label: string): string {
@@ -84,28 +84,28 @@ export class DesktopReviews {
   private roles(revision: unknown): string { return JSON.stringify(this.storage.status(revision).preferences.roles); }
   private async read(entry: ReviewSource, snapshot: IndexSnapshot, current: () => void, maxBytes = 1048576): Promise<string> {
     current(); const file = snapshot.listing.files[entry.path];
-    if (!file || file.bytes > maxBytes) throw new DesktopError("Review source is missing or exceeds the read budget. Inspect it manually.");
+    if (!file || file.bytes > maxBytes) throw new DesktopError("A note for this review is missing or too large. Look at it yourself.");
     const note = await this.reader.read(entry.path, snapshot.revision, maxBytes); current();
-    if (hashText(note.text) !== entry.hash) throw new DesktopError("Review source changed. Refresh the snapshot.");
+    if (hashText(note.text) !== entry.hash) throw new DesktopError("A note for this review changed. Choose Refresh reviews.");
     return note.text;
   }
   async load(input: unknown, revision: unknown): Promise<DesktopReviewSnapshot> {
     this.invalidate(); const epoch = this.epoch, controller = new AbortController(); this.controller = controller;
     try {
-      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).sort().join(",") !== "filter,mode,selection") throw new DesktopError("Choose a review view and current project selection.");
+      if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).sort().join(",") !== "filter,mode,selection") throw new DesktopError("Choose a review view and a project.");
       const request = input as ReviewRequest;
-      if (!reviewModes.includes(request.mode) || !["all", ...projectStatuses].includes(request.filter)) throw new DesktopError("Choose a supported review view and project filter.");
+      if (!reviewModes.includes(request.mode) || !["all", ...projectStatuses].includes(request.filter)) throw new DesktopError("Choose a review view and a project status from the lists.");
       const roles = this.roles(revision), home = await this.projects.home(request.selection, revision), snapshot = home.index;
       const current = (): void => {
         controller.signal.throwIfAborted();
-        if (epoch !== this.epoch || roles !== this.roles(revision)) throw new DesktopError("Review request, permissions or folders changed. Refresh the view.");
+        if (epoch !== this.epoch || roles !== this.roles(revision)) throw new DesktopError("Something changed (access or folders). Choose Refresh reviews.");
         this.evidence.assertCurrent(snapshot);
       };
       current();
-      if (["queue", "timeline"].includes(request.mode) && !home.home) throw new DesktopError("Choose a permitted project for its queue or timeline.");
+      if (["queue", "timeline"].includes(request.mode) && !home.home) throw new DesktopError("Choose a project to see its review queue or timeline.");
       const settings: ThreadSettings = { ...defaultSettings(), ...this.evidence.scope(), roles: { ...this.storage.status(revision).preferences.roles, projects: request.selection.folder }, selectedProject: request.selection.project };
       const index = this.evidence.index, entries = index.entries, eligible = index.projectEntries(settings, null), graph = index.graph(settings);
-      const value: DesktopReviewSnapshot = { id: randomUUID(), mode: request.mode, project: settings.selectedProject, sources: eligible.map(({ path, hash }) => ({ path, hash })), coverage: `${snapshot.listing.paths.length} permitted notes listed; ${snapshot.coverage.omittedFiles} omitted from the index; ${snapshot.invalid} unavailable during indexing. Dates describe records, not verified events. Unindexed content is not certified.` };
+      const value: DesktopReviewSnapshot = { id: randomUUID(), mode: request.mode, project: settings.selectedProject, sources: eligible.map(({ path, hash }) => ({ path, hash })), coverage: `${snapshot.listing.paths.length} notes Thread may read; ${snapshot.coverage.omittedFiles} skipped (not indexed); ${snapshot.invalid} could not be read. Dates come from your notes and are not checked. Notes that were skipped are not reviewed.` };
       const readQuestion = async (path: string, hash: string) => questionReviewReferences(await this.read({ path, hash }, snapshot, current), parseMetadata);
       let queue: DisposedQueue | undefined;
       if (request.mode === "queue") {
@@ -119,11 +119,11 @@ export class DesktopReviews {
         // Desktop and plugin journals are independent; count only visible desktop targets.
         const pending = this.changes.snapshot(revision).pending;
         for (const card of value.overview.cards) card.proposal = pending?.available && pending.paths.length > 0 && pending.paths.every(path => within(path, card.path)) ? 1 : 0;
-        value.overview.limits.push("Proposal counts cover only desktop pending changes whose destinations are all permitted and within that project. Plugin journals are not shared.");
+        value.overview.limits.push("Waiting changes count only changes made in Thread Desktop that stay inside this project and the folders Thread may read. Changes waiting in the Obsidian plugin are not counted.");
       }
       if (request.mode === "freshness") value.outputs = entries.filter(entry => entry.output).map(entry => {
         const state = graph.assess(entry.path);
-        return { path: entry.path, hash: entry.hash, state: state.state, reason: state.reason, references: state.references.map(ref => ref.path && snapshot.listing.files[ref.path] ? { state: ref.state, reason: ref.reason, path: ref.path, hash: ref.hash, heading: ref.ref.heading } : { state: ref.state, reason: "Supporting source unavailable in the current scope. Choose a current replacement." }) };
+        return { path: entry.path, hash: entry.hash, state: state.state, reason: state.reason, references: state.references.map(ref => ref.path && snapshot.listing.files[ref.path] ? { state: ref.state, reason: ref.reason, path: ref.path, hash: ref.hash, heading: ref.ref.heading } : { state: ref.state, reason: "A supporting note is not available with the current access. Choose another note." }) };
       });
       if (request.mode === "health") {
         const notes = new Map<string, string>();
@@ -146,16 +146,16 @@ export class DesktopReviews {
   }
   private active(id: unknown, revision: unknown): ReviewContext {
     const context = this.context;
-    if (!context || id !== context.value.id || revision !== context.index.revision || context.roles !== this.roles(revision)) throw new DesktopError("Review snapshot, permissions or folders changed. Refresh the view.");
+    if (!context || id !== context.value.id || revision !== context.index.revision || context.roles !== this.roles(revision)) throw new DesktopError("Your notes, access or folders changed. Choose Refresh reviews.");
     this.evidence.assertCurrent(context.index); return context;
   }
   private guard(context: ReviewContext, revision: unknown, epoch: number): void {
-    if (epoch !== this.epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Review request canceled or changed. Refresh the view.");
+    if (epoch !== this.epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Canceled or changed. Choose Refresh reviews.");
   }
   private async verify(context: ReviewContext, hashes: Record<string, string>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current();
     for (const [path, hash] of Object.entries(hashes)) {
-      if (/\.pdf$/i.test(path)) { if (await this.reader.currentHash(path, context.index.revision, current) !== hash) throw new DesktopError("Review source changed. Refresh the snapshot."); current(); }
+      if (/\.pdf$/i.test(path)) { if (await this.reader.currentHash(path, context.index.revision, current) !== hash) throw new DesktopError("A note for this review changed. Choose Refresh reviews."); current(); }
       else await this.read({ path, hash }, context.index, current);
     }
     await this.evidence.refresh(revision); current();
@@ -163,10 +163,10 @@ export class DesktopReviews {
   async prepare(id: unknown, input: unknown, revision: unknown) {
     const context = this.active(id, revision), epoch = ++this.epoch, current = () => this.guard(context, revision, epoch); this.preparing = epoch;
     try {
-      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose an explicit review action.");
+      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose what to do with this item.");
       const kind = (input as Record<string, unknown>).kind;
       const keys = kind === "review" ? ["kind", "row", "action", "name", "reason", "revisit", "question"] : kind === "milestone" ? ["kind", "name", "title", "detail", "day"] : kind === "next-action" ? ["kind", "project", "name", "action"] : kind === "repair" ? ["kind", "issue", "value", "headingAt"] : null;
-      if (!keys) throw new DesktopError("Choose a supported review action.");
+      if (!keys) throw new DesktopError("Choose an action from the list.");
       const data = fields(input, keys), hashes: Record<string, string> = {};
       let path: string, after: string, before: string | null = null;
       const identity = (project: string) => {
@@ -175,38 +175,38 @@ export class DesktopReviews {
       };
       if (kind === "review") {
         const row = context.queue?.pending[Number(data.row)];
-        if (!Number.isSafeInteger(data.row) || !row?.snapshot) throw new DesktopError("Choose a current review item with a supported snapshot.");
+        if (!Number.isSafeInteger(data.row) || !row?.snapshot) throw new DesktopError("Choose an item from the current review list.");
         await this.verify(context, row.snapshot.hashes, revision, current);
         const snapshot = await reviewSnapshot(this.evidence.index, context.settings, row.item, async (path, hash) => questionReviewReferences(await this.read({ path, hash }, context.index, current), parseMetadata)); current();
-        if (snapshot.key !== row.snapshot.key || snapshot.digest !== row.snapshot.digest) throw new DesktopError("Review dependencies changed. Refresh the queue.");
+        if (snapshot.key !== row.snapshot.key || snapshot.digest !== row.snapshot.digest) throw new DesktopError("Notes this item depends on changed. Choose Refresh reviews.");
         Object.assign(hashes, snapshot.hashes); const project = identity(context.value.project), reason = text(data.reason, 5000, "review reason"), revisit = text(data.revisit, 10, "future revisit date"), question = text(data.question, 1000, "follow-up question");
         if (data.action === "question") {
           if (!reason.trim()) throw new DesktopError("Enter your follow-up reason.");
           after = questionMarkdown(question, project, { sources: [], truncated: false, noteHashes: {} }) + `\n## Follow-up reason\n\n${escapeMarkdown(reason.trim())}\n\n## Review origin (not supporting evidence)\n\n<!-- thread:question-evidence -->\n[${escapeMarkdown(row.item.path)}](<${encodeURI(row.item.path).replace(/#/g, "%23")}>)\nSnapshot key: ${snapshot.key}\nSnapshot digest: ${snapshot.digest}\n<!-- /thread:question-evidence -->\n`;
         } else {
-          if (data.action !== "reviewed" && data.action !== "snoozed") throw new DesktopError("Choose Reviewed, a future-date revisit, or a follow-up question.");
+          if (data.action !== "reviewed" && data.action !== "snoozed") throw new DesktopError("Choose Reviewed, a later date to look again, or a follow-up question.");
           after = reviewEventMarkdown(project, snapshot, row.item, data.action, reason, revisit);
         }
         path = `${context.value.project}/${data.action === "question" ? "Questions" : "Reviews"}/${noteName(text(data.name, 100, "review note name"))}.md`;
       } else if (kind === "milestone") {
-        if (!context.value.timeline || !context.value.project) throw new DesktopError("Refresh the selected project timeline first.");
+        if (!context.value.timeline || !context.value.project) throw new DesktopError("Choose Refresh reviews to load this project's timeline first.");
         after = milestoneMarkdown(identity(context.value.project), text(data.title, 200, "milestone title"), text(data.detail, 5000, "milestone detail"), text(data.day, 10, "reported event date"));
         path = `${context.value.project}/Milestones/${noteName(text(data.name, 100, "milestone note name"))}.md`;
       } else if (kind === "next-action") {
         const card = context.value.overview?.cards.find(card => card.path === data.project);
-        if (!card?.identity.id) throw new DesktopError("Choose a current unambiguous project from the overview.");
+        if (!card?.identity.id) throw new DesktopError("Choose a project from the overview.");
         after = nextActionMarkdown(identity(card.path), text(data.action, 1000, "chosen next action")); path = `${card.path}/Next actions/${noteName(text(data.name, 100, "selection note name"))}.md`;
       } else {
         const issue = context.value.health?.issues[Number(data.issue)], choice = context.value.repairs?.[Number(data.issue)];
-        if (!Number.isSafeInteger(data.issue) || !issue || !choice?.allowed) throw new DesktopError("Choose an eligible individual diagnostic repair. Preserve unsupported records.");
+        if (!Number.isSafeInteger(data.issue) || !issue || !choice?.allowed) throw new DesktopError("Choose a problem Thread can fix. Leave the others as they are.");
         const entry = context.entries.find(entry => entry.path === issue.path), graph = this.evidence.index.graph(context.settings), state = graph.assess(issue.path);
-        if (!entry || !state.usable || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("Repair source is stale or ambiguous. Inspect it manually.");
+        if (!entry || !state.usable || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("The note to fix changed or is unclear. Look at it yourself.");
         before = await this.read(issue, context.index, current); const value = text(data.value, 200, "explicit replacement");
         if (issue.dateKey) {
-          if (data.headingAt !== null) throw new DesktopError("Choose only the invalid date correction.");
+          if (data.headingAt !== null) throw new DesktopError("Only correct the invalid date here.");
           after = repairHealthDate(before, issue.dateKey, value, parseMetadata);
         } else {
-          if (!Number.isSafeInteger(data.headingAt) || !choice.headings.some(h => h.at === data.headingAt)) throw new DesktopError("Choose an existing eligible heading.");
+          if (!Number.isSafeInteger(data.headingAt) || !choice.headings.some(h => h.at === data.headingAt)) throw new DesktopError("Choose one of the headings listed.");
           after = repairHealthHeading(before, data.headingAt as number, value, parseMetadata);
         }
         metadata(after); path = issue.path; Object.assign(hashes, state.dependencies, { [path]: issue.hash });
@@ -221,7 +221,7 @@ export class DesktopReviews {
     const notes: SourceNote[] = [], hashes: Record<string, string> = {}, graph = this.evidence.index.graph(context.settings);
     for (const entry of entries) {
       current(); const state = graph.assess(entry.path);
-      if (!state.usable || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("Selected evidence is stale or ambiguous. Choose current original notes.");
+      if (!state.usable || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("A chosen note is out of date or unclear. Choose the original notes instead.");
       const raw = await this.read(entry, context.index, current);
       notes.push({ path: entry.path, ...await projectedSource(raw, entry), metadata: entry.metadata, modifiedAt: entry.modifiedAt, fullHash: entry.hash });
       Object.assign(hashes, state.dependencies, { [entry.path]: entry.hash });
@@ -231,39 +231,39 @@ export class DesktopReviews {
   async generate(id: unknown, input: unknown, revision: unknown): Promise<ReviewDraft> {
     const context = this.active(id, revision); this.draftChanged(); const epoch = this.epoch, version = this.ai.version; this.generating = epoch;
     try { return await this.ai.run(async (settings, signal, currentAI, client) => {
-      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (this.ai.version !== version) throw new DesktopError("Model changed. Generate the review again."); };
-      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose a local review generation mode.");
+      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (this.ai.version !== version) throw new DesktopError("The AI model changed. Write the review again."); };
+      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose which review to write.");
       const kind = (input as Record<string, unknown>).kind;
       if (kind !== "weekly" && kind !== "refresh") throw new DesktopError("Choose Weekly review or Refreshed version.");
       const data = fields(input, kind === "weekly" ? ["kind", "name", "end", "scope"] : ["kind", "name", "path", "sources"]), name = noteName(text(data.name, 100, "new review note name")), folder = this.storage.status(revision).preferences.roles.reviews;
-      if (!folder) throw new DesktopError("Map a Reviews folder and explicitly grant its read access before saving a review.");
-      if (!settings.model) throw new DesktopError("Apply a downloaded local text model. Recorded review views remain available without AI.");
-      const journal = this.storage.changeState(revision); if (journal.pending || journal.recovery) throw new DesktopError("Review pending changes or resolve recovery before generating another review draft.");
+      if (!folder) throw new DesktopError("Set a Reviews folder under Saving notes, and let Thread read it, before saving a review.");
+      if (!settings.model) throw new DesktopError("Set up an AI model under Optional local AI to write this. Review lists still work without AI.");
+      const journal = this.storage.changeState(revision); if (journal.pending || journal.recovery) throw new DesktopError("Finish or resolve the unfinished changes in Review changes first.");
       const path = `${folder}/${name}.md`; let bundle: EvidenceBundle, markdown: string;
       const anchors: Record<string, string> = {}; let project = "";
       if (kind === "weekly") {
-        if (data.scope !== "project" && data.scope !== "allowed") throw new DesktopError("Choose selected project or explicitly all permitted notes.");
+        if (data.scope !== "project" && data.scope !== "allowed") throw new DesktopError("Choose the selected project or all notes Thread may read.");
         const period = reviewPeriod(text(data.end, 10, "review end date"));
         if (data.scope === "project") {
-          if (!context.value.project) throw new DesktopError("Select a permitted project or explicitly choose all permitted notes.");
+          if (!context.value.project) throw new DesktopError("Choose a project, or choose all notes Thread may read.");
           const identity = overviewIdentity(this.evidence.index, context.settings, context.value.project);
           if (!identity.id) throw new DesktopError(identity.reason); project = identity.id; Object.assign(anchors, identity.hashes);
         }
         const entries = this.evidence.index.projectEntries(context.settings, data.scope === "project" ? context.value.project : null).sort((a, b) => b.modifiedAt - a.modifiedAt || a.path.localeCompare(b.path));
         bundle = weeklyEvidence(await this.bundle(context, entries.slice(0, 80), revision, current), period); Object.assign(bundle.noteHashes, anchors);
-        if (!bundle.sources.length) throw new DesktopError("No usable evidence on or before the review end date. Choose another period or explicit scope.");
+        if (!bundle.sources.length) throw new DesktopError("No usable notes on or before the end date. Choose another period or scope.");
         const verify = () => this.verify(context, bundle.noteHashes, revision, current); await verify();
         const raw = await client(verify).generate(settings.model, weeklyPrompt(bundle, period), signal, WEEKLY_SCHEMA); current();
         const result = validateWeekly(raw, bundle, period); if (entries.length > 80) result.gaps.push("Only the 80 most recently modified eligible notes were considered.");
         markdown = weeklyMarkdown(result, bundle, period, settings.model, project); await verify();
       } else {
         const original = context.value.outputs?.find(output => output.path === data.path), eligible = this.evidence.index.projectEntries(context.settings, null);
-        if (!original) throw new DesktopError("Refresh Source freshness and choose an output from that snapshot.");
-        if (!Array.isArray(data.sources) || !data.sources.length || data.sources.length > 5 || new Set(data.sources).size !== data.sources.length || data.sources.some(path => typeof path !== "string" || path === original.path || !eligible.some(entry => entry.path === path))) throw new DesktopError("Choose one to five distinct current sources, separate from the original output.");
+        if (!original) throw new DesktopError("Open Source freshness, choose Refresh reviews and pick a result from that list.");
+        if (!Array.isArray(data.sources) || !data.sources.length || data.sources.length > 5 || new Set(data.sources).size !== data.sources.length || data.sources.some(path => typeof path !== "string" || path === original.path || !eligible.some(entry => entry.path === path))) throw new DesktopError("Choose one to five different notes, other than the original result.");
         const entry = context.entries.find(entry => entry.path === original.path)!;
         project = entry.metadata.project === undefined ? "" : text(entry.metadata.project, 4096, "original project association");
         bundle = await this.bundle(context, data.sources.map(path => eligible.find(entry => entry.path === path)!), revision, current); bundle.noteHashes[original.path] = original.hash;
-        if (!bundle.sources.length) throw new DesktopError("No usable passages in the chosen sources.");
+        if (!bundle.sources.length) throw new DesktopError("The chosen notes have no usable passages.");
         const verify = () => this.verify(context, bundle.noteHashes, revision, current); await verify();
         const raw = await client(verify).generate(settings.model, answerPrompt(`Synthesize current evidence for ${name}. Preserve uncertainty and distinguish facts, interpretations and suggestions.`, bundle), signal, ANSWER_SCHEMA); current();
         const result = validateAnswer(raw, bundle); if (!result.supported) throw new DesktopError(result.gaps.join(" "));
@@ -277,7 +277,7 @@ export class DesktopReviews {
   }
   async prepareDraft(id: unknown, revision: unknown) {
     const draft = this.draft;
-    if (!draft || id !== draft.value.id || draft.version !== this.ai.version) throw new DesktopError("Review draft changed. Generate it again before previewing.");
+    if (!draft || id !== draft.value.id || draft.version !== this.ai.version) throw new DesktopError("The draft changed. Write it again before previewing.");
     const { context, value } = draft, epoch = ++this.epoch, current = () => this.guard(context, revision, epoch); this.preparing = epoch;
     try {
       await this.verify(context, value.bundle.noteHashes, revision, current); current();

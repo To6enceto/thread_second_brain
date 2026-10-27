@@ -45,7 +45,7 @@ export interface SessionDraft { id: string; path: string; markdown: string; bund
 interface RecordContext { value: RecordsSnapshot; selection: ProjectRequest; index: IndexSnapshot; roles: string; identity: string; entries: IndexEntry[]; records: IndexEntry[]; anchors: Record<string, string>; }
 
 function object(value: unknown, keys: string[]): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw new DesktopError("Invalid record fields. Refresh records and enter the labeled fields.");
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join(",") !== [...keys].sort().join(",")) throw new DesktopError("Some fields are not valid. Choose Refresh records and fill in the fields shown.");
   return value as Record<string, unknown>;
 }
 function string(value: unknown, limit: number, label: string): string {
@@ -53,16 +53,16 @@ function string(value: unknown, limit: number, label: string): string {
   return value;
 }
 function decision(value: unknown): DecisionInput {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Enter the labeled decision fields.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Fill in the decision fields.");
   const data = object({ revisitOn: "", ...value }, ["question", "choice", "alternatives", "rationale", "constraints", "revisit", "status", "date", "revisitOn"]);
   for (const [key, value] of Object.entries(data)) string(value, 5000, key);
-  if (data.status !== "proposed" && data.status !== "accepted") throw new DesktopError("Choose Proposed or explicitly Accepted.");
+  if (data.status !== "proposed" && data.status !== "accepted") throw new DesktopError("Choose Proposed or Accepted.");
   return data as unknown as DecisionInput;
 }
 function questionUpdate(value: unknown): QuestionUpdate {
   const data = object(value, ["status", "answer", "reason", "day"]);
   for (const [key, value] of Object.entries(data)) string(value, 5000, key);
-  if (data.status !== "open" && data.status !== "investigating" && data.status !== "answered") throw new DesktopError("Choose an explicit question state.");
+  if (data.status !== "open" && data.status !== "investigating" && data.status !== "answered") throw new DesktopError("Choose a state for the question.");
   return data as unknown as QuestionUpdate;
 }
 
@@ -90,57 +90,57 @@ export class DesktopRecords {
   }
   invalidate(): void { this.context = null; this.actions = null; this.draftChanged(false); }
   draftChanged(keepAssessment: unknown): void {
-    if (typeof keepAssessment !== "boolean") throw new DesktopError("Invalid record draft update.");
+    if (typeof keepAssessment !== "boolean") throw new DesktopError("This change to the draft is not valid.");
     this.epoch++; this.session = null; if (this.assessing !== null) this.ai.cancel(); if (this.preparing !== null) this.changes.invalidate(); if (!keepAssessment) this.assessment = null;
   }
   private roles(revision: unknown): string { return JSON.stringify(this.storage.status(revision).preferences.roles); }
   async load(selection: unknown, revision: unknown): Promise<RecordsSnapshot> {
     this.invalidate(); const epoch = this.epoch;
     const home = await this.projects.home(selection, revision);
-    if (epoch !== this.epoch) throw new DesktopError("Records changed while loading. Refresh records.");
-    if (!home.home) throw new DesktopError("Choose a permitted project before opening records.");
+    if (epoch !== this.epoch) throw new DesktopError("Your notes changed while loading. Choose Refresh records.");
+    if (!home.home) throw new DesktopError("Choose a project first.");
     this.evidence.assertCurrent(home.index);
     const project = home.home.project, index = this.evidence.index, scope = this.evidence.scope();
     const identity = formatRecord(() => identityFromIndex(index.entries, project, index.ready, index.identityComplete));
-    if (identity !== project && !index.idUnambiguous(identity)) throw new DesktopError("Project identity is ambiguous. Resolve duplicate IDs before recording changes.");
+    if (identity !== project && !index.idUnambiguous(identity)) throw new DesktopError("Two notes claim to be this project. Give them different IDs before recording changes.");
     const entries = index.projectEntries(scope, null), records = index.projectRecords(scope, project);
     const choice = (entry: IndexEntry): RecordChoice => ({ path: entry.path, hash: entry.hash, status: typeof entry.metadata.status === "string" ? entry.metadata.status : "unknown" });
     const legacy = index.projectEntries(scope, project).filter(e => e.metadata.type !== "question").flatMap(entry => entry.chunks.filter(c => /^(?:open|unresolved) questions?$/i.test(c.heading.trim())).map(c => ({ path: entry.path, hash: entry.hash, heading: c.heading, text: c.excerpt.slice(0, 1000) }))).slice(0, 100);
     const value: RecordsSnapshot = { id: randomUUID(), project, decisions: records.filter(e => e.metadata.type === "decision").map(choice), questions: records.filter(e => e.metadata.type === "question").map(choice), evidence: entries.map(choice), legacy,
-      coverage: `${home.index.listing.paths.length} permitted notes listed; ${home.index.coverage.omittedFiles} omitted from the index. Up to 100 legacy sections shown. Evidence context is bounded to 16000 characters; dates describe records, not verified events.` };
+      coverage: `${home.index.listing.paths.length} notes Thread may read; ${home.index.coverage.omittedFiles} skipped (not indexed). Up to 100 open-question sections from older notes shown. The AI sees at most 16000 characters; dates come from your notes and are not checked.` };
     const anchors = Object.fromEntries(index.entries.filter(e => e.path.slice(0, e.path.lastIndexOf("/")) === project && (e.metadata.type === "project" || /(?:^|\/)overview\.md$/i.test(e.path))).map(e => [e.path, e.hash]));
     this.context = { value, selection: structuredClone(selection as ProjectRequest), index: home.index, roles: this.roles(revision), identity, entries: structuredClone(entries), records: structuredClone(records), anchors };
     return structuredClone(value);
   }
   private active(id: unknown, revision: unknown): RecordContext {
     const context = this.context;
-    if (!context || id !== context.value.id || revision !== context.index.revision || context.roles !== this.roles(revision)) throw new DesktopError("Records, access or folder preferences changed. Refresh records.");
+    if (!context || id !== context.value.id || revision !== context.index.revision || context.roles !== this.roles(revision)) throw new DesktopError("Your notes, access or folder settings changed. Choose Refresh records.");
     this.evidence.assertCurrent(context.index); return context;
   }
   private guard(context: RecordContext, revision: unknown, epoch: number): void {
-    if (epoch !== this.epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Record request canceled or changed. Refresh records.");
+    if (epoch !== this.epoch || this.active(context.value.id, revision) !== context) throw new DesktopError("Canceled or changed. Choose Refresh records.");
   }
   private async verify(context: RecordContext, hashes: Record<string, string>, revision: unknown, current: () => void): Promise<void> {
     current(); await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(context.index);
     for (const [path, hash] of Object.entries(hashes)) {
       const file = context.index.listing.files[path] ?? context.index.listing.pdfs[path];
-      if (!file || await this.reader.currentHash(path, revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Record evidence changed. Refresh records and select current sources.");
+      if (!file || await this.reader.currentHash(path, revision, current, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("A supporting note changed. Choose Refresh records and choose the notes again.");
       current();
     }
     await this.evidence.refresh(revision); current(); this.evidence.assertCurrent(context.index);
   }
   private paths(value: unknown, context: RecordContext, limit: number): string[] {
-    if (!Array.isArray(value) || value.length > limit || value.some(path => typeof path !== "string" || !context.entries.some(entry => entry.path === path)) || new Set(value).size !== value.length) throw new DesktopError(`Choose up to ${limit} distinct current evidence notes.`);
+    if (!Array.isArray(value) || value.length > limit || value.some(path => typeof path !== "string" || !context.entries.some(entry => entry.path === path)) || new Set(value).size !== value.length) throw new DesktopError(`Choose up to ${limit} different supporting notes.`);
     return value as string[];
   }
   private async bundle(context: RecordContext, paths: string[], revision: unknown, current: () => void): Promise<EvidenceBundle> {
     const notes: SourceNote[] = [], graph = this.evidence.index.graph(this.evidence.scope()), hashes = { ...context.anchors };
     for (const path of paths) {
       const entry = context.entries.find(e => e.path === path)!; current();
-      const state = graph.assess(path); if (!state.usable) throw new DesktopError("Selected derived evidence is stale. Choose current original sources.");
+      const state = graph.assess(path); if (!state.usable) throw new DesktopError("A chosen note summarizes sources that changed. Choose the original notes instead.");
       Object.assign(hashes, state.dependencies, { [path]: entry.hash });
       const note = await this.reader.read(path, revision, context.index.listing.files[path]!.bytes); current();
-      if (hashText(note.text) !== entry.hash) throw new DesktopError("Selected source changed. Refresh records.");
+      if (hashText(note.text) !== entry.hash) throw new DesktopError("A chosen note changed. Choose Refresh records.");
       notes.push({ ...note, ...await projectedSource(note.text, entry), metadata: entry.metadata, fullHash: entry.hash });
     }
     await this.verify(context, hashes, revision, current);
@@ -150,7 +150,7 @@ export class DesktopRecords {
     const entry = context.records.find(entry => entry.path === path && entry.metadata.type === type);
     if (!entry) throw new DesktopError(`Choose a current project ${type}.`);
     const note = await this.reader.read(entry.path, revision, 1048576); current();
-    if (hashText(note.text) !== entry.hash) throw new DesktopError("The selected record changed. Refresh records.");
+    if (hashText(note.text) !== entry.hash) throw new DesktopError("The chosen record changed. Choose Refresh records.");
     return { entry, before: note.text, metadata: metadata(note.text) };
   }
   async loadActions(selection: unknown, revision: unknown): Promise<ActionsSnapshot> {
@@ -163,27 +163,27 @@ export class DesktopRecords {
       verify: async bundle => { await this.verify(context, bundle.noteHashes, revision, current); return true; }
     }, new AbortController().signal);
     current();
-    if (actions.identity !== context.identity) throw new DesktopError("Project identity changed. Refresh actions.");
+    if (actions.identity !== context.identity) throw new DesktopError("The project changed. Choose Refresh actions.");
     this.actions = { context, value: actions };
     return { id: records.id, project: records.project, actions: structuredClone(actions), evidence: records.evidence.filter(e => context.entries.find(entry => entry.path === e.path)?.metadata.type !== "action"), coverage: records.coverage };
   }
   private activeActions(id: unknown, revision: unknown) {
     const context = this.active(id, revision), actions = this.actions;
-    if (!actions || actions.context !== context) throw new DesktopError("Action records changed. Refresh the board.");
+    if (!actions || actions.context !== context) throw new DesktopError("Actions changed. Choose Refresh actions.");
     return actions;
   }
   async prepareAction(id: unknown, input: unknown, revision: unknown) {
     const { context, value: actions } = this.activeActions(id, revision), epoch = ++this.epoch;
     const current = () => this.guard(context, revision, epoch); this.preparing = epoch;
     try {
-      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose an explicit action operation.");
+      if (!input || typeof input !== "object" || Array.isArray(input)) throw new DesktopError("Choose what to do with the action.");
       const kind = (input as Record<string, unknown>).kind;
-      if (kind !== "new" && kind !== "transition") throw new DesktopError("Choose Create Planned action or Record a state transition.");
+      if (kind !== "new" && kind !== "transition") throw new DesktopError("Choose Add a planned action or Change an action's state.");
       const data = object(input, kind === "new" ? ["kind", "name", "title", "reason", "day", "sources"] : ["kind", "path", "state", "reason", "day", "sources"]);
       const paths = this.paths(data.sources, context, 4), reason = string(data.reason, 2000, "action reason"), day = string(data.day, 10, "reported action date");
       for (const path of paths) {
         const entry = context.entries.find(e => e.path === path)!;
-        if (entry.metadata.type === "action" || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("Choose current, unambiguous non-action supporting notes.");
+        if (entry.metadata.type === "action" || entry.id && !this.evidence.index.idUnambiguous(entry.id)) throw new DesktopError("Choose supporting notes that are not actions and are not ambiguous.");
         if (entry.metadata.type === "question") formatRecord(() => questionRecord(entry.metadata));
       }
       const bundle = await this.bundle(context, paths, revision, current);
@@ -194,11 +194,11 @@ export class DesktopRecords {
         operation = { path: `${context.value.project}/Actions/${name}.md`, before: null, after };
       } else {
         const card = actions.cards.find(c => c.path === data.path);
-        if (!card) throw new DesktopError("Choose a current supported action from the board. Unavailable records stay preserved.");
-        if (typeof data.state !== "string" || !actionStates.includes(data.state as ActionState)) throw new DesktopError("Choose an explicit recorded action state.");
+        if (!card) throw new DesktopError("Choose an action from the list. Actions Thread cannot use are kept as they are.");
+        if (typeof data.state !== "string" || !actionStates.includes(data.state as ActionState)) throw new DesktopError("Choose a state for the action.");
         const target = await this.target(context, data.path, "action", revision, current), record = formatRecord(() => readAction(target.before, target.metadata));
         const freshness = this.evidence.index.graph(this.evidence.scope()).assess(target.entry.path);
-        if (!freshness.usable || record.project !== context.identity || !this.evidence.index.idUnambiguous(record.id)) throw new DesktopError("Action identity or support is unavailable. Refresh and inspect the original.");
+        if (!freshness.usable || record.project !== context.identity || !this.evidence.index.idUnambiguous(record.id)) throw new DesktopError("This action or its supporting notes are not available. Choose Refresh actions and look at the original note.");
         Object.assign(bundle.noteHashes, freshness.dependencies, { [target.entry.path]: target.entry.hash });
         operation = { path: target.entry.path, before: target.before, after: formatRecord(() => transitionAction(target.before, target.metadata, data.state as ActionState, reason, day, bundle)) };
       }
@@ -212,16 +212,16 @@ export class DesktopRecords {
     const { context, value: actions } = this.activeActions(id, revision);
     this.draftChanged(false); const epoch = this.epoch, version = this.ai.version; this.assessing = epoch;
     try { return await this.ai.run(async (settings, signal, currentAI, client) => {
-      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (version !== this.ai.version) throw new DesktopError("Model changed. Generate the session again."); };
+      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (version !== this.ai.version) throw new DesktopError("The AI model changed. Write the session summary again."); };
       const data = object(input, ["name", "report", "actions"]), name = formatRecord(() => noteName(string(data.name, 100, "session note name"))), report = string(data.report, 5000, "reported progress");
-      if (!Array.isArray(data.actions) || data.actions.length > 5 || data.actions.some(p => typeof p !== "string" || !actions.cards.some(c => c.path === p)) || new Set(data.actions).size !== data.actions.length) throw new DesktopError("Select at most five distinct current action reports, or leave the selection empty.");
-      if (!settings.model) throw new DesktopError("Apply a downloaded local text model before generating a session. Manual actions remain available.");
+      if (!Array.isArray(data.actions) || data.actions.length > 5 || data.actions.some(p => typeof p !== "string" || !actions.cards.some(c => c.path === p)) || new Set(data.actions).size !== data.actions.length) throw new DesktopError("Choose up to five different action updates, or none.");
+      if (!settings.model) throw new DesktopError("Set up an AI model under Optional local AI to write a session summary. Actions still work without AI.");
       current(); const general = await this.projects.resume(context.selection, revision); current();
       const chosen = formatRecord(() => chosenActionContext(actions, data.actions as string[], general.bundle)), bundle = chosen.bundle;
       Object.assign(bundle.noteHashes, context.anchors);
       const graph = this.evidence.index.graph(this.evidence.scope());
-      for (const card of chosen.cards) { const state = graph.assess(card.path); if (!state.usable) throw new DesktopError("Selected action support is stale. Refresh the board."); Object.assign(bundle.noteHashes, state.dependencies); }
-      if (!bundle.sources.length) throw new DesktopError("Add current project notes or select action reports before generating a sourced session.");
+      for (const card of chosen.cards) { const state = graph.assess(card.path); if (!state.usable) throw new DesktopError("A chosen action's notes changed. Choose Refresh actions."); Object.assign(bundle.noteHashes, state.dependencies); }
+      if (!bundle.sources.length) throw new DesktopError("This project has no notes Thread can use yet. Add a project note or choose action updates before writing a session summary.");
       const verify = () => this.verify(context, bundle.noteHashes, revision, current); await verify();
       const raw = await client(verify).generate(settings.model, sessionPrompt(bundle), signal, SESSION_SCHEMA); current();
       const result = formatRecord(() => validateSession(raw, bundle)); await verify();
@@ -231,7 +231,7 @@ export class DesktopRecords {
   }
   async prepareSession(id: unknown, revision: unknown) {
     const session = this.session;
-    if (!session || id !== session.value.id || session.version !== this.ai.version) throw new DesktopError("Session draft changed. Generate it again before previewing.");
+    if (!session || id !== session.value.id || session.version !== this.ai.version) throw new DesktopError("The draft changed. Write it again before previewing.");
     const { context, value } = session, epoch = ++this.epoch, current = () => this.guard(context, revision, epoch); this.preparing = epoch;
     try {
       await this.verify(context, value.bundle.noteHashes, revision, current);
@@ -242,14 +242,14 @@ export class DesktopRecords {
     const context = this.active(id, revision); this.draftChanged(false); const epoch = this.epoch, version = this.ai.version;
     this.assessing = epoch;
     try { return await this.ai.run(async (settings, signal, currentAI, client) => {
-      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (version !== this.ai.version) throw new DesktopError("Model changed. Assess again."); };
-      if (!settings.model) throw new DesktopError("Apply a downloaded local text model before assessment. Manual decisions and questions remain available.");
+      const current = (): void => { currentAI(); this.guard(context, revision, epoch); if (version !== this.ai.version) throw new DesktopError("The AI model changed. Ask the AI to compare again."); };
+      if (!settings.model) throw new DesktopError("Set up an AI model under Optional local AI to compare a decision with notes. Decisions and questions still work without AI.");
       const target = await this.target(context, path, "decision", revision, current), paths = this.paths(selected, context, 4);
-      if (target.metadata.status !== "accepted" && target.metadata.status !== "proposed") throw new DesktopError("Choose an accepted or proposed decision. Superseded and unsupported records remain preserved.");
-      if (!paths.length || paths.includes(target.entry.path)) throw new DesktopError("Choose one to four evidence notes separately from the decision.");
-      if (!context.entries.some(e => e.path === target.entry.path)) throw new DesktopError("Decision evidence is unavailable. Inspect its freshness and original sources.");
+      if (target.metadata.status !== "accepted" && target.metadata.status !== "proposed") throw new DesktopError("Choose an accepted or proposed decision. Replaced or unsupported ones are kept as they are.");
+      if (!paths.length || paths.includes(target.entry.path)) throw new DesktopError("Choose one to four supporting notes, other than the decision itself.");
+      if (!context.entries.some(e => e.path === target.entry.path)) throw new DesktopError("This decision is not available to Thread right now. Check it in Project reviews.");
       const bundle = decisionComparison(await this.bundle(context, [target.entry.path, ...paths], revision, current), target.entry.path);
-      if (!bundle.sources.some(s => s.path === target.entry.path) || !bundle.sources.some(s => s.path !== target.entry.path)) throw new DesktopError("The bounded context must include both decision and evidence. Choose smaller notes.");
+      if (!bundle.sources.some(s => s.path === target.entry.path) || !bundle.sources.some(s => s.path !== target.entry.path)) throw new DesktopError("The decision and its supporting notes do not fit in what the AI can see. Choose smaller notes.");
       const verify = () => this.verify(context, bundle.noteHashes, revision, current);
       await verify();
       const raw = await client(verify).generate(settings.model, answerPrompt("Does the selected later evidence support revisiting this decision, and which constraints remain? Explain the specific tension and uncertainty.", bundle), signal, ANSWER_SCHEMA);
@@ -272,7 +272,7 @@ export class DesktopRecords {
       } else if (kind === "question") {
         const data = object(input, ["kind", "name", "question", "day", "sources", "legacy"]), paths = this.paths(data.sources, context, 4);
         if (data.legacy !== null) {
-          if (!Number.isInteger(data.legacy) || (data.legacy as number) < 0 || !context.value.legacy[data.legacy as number]) throw new DesktopError("Choose a current legacy section or no copy.");
+          if (!Number.isInteger(data.legacy) || (data.legacy as number) < 0 || !context.value.legacy[data.legacy as number]) throw new DesktopError("Choose a question from an older note, or none.");
           const source = context.value.legacy[data.legacy as number]!; if (!paths.includes(source.path)) paths.push(source.path);
         }
         bundle = await this.bundle(context, paths, revision, current);
@@ -280,24 +280,24 @@ export class DesktopRecords {
       } else if (kind === "question-update") {
         const data = object(input, ["kind", "path", "update", "sources"]), fields = questionUpdate(data.update);
         const target = await this.target(context, data.path, "question", revision, current), record = formatRecord(() => questionRecord(target.metadata));
-        if (typeof target.metadata.status !== "string" || !this.evidence.index.idUnambiguous(record.id)) throw new DesktopError("Question identity/status is ambiguous or coverage incomplete. Preserve it and resolve its metadata first.");
+        if (typeof target.metadata.status !== "string" || !this.evidence.index.idUnambiguous(record.id)) throw new DesktopError("Thread cannot tell which question this is or what state it is in. Leave it and fix its properties first.");
         const paths = this.paths(data.sources, context, 4);
-        if (paths.includes(target.entry.path)) throw new DesktopError("Choose supporting evidence separately from the updated question.");
+        if (paths.includes(target.entry.path)) throw new DesktopError("Choose supporting notes other than the question itself.");
         bundle = await this.bundle(context, paths, revision, current); bundle.noteHashes[target.entry.path] = target.entry.hash;
         operations = [{ path: target.entry.path, before: target.before, after: formatRecord(() => updateQuestion(target.before, target.metadata, fields, bundle)) }];
       } else if (kind === "decision-review") {
         const data = object(input, ["kind", "assessment", "action", "reason", "name", "replacement"]), assessed = this.assessment;
-        if (!assessed || data.assessment !== assessed.value.id || assessed.context !== context || assessed.version !== this.ai.version) throw new DesktopError("Decision assessment changed. Assess current evidence again.");
-        if (data.action !== "retain" && data.action !== "annotate" && data.action !== "supersede") throw new DesktopError("Choose Retain, Annotate or explicitly Supersede.");
+        if (!assessed || data.assessment !== assessed.value.id || assessed.context !== context || assessed.version !== this.ai.version) throw new DesktopError("The AI comparison changed. Ask the AI to compare again.");
+        if (data.action !== "retain" && data.action !== "annotate" && data.action !== "supersede") throw new DesktopError("Choose Retain, Annotate or Replace.");
         const reason = string(data.reason, 5000, "review reasoning"), { path } = assessed.value;
         bundle = assessed.value.bundle; operations = []; let original = assessed.before, replacement = "";
         if (data.action === "supersede") {
           const fields = decision(data.replacement);
-          if (fields.status !== "accepted") throw new DesktopError("Explicitly accept the replacement before superseding.");
+          if (fields.status !== "accepted") throw new DesktopError("Accept the new decision before replacing the old one.");
           original = formatRecord(() => supersededStatus(original, assessed.status));
-          if (metadata(original).status !== "superseded") throw new DesktopError("Status needs manual normalization before supersession.");
+          if (metadata(original).status !== "superseded") throw new DesktopError("Fix this decision's status by hand before replacing it.");
           replacement = `${context.value.project}/Decisions/${formatRecord(() => noteName(string(data.name, 100, "replacement name")))}.md`;
-          if (replacement === path) throw new DesktopError("Choose a distinct replacement name. The original must remain.");
+          if (replacement === path) throw new DesktopError("Choose a different name for the new decision. The original is kept.");
           operations.push({ path: replacement, before: null, after: formatRecord(() => decisionMarkdown(fields, context.identity, bundle)) });
         }
         const action = data.action;

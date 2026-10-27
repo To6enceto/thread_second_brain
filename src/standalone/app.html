@@ -138,7 +138,7 @@
       </section>
       <section id="portability-panel" tabindex="-1" aria-label="Project portability" hidden>
         <h2>Project portability</h2>
-        <p class="thread-muted">Checkpoints are selected project packages, not full vault backups or change journals. Nothing is overwritten, restored or granted automatically.</p>
+        <p class="thread-muted">A checkpoint is a package of the project files you choose, to move or compare them. It is not a full backup of your notes or their history. Thread never overwrites or restores notes, and never lets itself read a new folder unless you allow it.</p>
         <div class="thread-review-controls">
           <label>Portability workflow<select id="portability-mode" aria-label="Portability workflow"><option value="export">Export a checkpoint</option><option value="compare">Compare a checkpoint</option><option value="import">Import a package as new copies</option></select></label>
         </div>
@@ -148,7 +148,7 @@
       </section>
       <section id="reviews-panel" tabindex="-1" aria-label="Project reviews" hidden>
         <h2>Project reviews</h2>
-        <p class="thread-muted">Inspect current records and make explicit choices. Review never runs automatically.</p>
+        <p class="thread-muted">Look over your project and decide what needs attention. Reviews load when you open this panel or choose Refresh reviews; nothing is marked reviewed, fixed or saved unless you choose it.</p>
         <div class="thread-review-controls">
           <label>Review view<select id="reviews-mode" aria-label="Review view"><option value="queue">Review queue</option><option value="freshness">Source freshness</option><option value="timeline">Project timeline</option><option value="overview">All projects</option><option value="health">Vault health</option><option value="weekly">Weekly review</option></select></label>
           <label>Project status filter (All projects)<select id="reviews-filter" aria-label="Project status filter"><option value="all">All statuses</option><option value="active">Active</option><option value="paused">Paused</option><option value="archived">Archived</option><option value="unknown">Unknown</option></select></label>
@@ -159,21 +159,21 @@
       </section>
       <section id="actions-panel" tabindex="-1" aria-label="Project actions and session wrap-up" hidden>
         <h2>Actions and wrap-up</h2>
-        <p class="thread-muted">Recorded progress, explicit choices. AI never changes an action status.</p>
+        <p class="thread-muted">Track what you plan and do. Only you change an action's state; the AI never does.</p>
         <div class="thread-controls"><button id="actions-refresh">Refresh actions</button><button id="actions-cancel">Cancel actions and wrap-up</button><button id="actions-close">Close actions</button></div>
         <p id="actions-status" role="status" aria-live="polite"></p>
         <div id="actions-content"></div>
       </section>
       <section id="records-panel" tabindex="-1" aria-label="Decisions and managed questions" hidden>
         <h2>Decisions and questions</h2>
-        <p class="thread-muted">Record your choices and questions explicitly. Earlier reasoning and answers stay in Markdown. Preview every change before applying.</p>
+        <p class="thread-muted">Record decisions and open questions as notes. Earlier reasons and answers stay in the notes, and you preview every change before it is applied.</p>
         <div class="thread-controls"><button id="records-refresh">Refresh records</button><button id="records-cancel">Cancel record work</button><button id="records-close">Close records</button></div>
         <p id="records-status" role="status" aria-live="polite"></p>
         <div id="records-content"></div>
       </section>
       <section id="changes-panel" tabindex="-1" aria-label="Change review and recovery" hidden>
         <h2>Review changes</h2>
-        <p class="thread-muted">Inspect exact changes and retained originals. Nothing applies automatically. Close other editors and allow saving under Saving notes before confirming.</p>
+        <p class="thread-muted">See each change before it is applied. Thread keeps a copy of the originals for its last 20 changes, so you can undo them unless a note was edited since. Allow saving under Saving notes and close other editors before confirming.</p>
         <div class="thread-controls"><button id="changes-refresh">Refresh changes</button><button id="changes-close">Close change review</button></div>
         <p id="changes-status" role="status" aria-live="polite"></p>
         <div id="changes-work"></div><div id="changes-list"></div>
@@ -204,7 +204,7 @@
       <p class="thread-eyebrow">FROM YOUR NOTES</p>
       <button id="propose-note" disabled>Propose body change</button>
         <h2 id="note-title">Open a source</h2>
-      <p id="note-meta" class="thread-muted">Select a permitted note to read its original Markdown. Thread makes no changes to it.</p>
+      <p id="note-meta" class="thread-muted">Choose a note to read it here. Thread does not change it.</p>
       <div id="link-choices" class="thread-link-choices" aria-label="Internal link choices"></div>
       <p id="preview-limit" class="thread-muted"></p>
       <article id="note-preview" class="thread-markdown" tabindex="0" aria-label="Formatted Markdown preview"></article>

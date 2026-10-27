@@ -28,7 +28,7 @@ const thought = { kind: "thought", name: "Thought", text: "Compare local citatio
 test("typed capture suggests without assigning and saves only through exact non-overwriting review", async t => {
   const f = await fixture(t), snapshot = await f.load(); assert.equal(f.intake.suggest(snapshot.id, { kind: "thought", text: thought.text, file: "" }, f.info.revision), "Projects/Demo");
   await f.intake.capture(snapshot.id, thought, f.info.revision); await assert.rejects(f.read("Inbox/Thought.md"), { code: "ENOENT" }); const preview = await f.apply(); const saved = await f.read("Inbox/Thought.md"); assert.equal(saved, preview.operations[0]!.after); assert.equal(metadata(saved).project, undefined); assert.ok(saved.endsWith(thought.text)); assert.equal(await f.read("Projects/Demo/Overview.md"), f.original);
-  const next = await f.load(); await assert.rejects(f.intake.capture(next.id, thought, f.info.revision), /Target changed/); assert.equal(await f.read("Inbox/Thought.md"), saved);
+  const next = await f.load(); await assert.rejects(f.intake.capture(next.id, thought, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read("Inbox/Thought.md"), saved);
 });
 test("explicit project capture binds current identity, metadata URL and supporting snapshot", async t => {
   const f = await fixture(t), snapshot = await f.load(); await f.intake.capture(snapshot.id, { ...thought, project: "Projects/Demo", url: "https://example.invalid/original" }, f.info.revision);

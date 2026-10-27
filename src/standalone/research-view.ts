@@ -92,7 +92,7 @@ export class ResearchView {
     const preview = this.button(form, "Preview clipped source", () => { const reviewed = this.clip; if (!reviewed) return; const accepted = acknowledgement.checked; void this.run(async (access, current) => { value(await this.bridge.prepareClip(snapshot.id, reviewed.id, accepted, access.revision)); if (current()) this.review(); }); }, true); preview.dataset.needsClip = "true"; preview.disabled = true; preview.className = "thread-primary";
   }
   private collections(area: HTMLElement, snapshot: CollectionsSnapshot): void {
-    add(area, "p", snapshot.coverage, "thread-muted"); if (!snapshot.items.length) add(area, "p", "No saved collections yet. In Ask, choose Find passages, pick passages and save them as a collection.", "thread-empty");
+    add(area, "p", snapshot.coverage, "thread-muted"); if (!snapshot.items.length) add(area, "p", "No saved collections for this choice. Try the other Collections from option, or in Ask choose Find passages, pick passages and save them as a collection.", "thread-empty");
     const detail = add(area, "section", "", "thread-record-form thread-research-form");
     for (const item of snapshot.items) this.button(area, `Open collection: ${item.title}`, () => { detail.replaceChildren(); this.changed(); void this.run(async (access, current) => { const review = value(await this.bridge.openCollection(snapshot.id, item.path, access.revision)); if (!current()) return; this.collection(detail, snapshot, review); this.message("Collection checked. Confirm any changed passages before using them again."); }); }, true);
   }

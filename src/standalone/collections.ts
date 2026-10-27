@@ -64,7 +64,7 @@ export class DesktopCollections {
       if (record.scope === scope && (scope === "allowed" || record.projectPath === selection.project && record.projectIdentity === identity.id)) items.push({ path: entry.path, hash: entry.hash, title: record.title });
     }
     await this.verify(home.index, identity.hashes, current);
-    const value: CollectionsSnapshot = { id: randomUUID(), scope, project: scope === "project" ? selection.project : "", items, coverage: `${items.length} collections found (${Math.min(100, candidates.length)} of ${candidates.length} possible notes checked; ${unavailable} could not be used; ${home.index.coverage.omittedFiles} notes could not be read). Collections from other scopes are not shown. A collection does not let Thread read anything new, and unavailable passages hide their path and text.` };
+    const value: CollectionsSnapshot = { id: randomUUID(), scope, project: scope === "project" ? selection.project : "", items, coverage: `${items.length} collections found (${Math.min(100, candidates.length)} of ${candidates.length} possible notes checked; ${unavailable} could not be used; ${home.index.coverage.omittedFiles} notes skipped (not indexed)). Collections from other scopes are not shown. A collection does not let Thread read anything new, and unavailable passages hide their path and text.` };
     this.context = { value, index: home.index, selection, settings, roles, entries, identity: identity.id ?? "", anchors: identity.hashes }; return structuredClone(value);
   }
   async open(id: unknown, path: unknown, revision: unknown): Promise<CollectionReview> {

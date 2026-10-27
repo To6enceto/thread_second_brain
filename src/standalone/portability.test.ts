@@ -27,7 +27,7 @@ test("package snapshots come only from one chosen ordinary .thread-project.json 
   await writeFile(good, text); await writeFile(join(root, "Notes.json"), text); await writeFile(join(root, "Huge.thread-project.json"), Buffer.alloc(48 * 1048576 + 1));
   await symlink(good, join(root, "Linked.thread-project.json")); await writeFile(join(root, "Copy.thread-project.json"), text); await link(join(root, "Copy.thread-project.json"), join(root, "Hard.thread-project.json"));
   assert.equal(Buffer.from((await readPickedPackage(good, () => {})).bytes).toString(), text);
-  for (const [name, message] of [["Notes.json", /\.thread-project\.json/], ["Huge.thread-project.json", /48 MiB/], ["Linked.thread-project.json", /./], ["Hard.thread-project.json", /single-link/], ["../x.thread-project.json", /./]] as const) await assert.rejects(readPickedPackage(join(root, name), () => {}), message);
+  for (const [name, message] of [["Notes.json", /\.thread-project\.json/], ["Huge.thread-project.json", /48 MiB/], ["Linked.thread-project.json", /./], ["Hard.thread-project.json", /ordinary Thread package file/], ["../x.thread-project.json", /./]] as const) await assert.rejects(readPickedPackage(join(root, name), () => {}), message);
   let calls = 0; await assert.rejects(readPickedPackage(good, () => { if (++calls === 3) appendFileSync(good, " "); }), /changed/);
   for (const name of ["backup 10:30.thread-project.json", "what?.thread-project.json", "Cafe\u0301.thread-project.json"]) { await writeFile(join(root, name), text); await assert.rejects(readPickedPackage(join(root, name), () => {}), /portable name/); }
 });
@@ -39,7 +39,7 @@ test("portability decodes picked packages with the shared validator and refuses 
   const traversal = structuredClone(fixture); traversal.manifest.entries[0]!.path = "../Escape.md";
   const mismatch = structuredClone(fixture); mismatch.manifest.entries[0]!.sha256 = "0".repeat(64);
   for (const [name, body] of [["Malformed", "{not json"], ["Traversal", encode(traversal)], ["Mismatch", encode(mismatch)], ["Version", encode({ ...fixture, schemaVersion: 2 })]] as const) {
-    const path = join(root, `${name}.thread-project.json`); await writeFile(path, body); await assert.rejects(portability.pick(async () => path), /Package refused before any write/);
+    const path = join(root, `${name}.thread-project.json`); await writeFile(path, body); await assert.rejects(portability.pick(async () => path), /Package refused; nothing was written/);
   }
   assert.throws(() => portability.package(summary.token), /again/);
   const slow = portability.pick(async () => { await new Promise(resolve => setTimeout(resolve, 20)); return good; }); portability.invalidate(); await assert.rejects(slow, /changed|canceled/);
@@ -85,7 +85,7 @@ test("desktop export previews permitted project files and granted PDFs, then wri
   await assert.rejects(f.portability.writeExport(again.id, f.info.revision), /already exists/);
   inventory = await f.portability.exportInventory(f.selection, f.info.revision);
   const lower = await f.portability.previewExport(inventory.id, ["Projects/Demo/Notes.md"], "Checkpoints", "demo checkpoint", f.info.revision);
-  await assert.rejects(f.portability.writeExport(lower.id, f.info.revision), /case or Unicode/);
+  await assert.rejects(f.portability.writeExport(lower.id, f.info.revision), /capital letters or accents/);
   for (const [folderName, name] of [["Private", "Leak"], ["Outside", "Leak"], ["../Escape", "Leak"], ["Checkpoints", "../Leak"]]) await assert.rejects(f.portability.previewExport(inventory.id, ["Projects/Demo/Notes.md"], folderName, name, f.info.revision));
   assert.deepEqual(await readFile(join(f.base, "Papers/Paper.pdf")), f.pdf);
   await writeFile(join(f.base, "Projects/Demo/Long.md"), "# Long\n" + "x".repeat(30000)); f.evidence.reset(); const longInventory = await f.portability.exportInventory(f.selection, f.info.revision);
@@ -144,7 +144,7 @@ test("imports create byte-exact new copies under a new unread top-level folder a
   for (const root of ["Projects", "Private", "Papers/Nested", ".Hidden", ""]) await assert.rejects(f.portability.previewImport(summary.token, root, f.info.revision));
   // Errors must be DesktopErrors: plain errors are replaced by the generic IPC failure message.
   await mkdir(join(f.base, "Existing")); await assert.rejects(f.portability.previewImport(summary.token, "Existing", f.info.revision), (error: unknown) => error instanceof DesktopError && /already exists/.test(error.message));
-  await mkdir(join(f.base, "thread import b")); await assert.rejects(f.portability.previewImport(summary.token, "Thread Import B", f.info.revision), /case or Unicode/);
+  await mkdir(join(f.base, "thread import b")); await assert.rejects(f.portability.previewImport(summary.token, "Thread Import B", f.info.revision), /capital letters or accents/);
   const preview = await f.portability.previewImport(summary.token, "Thread Import A", f.info.revision);
   assert.deepEqual(preview.entries.map(entry => entry.path), ["Thread Import A/Projects/Demo/Notes.md", "Thread Import A/Projects/Demo/Overview.md"]); assert.equal(preview.recovery, false);
   const status = await f.portability.applyImport(preview.id, f.info.revision); assert.equal(status.pending, null); assert.equal(status.completed, 1);
@@ -153,17 +153,17 @@ test("imports create byte-exact new copies under a new unread top-level folder a
   summary = (await f.portability.pick(async () => packagePath))!; const second = await f.portability.previewImport(summary.token, "Thread Import C", f.info.revision);
   await mkdir(join(f.base, "Thread Import C")); await assert.rejects(f.portability.applyImport(second.id, f.info.revision), /exists|appeared/);
   f.info = f.reader.grant({ roots: ["."], excluded: [] }, f.info.revision);
-  summary = (await f.portability.pick(async () => packagePath))!; await assert.rejects(f.portability.previewImport(summary.token, "Thread Import D", f.info.revision), /Whole-vault/);
+  summary = (await f.portability.pick(async () => packagePath))!; await assert.rejects(f.portability.previewImport(summary.token, "Thread Import D", f.info.revision), /whole notes folder/);
 });
 
 test("interrupted imports keep partial copies, then recover by continuing or are closed without deleting anything", async t => {
   const f = await vault(t), packagePath = await exported(f, "Interrupted"), otherPath = await exported(f, "Other package"), files = (f.portability as unknown as { files: VaultFiles }).files, original = files.create.bind(files);
   let calls = 0; files.create = async (path, bytes, revision, parents) => { if (++calls === 2) throw Error("Simulated power loss"); return original(path, bytes, revision, parents); };
   let summary = (await f.portability.pick(async () => packagePath))!, preview = await f.portability.previewImport(summary.token, "Thread Import R", f.info.revision);
-  await assert.rejects(f.portability.applyImport(preview.id, f.info.revision), /Partial copies are preserved/);
+  await assert.rejects(f.portability.applyImport(preview.id, f.info.revision), /Copies already made are kept/);
   let status = f.portability.importStatus(f.info.revision); assert.equal(status.pending!.created, 1); assert.equal(status.pending!.total, 2);
   assert.equal(await readFile(join(f.base, "Thread Import R/Projects/Demo/Notes.md"), "utf8"), f.files["Projects/Demo/Notes.md"]);
-  await assert.rejects(f.portability.previewImport((await f.portability.pick(async () => otherPath))!.token, "Other", f.info.revision), /interrupted import is pending/);
+  await assert.rejects(f.portability.previewImport((await f.portability.pick(async () => otherPath))!.token, "Other", f.info.revision), /An import was interrupted/);
   files.create = original; summary = (await f.portability.pick(async () => packagePath))!; preview = await f.portability.previewImport(summary.token, "ignored", f.info.revision);
   assert.equal(preview.recovery, true); assert.equal(preview.root, "Thread Import R");
   status = await f.portability.applyImport(preview.id, f.info.revision); assert.equal(status.pending, null);
@@ -171,5 +171,5 @@ test("interrupted imports keep partial copies, then recover by continuing or are
   calls = 0; files.create = async (path, bytes, revision, parents) => { if (++calls === 2) throw Error("Simulated crash"); return original(path, bytes, revision, parents); };
   summary = (await f.portability.pick(async () => packagePath))!; preview = await f.portability.previewImport(summary.token, "Thread Import L", f.info.revision); await assert.rejects(f.portability.applyImport(preview.id, f.info.revision));
   status = await f.portability.leaveImport(f.info.revision); assert.equal(status.pending, null); assert.ok(await readFile(join(f.base, "Thread Import L/Projects/Demo/Notes.md")));
-  await assert.rejects(f.portability.leaveImport(f.info.revision), /No interrupted import/);
+  await assert.rejects(f.portability.leaveImport(f.info.revision), /no interrupted import/);
 });

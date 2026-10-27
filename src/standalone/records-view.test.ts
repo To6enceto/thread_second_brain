@@ -50,7 +50,7 @@ test("records invalidation restores Refresh and rejects a delayed revoked list",
 test("changed evidence rejects late assessment and disables review preview until renewed", async t => {
   const f = fixture(t); await f.ready(); const mode = f.label("Record action"); mode.value = "decision-review"; mode.fire("change");
   assert.equal(f.button("Preview record action").disabled, true); f.label("Decision to review").value = snapshot.decisions[0]!.path;
-  f.button("Assess selected decision evidence").fire("click"); f.label("Record evidence notes").fire("change");
+  f.button("Ask the AI to compare the decision with these notes").fire("click"); f.label("Supporting notes").fire("change");
   f.assessed.resolve({ ok: true, value: assessment }); await flush();
   assert.equal(f.el("record-assessment").children.length, 0); assert.equal(f.button("Preview record action").disabled, true); assert.equal(f.el("records-refresh").disabled, false);
 });
@@ -67,7 +67,7 @@ test("form edits cancel late proposal navigation and preserve explicit proposed 
 
 test("managed question form sends explicit state, answer and reason to the reviewed proposal path", async t => {
   const f = fixture(t); await f.ready(); const mode = f.label("Record action"); mode.value = "question-update"; mode.fire("change");
-  f.label("Managed question to update").value = snapshot.questions[0]!.path; f.label("Question state").value = "answered";
+  f.label("Question to update").value = snapshot.questions[0]!.path; f.label("Question state").value = "answered";
   f.label("Question answer or working response").value = "User answer"; f.label("Question update reason").value = "Observed result";
   f.button("Preview record action").fire("click"); const command = f.calls.commands[0]!; assert.equal(command.kind, "question-update");
   if (command.kind === "question-update") { assert.equal(command.update.status, "answered"); assert.equal(command.update.answer, "User answer"); assert.equal(command.update.reason, "Observed result"); }

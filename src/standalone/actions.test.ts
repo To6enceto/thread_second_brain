@@ -80,14 +80,14 @@ test("desktop actions start Planned, retain all explicit transitions and change 
   }
   assert.deepEqual(record.history.map(h => h.to), ["planned", "in-progress", "blocked", "done", "planned"]);
   assert.equal(record.history[0]!.sources[0]!.path, "Sources/Research.md"); assert.match(text, /User recorded blocked/);
-  snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, create, f.info.revision), /Target changed/); assert.equal(await f.read(path), text);
+  snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, create, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read(path), text);
 });
 
 test("desktop action board reports stale, edited, duplicate and unsupported records without silently mutating them", async t => {
   const f = await fixture(t); let snapshot = await f.load(); await f.records.prepareAction(snapshot.id, create, f.info.revision); await f.apply(); const original = await f.read(path);
   await f.put("Sources/Research.md", "Changed supporting evidence"); snapshot = await f.load(); assert.equal(snapshot.actions.cards.length, 0); assert.equal(snapshot.actions.unavailable, 1);
   const transition = { kind: "transition", path, state: "done", reason: "Explicit report", day, sources: [] };
-  await assert.rejects(f.records.prepareAction(snapshot.id, transition, f.info.revision), /supported action/); assert.equal(await f.read(path), original);
+  await assert.rejects(f.records.prepareAction(snapshot.id, transition, f.info.revision), /Choose an action from the list/); assert.equal(await f.read(path), original);
   await f.put("Sources/Research.md", "## Method\nCompare citations against original passages.\n"); await f.put(path, original + "User appended text\n"); snapshot = await f.load(); assert.equal(snapshot.actions.cards.length, 0);
   await f.put(path, original); await f.put("Projects/Demo/Duplicate.md", original); snapshot = await f.load(); assert.equal(snapshot.actions.cards.length, 0); assert.equal(snapshot.actions.unavailable, 2);
   await f.put("Projects/Demo/Duplicate.md", "Ordinary note"); await f.put(path, original.replace('thread_action_version: "1"', 'thread_action_version: "99"')); snapshot = await f.load(); assert.equal(snapshot.actions.cards.length, 0);
@@ -102,7 +102,7 @@ test("action IPC validation, canceled reads, permission revocation and external 
   const preparing = f.records.prepareAction(snapshot.id, create, f.info.revision); const rejected = assert.rejects(preparing, /canceled|changed/); await start; f.records.draftChanged(false); release(); await rejected; f.reader.read = read;
   assert.equal(f.changes.snapshot(f.info.revision).pending, null);
   snapshot = await f.load(); await f.records.prepareAction(snapshot.id, create, f.info.revision); await f.apply(); const before = await f.read(path);
-  snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { kind: "transition", path, state: ["done"], reason: "Bad input", day, sources: [] }, f.info.revision), /explicit recorded/);
+  snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { kind: "transition", path, state: ["done"], reason: "Bad input", day, sources: [] }, f.info.revision), /Choose a state for the action/);
   await f.records.prepareAction(snapshot.id, { kind: "transition", path, state: "done", reason: "Reported done", day, sources: [] }, f.info.revision);
   const preview = await f.changes.preview("apply", f.changes.snapshot(f.info.revision).pending!.id, f.info.revision); await f.put(path, before + "External edit preserved"); await assert.rejects(f.changes.confirm(preview.id, f.info.revision)); assert.match(await f.read(path), /External edit preserved/);
   f.reader.grant({ roots: [], excluded: [] }, f.info.revision); f.index.reset(); await assert.rejects(f.records.prepareAction(snapshot.id, create, f.info.revision));
@@ -110,9 +110,9 @@ test("action IPC validation, canceled reads, permission revocation and external 
 
 test("action support refuses ambiguous identities, invalid managed questions and action self-reference", async t => {
   const f = await fixture(t); await f.put("Sources/Question.md", frontmatter({ id: "question", type: "question", thread_question_version: "99", project: "demo", status: "open" }) + "## Question\nUnsupported question\n");
-  let snapshot = await f.load(); assert.ok(!snapshot.evidence.some(e => e.path === "Sources/Question.md")); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, sources: ["Sources/Question.md"] }, f.info.revision), /current evidence notes/);
-  await f.put("Sources/A.md", frontmatter({ id: "same" }) + "Note A"); await f.put("Sources/B.md", frontmatter({ id: "same" }) + "Note B"); snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, sources: ["Sources/A.md"] }, f.info.revision), /unambiguous|current evidence notes/);
-  await f.records.prepareAction(snapshot.id, create, f.info.revision); await f.apply(); snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, name: "Another", sources: [path] }, f.info.revision), /non-action/);
+  let snapshot = await f.load(); assert.ok(!snapshot.evidence.some(e => e.path === "Sources/Question.md")); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, sources: ["Sources/Question.md"] }, f.info.revision), /different supporting notes/);
+  await f.put("Sources/A.md", frontmatter({ id: "same" }) + "Note A"); await f.put("Sources/B.md", frontmatter({ id: "same" }) + "Note B"); snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, sources: ["Sources/A.md"] }, f.info.revision), /not ambiguous|different supporting notes/);
+  await f.records.prepareAction(snapshot.id, create, f.info.revision); await f.apply(); snapshot = await f.load(); await assert.rejects(f.records.prepareAction(snapshot.id, { ...create, name: "Another", sources: [path] }, f.info.revision), /not actions/);
 });
 
 function sessionProvider() {
@@ -146,7 +146,7 @@ test("session uses only explicitly chosen action reports, preserves states and s
   assert.equal(await f.read(path), before); assert.equal(await f.read(otherPath), other);
   snapshot = await f.load(); const collision = await f.records.generateSession(snapshot.id, { name: "Reviewed session", report: "Later report", actions: [] }, f.info.revision);
   assert.equal(collision.actionCount, 0); assert.equal(provider.prompts[1]!.evidence.filter(s => s.noteType === "action").length, 0);
-  await assert.rejects(f.records.prepareSession(collision.id, f.info.revision), /Target changed/); assert.equal(await f.read(draft.path), draft.markdown);
+  await assert.rejects(f.records.prepareSession(collision.id, f.info.revision), /The note changed before the change was prepared/); assert.equal(await f.read(draft.path), draft.markdown);
   const history = f.changes.snapshot(f.info.revision).history.at(-1)!, undo = await f.changes.preview("undo", history.id, f.info.revision); await f.changes.confirm(undo.id, f.info.revision);
   await assert.rejects(f.read(draft.path), { code: "ENOENT" }); assert.equal(await f.read(path), before);
 });
