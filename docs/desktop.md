@@ -8,8 +8,8 @@ recovery, decisions, managed questions, actions, session wrap-up, on-demand
 project reviews, reviewed capture and clip intake, saved research collections,
 cited knowledge synthesis, offline extraction of explicitly granted local PDFs
 with page citations, and portable project checkpoints shared with the plugin.
-Obsidian can stay closed. Desktop packaging is tracked in item 62 of the build
-plan; the existing plugin remains available.
+Obsidian can stay closed, and a packaged local Fedora build is available (see
+**Packaged desktop build**); the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -30,8 +30,8 @@ No sudo, system-wide installation or desktop shortcut is needed.
 
 The development profile lives at `.thread-local/desktop/profile`, separate from
 your vault and the plugin's settings/history. Access grants are held only in memory.
-Closing/restarting or reloading Thread clears them. This is a development preview;
-a distributable installer and persistent setup arrive in later planned features.
+Closing/restarting or reloading Thread clears them. To use Thread without this
+checkout, build the packaged desktop folder described below.
 
 ## Try it now
 
@@ -627,3 +627,46 @@ Limits: 100 files, 2 MiB per text file, 16 MiB per PDF, 32 MiB expanded and
 48 MiB per package; at most 10 PDF originals and 32 MiB of PDFs per export; 100
 recorded imports with one pending at a time. Package hashes prove integrity,
 not that the contents are trustworthy evidence.
+
+## Packaged desktop build
+
+`npm run desktop:package` runs Verify, then writes
+`dist/thread-desktop-<version>-linux-x64.tar.gz` (currently version 0.1.0 with
+Electron 45.0.0). It needs the Electron runtime from `npm run desktop:setup` and
+the system `tar` and `gzip`. The archive is reproducible: packaging the same
+checkout again gives a byte-identical file. The desktop version is set in
+`src/standalone/desktop-release.json` and is separate from the plugin version.
+
+The archive holds one `thread-desktop-<version>/` folder:
+
+- `thread-desktop`: the launcher. It starts the bundled runtime with the packaged
+  app, keeps Chromium's sandbox enabled and refuses to run as root.
+- `runtime/`: the Electron runtime with Thread in `runtime/resources/app`.
+- `licenses/`: Electron and Chromium notices and the license of every bundled
+  package (currently PDF.js and yaml); PDF.js CMap and font licenses ship with the
+  app's `pdf-resources`.
+- `inventory.json`: the SHA-256, size and executable flag of every file.
+- `README.txt` and `thread-desktop.desktop.example`.
+
+To use it, extract the archive into a folder you own and run `./thread-desktop`.
+Nothing is installed: no files outside that folder, no desktop entry and no
+background service. The example `.desktop` file is only a template; copy it into
+`~/.local/share/applications/` yourself after replacing `/path/to` if you want a
+menu entry. Remove the folder to remove the app; notes are never stored there.
+
+The packaged app keeps its profile in Electron's user data folder for "Thread
+Desktop" (normally `~/.config/Thread Desktop`), outside your vaults and this
+repository. Pass `--user-data-dir=PATH` to use a separate profile. Its formats are
+the same as the development build's, so an existing desktop profile keeps its
+preferences, change, save and import history.
+
+Updates are manual: quit Thread, extract the newer folder next to the old one,
+start it and delete the old folder when satisfied. The Obsidian plugin's updater
+accepts only plugin packages and refuses desktop archives. The packaged app works
+fully offline; AI features need a local Ollama on loopback, which is not bundled,
+and neither are model weights. Chromium's sandbox needs unprivileged user
+namespaces, which Fedora enables by default.
+
+Thread itself is UNLICENSED: the packaged build is for local use, and no public
+distribution license is asserted. Linux x64 only; other platforms are not built
+or verified.

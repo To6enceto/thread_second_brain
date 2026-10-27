@@ -23,7 +23,8 @@
     "updater": "node --experimental-strip-types scripts/update-thread.mjs",
     "desktop:build": "node scripts/desktop-build.mjs",
     "desktop:start": "npm run desktop:build && node scripts/desktop-start.mjs",
-    "desktop:setup": "node scripts/desktop-setup.mjs"
+    "desktop:setup": "node scripts/desktop-setup.mjs",
+    "desktop:package": "npm run verify && node --experimental-strip-types scripts/desktop-package.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

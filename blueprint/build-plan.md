@@ -123,7 +123,7 @@ verifiable boundaries; no earlier feature is renumbered.
 
 ## Milestone R - Deliver the independent local application
 
-- [ ] 62. **Desktop packaging and offline acceptance** - Produce a separately versioned local Fedora desktop artifact and launcher instructions, with bundled licenses/assets and clear update compatibility. Verify the full desktop workflow offline, plugin regressions, data preservation and real local inference. Keep installation/publication explicit; do not reuse the plugin updater for desktop binaries. Depends on 49-61.
+- [x] 62. **Desktop packaging and offline acceptance** - Produce a separately versioned local Fedora desktop artifact and launcher instructions, with bundled licenses/assets and clear update compatibility. Verify the full desktop workflow offline, plugin regressions, data preservation and real local inference. Keep installation/publication explicit; do not reuse the plugin updater for desktop binaries. Depends on 49-61.
 
 ## Desktop build discipline
 

@@ -328,6 +328,7 @@ checks do not make the Blueprint unusable.
 - Development watcher: `npm run dev` (rebuilds `main.js`; no web server).
 - Desktop runtime setup: `npm run desktop:setup` (explicit project-local Electron download).
 - Desktop build: `npm run desktop:build`; launch: `npm run desktop:start` (actual standalone window).
+- Desktop package: `npm run desktop:package` (Verify, then reproducible `dist/thread-desktop-<version>-linux-x64.tar.gz`; never installs).
 - Typecheck: `npm run typecheck`.
 - Build: `npm run build` (plugin production bundle plus standalone desktop build).
 - Test: `npm test` (Node's built-in test runner with TypeScript type stripping).

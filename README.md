@@ -8,8 +8,9 @@ change review with guarded undo, decisions, questions, actions, project reviews,
 capture and clip intake, research collections, knowledge synthesis, granted
 local PDF extraction with page citations and portable project checkpoints. Explicit
 writer setup, renewed exact previews and
-durable originals govern every change. Further
-desktop workflows remain in the build plan; the existing plugin is preserved.
+durable originals govern every change. `npm run desktop:package` builds a
+reproducible local Linux folder archive with its own launcher and licenses; the
+existing plugin is preserved.
 See [desktop setup and limits](docs/desktop.md).
 
 Open **Thread: Open full workspace**, then **Actions**, to inspect the current four-column action board. **Refresh action board** rereads permitted records; stale or unsupported records have generic unavailable counts. **Review action** selects a current record in the explicit transition form and does not move it automatically. In **Wrap up**, click **Refresh recorded actions**, select up to five records (none are selected by default), then generate locally. The preview separates those user reports from the model summary; saving the session never changes action statuses. Changing inputs, sources or selections revokes older save previews. Large selections that cannot fit the existing context budget must be reduced explicitly.
