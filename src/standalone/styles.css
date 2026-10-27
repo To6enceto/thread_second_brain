@@ -85,6 +85,12 @@
 .thread-project-controls { border-bottom: 1px solid var(--thread-border); padding-bottom: 20px; }
 .thread-project-controls select { width: 100%; }
 .thread-project-controls > button { margin-top: 12px; }
+.thread-main-actions { margin-top: 12px; }
+.thread-more-tools { margin-top: 14px; }
+.thread-more-tools > summary { cursor: pointer; font-weight: 600; }
+.thread-tool-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.thread-steps { margin: 8px 0 12px; padding-left: 20px; font-size: 13px; }
+.thread-steps li { margin: 4px 0; }
 .thread-project-section { margin: 22px 0; }
 .thread-project-section h3 { font: 20px var(--thread-serif); }
 .thread-project-section .thread-eyebrow { font: 600 11px var(--thread-interface); text-transform: uppercase; }

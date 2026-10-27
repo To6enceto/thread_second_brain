@@ -20,25 +20,25 @@ export class ModelSetup {
   private feedback = document.getElementById("ai-setup-status")!;
   constructor(bridge: DesktopBridge, changed: () => void) {
     this.bridge = bridge; this.changed = changed;
-    this.endpoint.addEventListener("input", () => { this.edit(); this.choices.replaceChildren(new Option("Discover models first", "")); this.choices.disabled = true; this.embeddings.replaceChildren(new Option("Discover models first", "")); this.embeddings.disabled = true; });
+    this.endpoint.addEventListener("input", () => { this.edit(); this.choices.replaceChildren(new Option("Find models first", "")); this.choices.disabled = true; this.embeddings.replaceChildren(new Option("Find models first", "")); this.embeddings.disabled = true; });
     this.embeddings.addEventListener("change", () => this.edit());
     this.choices.addEventListener("change", () => this.edit());
-    this.cancelButton.addEventListener("click", () => { this.epoch++; this.revert(); this.changed(); void this.bridge.cancelAI(); this.busy(false); this.feedback.textContent = "Local checks canceled."; });
+    this.cancelButton.addEventListener("click", () => { this.epoch++; this.revert(); this.changed(); void this.bridge.cancelAI(); this.busy(false); this.feedback.textContent = "Check canceled."; });
     this.discover.addEventListener("click", () => { void this.run(async current => {
       this.dirty = true;
       const result = this.value(await this.bridge.discoverModels(this.endpoint.value)); if (!current()) return;
       const textModels = this.populate(result.models);
-      this.feedback.textContent = `${textModels.length} downloaded text models from ${result.total} listed; ${result.omitted} remote, incompatible, uninspectable or over-limit entries omitted. Choose one explicitly, then Apply AI settings. Capability is not answer quality.`;
-    }, "Checking cloud-disabled local model metadata..."); });
+      this.feedback.textContent = `Found ${textModels.length} text models you can use (${result.omitted} of ${result.total} listed were skipped because they are online-only, unsuitable or too large to check). Pick one, then choose Use this model. Working does not guarantee good answers.`;
+    }, "Looking for downloaded models on this computer..."); });
     this.apply.addEventListener("click", () => { void this.run(async current => {
       this.configurations++; this.unconfirmed = null;
       const settings = this.value(await this.bridge.configureAI({ endpoint: this.endpoint.value, model: this.choices.value })); if (!current()) return;
       this.saved = settings; this.dirty = false;
-      this.feedback.textContent = settings.model ? `Applied ${settings.model} for this session. Test the local connection, then Resume project.` : "Recorded-only Resume selected. No model will be used.";
-    }, "Applying local AI settings..."); });
+      this.feedback.textContent = settings.model ? `Using ${settings.model} for now. Choose Test connection, then Resume project.` : "No model selected. Resume shows what your notes say, without AI.";
+    }, "Setting up the model..."); });
     this.check.addEventListener("click", () => { void this.run(async current => {
       const result = this.value(await this.bridge.checkAI()); if (current()) this.feedback.textContent = result;
-    }, "Testing local completion capability and cloud-disabled status..."); });
+    }, "Testing the model and checking that cloud features are off..."); });
   }
   /** Rechecks remembered settings; the model becomes usable only after discovery, apply and the connection test pass. */
   restore(input: { endpoint: string; model: string; embeddingModel: string }): Promise<void> {
@@ -47,7 +47,7 @@ export class ModelSetup {
       try {
         const result = this.value(await this.bridge.discoverModels(input.endpoint)); if (!current()) return;
         const textModels = this.populate(result.models);
-        if (input.model && !textModels.some(model => model.name === input.model)) throw Error(`The saved model ${input.model} is not among the downloaded local text models.`);
+        if (input.model && !textModels.some(model => model.name === input.model)) throw Error(`The saved model ${input.model} is no longer downloaded on this computer.`);
         const embedding = !input.embeddingModel || result.models.some(model => model.embedding && model.name === input.embeddingModel);
         this.choices.value = input.model; this.embeddings.value = embedding ? input.embeddingModel : "";
         const serial = ++this.configurations, settings = this.value(await this.bridge.configureAI({ endpoint: input.endpoint, model: input.model }));
@@ -55,35 +55,35 @@ export class ModelSetup {
         if (!current()) return this.revert();
         const check = settings.model ? this.value(await this.bridge.checkAI()) : ""; if (!current()) return this.revert();
         this.unconfirmed = null; this.saved = settings; this.dirty = false;
-        this.feedback.textContent = `${settings.model ? `Saved AI rechecked: ${settings.model}. ${check}` : "Saved setting: recorded-only Resume, no model."}${embedding ? "" : ` The saved embedding model ${input.embeddingModel} is unavailable, so Ask uses keyword search.`}`;
+        this.feedback.textContent = `${settings.model ? `Saved AI rechecked: ${settings.model}. ${check}` : "Saved setting: no AI model."}${embedding ? "" : ` The saved search model ${input.embeddingModel} is not available, so Ask searches by keywords.`}`;
       } catch (error) {
         // Main must not keep a model the recheck rejected; other workflows read its configuration.
         this.revert();
-        throw Error(`${error instanceof Error ? error.message : "Local AI could not be checked."} Thread is working without AI until you set it up again.`);
+        throw Error(`${error instanceof Error ? error.message : "The AI model could not be checked."} Thread is working without AI until you set it up again.`);
       }
-    }, "Rechecking the saved local AI model...");
+    }, "Checking your saved AI model again...");
   }
   draft(): { endpoint: string; model: string; embeddingModel: string } { return { endpoint: this.endpoint.value, model: this.choices.value, embeddingModel: this.embeddings.value }; }
   restoreDraft(input: { endpoint: string; model: string; embeddingModel: string }): void {
     this.reset(); this.changed(); this.endpoint.value = input.endpoint;
-    this.choices.replaceChildren(new Option("Recorded only (no model)", ""), ...(input.model ? [new Option(input.model, input.model)] : []));
+    this.choices.replaceChildren(new Option("No model (notes only)", ""), ...(input.model ? [new Option(input.model, input.model)] : []));
     this.embeddings.replaceChildren(new Option("Keyword only", ""), ...(input.embeddingModel ? [new Option(input.embeddingModel, input.embeddingModel)] : []));
     this.choices.value = input.model; this.embeddings.value = input.embeddingModel; this.choices.disabled = false; this.embeddings.disabled = false;
-    this.feedback.textContent = "Restored preference drafts only. Find downloaded models to check availability, then explicitly choose and Apply AI settings. No inference or read grant started.";
+    this.feedback.textContent = "Saved settings filled in. Choose Find downloaded models, pick the model and choose Use this model. Nothing else started.";
   }
   embeddingModel(): string { return this.dirty ? "" : this.embeddings.value; }
   model(): string { return this.dirty ? "" : this.saved.model; }
   reset(): void {
     this.epoch++; this.configurations++; this.unconfirmed = null; this.saved = { endpoint: "http://127.0.0.1:11434", model: "" }; this.dirty = true;
-    this.endpoint.value = this.saved.endpoint; this.choices.replaceChildren(new Option("Discover models first", "")); this.choices.disabled = true;
-    this.embeddings.replaceChildren(new Option("Discover models first", "")); this.embeddings.disabled = true;
-    this.busy(false); this.feedback.textContent = "Optional. Recorded context works without an AI model.";
+    this.endpoint.value = this.saved.endpoint; this.choices.replaceChildren(new Option("Find models first", "")); this.choices.disabled = true;
+    this.embeddings.replaceChildren(new Option("Find models first", "")); this.embeddings.disabled = true;
+    this.busy(false); this.feedback.textContent = "Optional. Everything else works without AI.";
   }
   private populate(models: { name: string; completion: boolean; embedding: boolean }[]): { name: string }[] {
     const textModels = models.filter(model => model.completion);
-    this.choices.replaceChildren(new Option("Recorded only (no model)", ""), ...textModels.map(model => new Option(model.name, model.name)));
+    this.choices.replaceChildren(new Option("No model (notes only)", ""), ...textModels.map(model => new Option(model.name, model.name)));
     this.choices.disabled = false;
-    this.embeddings.replaceChildren(new Option("Keyword only (no embedding model)", ""), ...models.filter(model => model.embedding).map(model => new Option(model.name, model.name)));
+    this.embeddings.replaceChildren(new Option("None (keyword search only)", ""), ...models.filter(model => model.embedding).map(model => new Option(model.name, model.name)));
     this.embeddings.disabled = false;
     return textModels;
   }
@@ -96,12 +96,12 @@ export class ModelSetup {
   private busy(active: boolean): void { this.discover.disabled = active; this.apply.disabled = active; this.check.disabled = active || this.dirty || !this.saved.model; this.cancelButton.disabled = !active; }
   private edit(): void {
     this.epoch++; this.dirty = true; this.changed(); void this.bridge.cancelAI(); this.busy(false);
-    this.feedback.textContent = "Draft changed. Apply AI settings before using the model. Recorded-only Resume remains available.";
+    this.feedback.textContent = "Settings changed. Choose Use this model before using it. Resume still works without AI.";
   }
   private async run(work: (current: () => boolean) => Promise<void>, message: string): Promise<void> {
     const epoch = ++this.epoch; this.changed(); this.busy(true); this.feedback.textContent = message;
     try { await work(() => epoch === this.epoch); }
-    catch (error) { if (epoch === this.epoch) this.feedback.textContent = error instanceof Error ? error.message : "Local setup failed. Check Ollama and retry."; }
+    catch (error) { if (epoch === this.epoch) this.feedback.textContent = error instanceof Error ? error.message : "AI setup did not finish. Check that Ollama is running and try again."; }
     finally { if (epoch === this.epoch) this.busy(false); }
   }
 }

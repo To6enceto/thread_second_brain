@@ -49,8 +49,8 @@ export class SavedAccessView {
     warning.textContent = status.warning; warning.hidden = !status.warning;
     const lines = saved ? [
       `Folder: ${saved.name} (${saved.path})`,
-      `Allowed paths: ${saved.scope.roots.join(", ")}`,
-      `Excluded paths: ${saved.scope.excluded.length ? saved.scope.excluded.join(", ") : "none"}`,
+      `Thread may read: ${saved.scope.roots.join(", ")}`,
+      `Kept private: ${saved.scope.excluded.length ? saved.scope.excluded.join(", ") : "none"}`,
       `Projects folder: ${saved.projectsFolder || "not saved"}`,
       `Local AI: ${saved.ai.model ? `${saved.ai.model} at ${saved.ai.endpoint}, checked again when you continue` : "not used"}`,
       ...(saved.ai.embeddingModel ? [`Embedding model: ${saved.ai.embeddingModel}`] : []),

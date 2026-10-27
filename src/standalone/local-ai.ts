@@ -10,14 +10,14 @@ import { DesktopError } from "./security.ts";
 
 const RESPONSE_LIMIT = 2 * 1024 * 1024;
 function endpoint(value: unknown): string {
-  if (typeof value !== "string" || value.length > 200) throw new DesktopError("Enter a local Ollama loopback URL.");
-  try { return localEndpoint(value); } catch { throw new DesktopError("Use an HTTP loopback URL such as http://127.0.0.1:11434, without paths or credentials."); }
+  if (typeof value !== "string" || value.length > 200) throw new DesktopError("Enter the Ollama address on this computer.");
+  try { return localEndpoint(value); } catch { throw new DesktopError("Enter an address on this computer such as http://127.0.0.1:11434, with nothing after the port."); }
 }
 function config(value: unknown): AIConfig {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Review the local AI settings.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Check the AI settings.");
   const data = value as Record<string, unknown>;
-  if (Object.keys(data).sort().join(",") !== "endpoint,model" || typeof data.model !== "string" || data.model.length > 200 || /[\s\u0000-\u001f]/.test(data.model)) throw new DesktopError("Choose an exact downloaded text model name, or leave it empty for recorded-only Resume.");
-  if (/(?:[:/-])cloud(?:$|[:/])/i.test(data.model)) throw new DesktopError("Cloud models are outside Thread's local-only mode.");
+  if (Object.keys(data).sort().join(",") !== "endpoint,model" || typeof data.model !== "string" || data.model.length > 200 || /[\s\u0000-\u001f]/.test(data.model)) throw new DesktopError("Choose a model from the list, or choose No model.");
+  if (/(?:[:/-])cloud(?:$|[:/])/i.test(data.model)) throw new DesktopError("Online (cloud) models are not allowed. Thread only uses models on this computer.");
   return { endpoint: endpoint(data.endpoint), model: data.model };
 }
 
@@ -53,10 +53,10 @@ export class DesktopAI {
     const current = (): void => { signal.throwIfAborted(); if (epoch !== this.epoch) throw new DOMException("Canceled", "AbortError"); };
     try { const result = await work(signal, current); current(); return result; }
     catch (error) {
-      if (timeout.aborted) throw new DesktopError("Local AI took too long. Try a smaller downloaded model and retry.");
-      if (signal.aborted || epoch !== this.epoch) throw new DesktopError("Local AI canceled.");
-      if (error instanceof SyntaxError) throw new DesktopError("Ollama returned malformed JSON. Check its local version or choose another model.");
-      throw error instanceof DesktopError ? error : new DesktopError(error instanceof Error ? error.message : "Local AI could not finish. Check the local connection and model.");
+      if (timeout.aborted) throw new DesktopError("The AI took too long. Try a smaller model.");
+      if (signal.aborted || epoch !== this.epoch) throw new DesktopError("AI canceled.");
+      if (error instanceof SyntaxError) throw new DesktopError("Ollama returned an answer Thread could not understand. Update Ollama or choose another model.");
+      throw error instanceof DesktopError ? error : new DesktopError(error instanceof Error ? error.message : "The AI could not finish. Check that Ollama is running and the model is available.");
     } finally { if (this.controller === controller) this.controller = null; }
   }
   private client(url: string, signal: AbortSignal, current: () => void, beforeContext?: () => Promise<void>): OllamaClient {
@@ -66,13 +66,13 @@ export class DesktopAI {
       const response = await this.fetcher(input, { ...options, signal: AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])]) });
       current();
       if (!response.ok) { await response.body?.cancel(); return new Response(null, { status: response.status }); }
-      const reader = response.body?.getReader(); if (!reader) throw new DesktopError("Ollama returned an empty response.");
+      const reader = response.body?.getReader(); if (!reader) throw new DesktopError("Ollama returned nothing. Try again or choose another model.");
       const parts: Uint8Array[] = []; let bytes = 0;
       try {
         while (true) {
           current(); const chunk = await reader.read(); current(); if (chunk.done) break;
           bytes += chunk.value.byteLength;
-          if (bytes > RESPONSE_LIMIT) throw new DesktopError("Ollama response exceeded the 2 MiB local limit. Choose another model or narrow the context.");
+          if (bytes > RESPONSE_LIMIT) throw new DesktopError("Ollama's answer was larger than 2 MiB. Choose another model.");
           parts.push(chunk.value);
         }
       } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
@@ -86,7 +86,7 @@ export class DesktopAI {
   }
   async check(): Promise<string> {
     const settings = { ...this.configuration };
-    return this.operation(async (signal, current) => { await this.client(settings.endpoint, signal, current).check(settings.model, signal); return "Text model available; local completion capability confirmed and cloud features disabled."; });
+    return this.operation(async (signal, current) => { await this.client(settings.endpoint, signal, current).check(settings.model, signal); return "Connection works: the model is available and cloud features are off."; });
   }
   async prepare(input: unknown, revision: unknown): Promise<PreparedResume> {
     this.forget();
@@ -97,13 +97,13 @@ export class DesktopAI {
   }
   async interpret(identity: unknown, revision: unknown): Promise<AIInterpretation> {
     const recorded = this.prepared, settings = { ...this.configuration };
-    if (typeof identity !== "string" || !recorded || identity !== recorded.briefingId || revision !== recorded.revision) throw new DesktopError("Recorded briefing changed. Resume the project again.");
-    if (!settings.model) throw new DesktopError("Choose a downloaded text model for optional AI interpretation.");
+    if (typeof identity !== "string" || !recorded || identity !== recorded.briefingId || revision !== recorded.revision) throw new DesktopError("Your notes changed. Choose Resume project again.");
+    if (!settings.model) throw new DesktopError("Choose a downloaded model to get AI suggestions.");
     return this.operation(async (signal, current) => {
-      const guard = (): void => { current(); this.evidence.assertCurrent(recorded.index); if (this.prepared !== recorded) throw new DesktopError("Recorded briefing changed. Resume again."); };
+      const guard = (): void => { current(); this.evidence.assertCurrent(recorded.index); if (this.prepared !== recorded) throw new DesktopError("Your notes changed. Choose Resume project again."); };
       const verify = async (): Promise<void> => { guard(); await this.projects.assertCurrent(recorded); guard(); };
       await verify();
-      if (!recorded.bundle.sources.length) throw new DesktopError("No eligible project passages. Recorded gaps remain available; check your notes and read access.");
+      if (!recorded.bundle.sources.length) throw new DesktopError("No project notes could be used. Check your notes and what Thread may read.");
       const raw = await this.client(settings.endpoint, signal, guard, verify).generate(settings.model, briefingPrompt(recorded.home!.project, recorded.bundle), signal);
       guard(); const model = validateBriefing(raw, recorded.bundle); await verify();
       const result = composeBriefing(recorded.recorded, model);

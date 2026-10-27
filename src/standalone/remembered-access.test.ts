@@ -67,7 +67,7 @@ test("an unreadable saved file is reported, never used, and Forget removes only 
   for (const bad of ["not json", JSON.stringify({ ...saved, grants: ["."] }), JSON.stringify({ ...saved, saved: { ...saved.saved, scope: { roots: ["../.."], excluded: [] } } }), JSON.stringify({ ...saved, saved: { ...saved.saved, path: "relative/vault" } })]) {
     await writeFile(f.file, bad); const reopened = new RememberedAccess(f.profile), status = await reopened.load();
     assert.equal(status.saved, null); assert.match(status.warning, /could not be read/);
-    await assert.rejects(reopened.open(new VaultReader()), /No saved access/);
+    await assert.rejects(reopened.open(new VaultReader()), /There is no saved access/);
     await assert.rejects(reopened.remember(f.reader, ai, "", "", f.granted.revision), /Forget the unreadable/);
   }
   const reopened = new RememberedAccess(f.profile); await reopened.load();

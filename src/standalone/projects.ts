@@ -11,10 +11,10 @@ import type { ProjectRequest, ProjectSnapshot, RecordedSnapshot } from "./contra
 import { DesktopError, relativePath } from "./security.ts";
 
 function request(value: unknown): ProjectRequest {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Choose a projects folder and project.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Choose a project.");
   const data = value as Record<string, unknown>;
-  if (Object.keys(data).sort().join(",") !== "folder,project" || typeof data.folder !== "string" || typeof data.project !== "string") throw new DesktopError("Invalid project selection.");
-  for (const path of [data.folder, data.project]) if (path && relativePath(path) === ".") throw new DesktopError("Map a named project folder. Root-level projects are not supported yet.");
+  if (Object.keys(data).sort().join(",") !== "folder,project" || typeof data.folder !== "string" || typeof data.project !== "string") throw new DesktopError("Choose a project from the list.");
+  for (const path of [data.folder, data.project]) if (path && relativePath(path) === ".") throw new DesktopError("Enter a named projects folder. Projects at the top of the notes folder are not supported yet.");
   return { folder: data.folder, project: data.project };
 }
 
@@ -29,7 +29,7 @@ export class DesktopProjects {
     const settings = { ...defaultSettings(), ...this.evidence.scope() };
     settings.roles.projects = selection.folder;
     const projects = permittedProjects(this.evidence.index, settings);
-    if (selection.project && !projects.includes(selection.project)) throw new DesktopError("Project unavailable in the current read scope. Refresh projects and choose again.");
+    if (selection.project && !projects.includes(selection.project)) throw new DesktopError("This project is not in the folders Thread may read. Refresh projects and choose again.");
     settings.selectedProject = selection.project;
     return { revision: snapshot.revision, generation: snapshot.generation, projects,
       home: selection.project ? projectHome(this.evidence.index, settings) : null, index: snapshot };
@@ -41,14 +41,14 @@ export class DesktopProjects {
     for (const [path, hash] of Object.entries(recorded.bundle.noteHashes)) {
       this.evidence.assertCurrent(snapshot);
       const file = snapshot.listing.files[path] ?? snapshot.listing.pdfs[path];
-      if (!file || await this.reader.currentHash(path, snapshot.revision, undefined, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Supporting source changed. Resume again.");
+      if (!file || await this.reader.currentHash(path, snapshot.revision, undefined, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("A note used here changed. Choose Resume project again.");
     }
     await this.evidence.refresh(snapshot.revision);
     this.evidence.assertCurrent(snapshot);
   }
   async resume(input: unknown, revision: unknown, now = Date.now()): Promise<RecordedSnapshot> {
     const selection = request(input), home = await this.home(selection, revision);
-    if (!home.home) throw new DesktopError("Choose a permitted project before Resume.");
+    if (!home.home) throw new DesktopError("Choose a project first.");
     const snapshot = home.index, scope = this.evidence.scope();
     const entries = this.evidence.index.projectEntries(scope, selection.project);
     const graph = this.evidence.index.graph(scope), notes: SourceNote[] = [];
@@ -58,7 +58,7 @@ export class DesktopProjects {
       Object.assign(hashes, graph.assess(entry.path).dependencies, { [entry.path]: entry.hash });
       const note = await this.reader.read(entry.path, revision, snapshot.listing.files[entry.path]!.bytes);
       this.evidence.assertCurrent(snapshot);
-      if (await contentHash(note.text) !== entry.hash) throw new DesktopError("Source changed. Refresh and Resume again.");
+      if (await contentHash(note.text) !== entry.hash) throw new DesktopError("A note changed. Choose Resume project again.");
       notes.push({ ...note, ...await projectedSource(note.text, entry), metadata: entry.metadata, fullHash: entry.hash });
     }
     const bundle = await buildEvidence(notes, now);
@@ -66,8 +66,8 @@ export class DesktopProjects {
     for (const [path, hash] of Object.entries(hashes)) {
       this.evidence.assertCurrent(snapshot);
       const file = snapshot.listing.files[path] ?? snapshot.listing.pdfs[path];
-      if (!file) throw new DesktopError("Supporting source unavailable. Refresh and Resume again.");
-      if (await this.reader.currentHash(path, revision, undefined, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("Supporting source changed. Refresh and Resume again.");
+      if (!file) throw new DesktopError("A note used here is no longer available. Choose Resume project again.");
+      if (await this.reader.currentHash(path, revision, undefined, Math.min(file.bytes, READ_LIMITS.bytes)) !== hash) throw new DesktopError("A note used here changed. Choose Resume project again.");
     }
     await this.evidence.refresh(revision);
     this.evidence.assertCurrent(snapshot);

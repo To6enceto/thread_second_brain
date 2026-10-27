@@ -235,7 +235,7 @@ export class AskView {
   }
   private renderSave(output: HTMLElement, prepared: AskSnapshot, answer: AskAnswer): void {
     const section = add(output, "section", "", "thread-record-card"); add(section, "h3", "Save a new reviewed note");
-    add(section, "p", "Enable writing in Desktop storage first. Preview the exact destination and Markdown; Save refuses overwrites. Unapplied corrections block saving. Pending receipts remain in Desktop storage after an interruption.", "thread-muted");
+    add(section, "p", "Allow saving notes under Saving notes first. Preview the exact destination and Markdown; Save refuses overwrites. Unapplied corrections block saving. Unfinished saves stay listed under Saving notes after an interruption.", "thread-muted");
     const label = add(section, "label", "New note name"), name = add(label, "input"); name.id = "ask-save-name"; name.maxLength = 100;
     name.value = `Answer ${new Date().toISOString().slice(0, 10)}`;
     const kindLabel = add(section, "label", "Save format"), kind = add(kindLabel, "select"); kind.id = "ask-save-kind";
@@ -260,7 +260,7 @@ export class AskView {
         if (!current(request)) return;
         previewId = result.id; add(previewArea, "p", result.path, "thread-source-chip"); add(previewArea, "pre", result.content); save.dataset.limit = "false";
         this.feedback.textContent = "Exact new-note preview ready. Review every byte and the destination before Save.";
-      } catch (error) { if (current(request)) this.feedback.textContent = error instanceof Error ? error.message : "Preview unavailable. Inspect Desktop storage."; }
+      } catch (error) { if (current(request)) this.feedback.textContent = error instanceof Error ? error.message : "Preview unavailable. Look under Saving notes."; }
       finally { if (epoch === this.epoch) this.setBusy(false); }
     })(); });
     save.addEventListener("click", () => { void (async () => {
@@ -268,8 +268,8 @@ export class AskView {
       const request = token, epoch = this.epoch; this.setBusy(true); this.feedback.textContent = "Recording intent and saving the exact new note...";
       try {
         const result = value(await this.bridge.saveAskPreview(previewId, prepared.index.revision));
-        if (current(request)) { revoke(); this.feedback.textContent = `Saved ${result.path}. Desktop storage retains the receipt. Refresh projects to include the new note.`; }
-      } catch (error) { if (current(request)) { revoke(); this.feedback.textContent = error instanceof Error ? error.message : "Save unconfirmed. Inspect Desktop storage recovery."; } }
+        if (current(request)) { revoke(); this.feedback.textContent = `Saved ${result.path}. Its save record is kept under Saving notes. Refresh projects to include the new note.`; }
+      } catch (error) { if (current(request)) { revoke(); this.feedback.textContent = error instanceof Error ? error.message : "Save not confirmed. Look at the unfinished save under Saving notes."; } }
       finally { if (epoch === this.epoch) this.setBusy(false); }
     })(); });
   }

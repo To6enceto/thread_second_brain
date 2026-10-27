@@ -34,7 +34,7 @@ test("desktop index reuses unchanged notes, ranks sections, and revokes changed/
   const changed = await f.index.refresh(f.info.revision);
   assert.equal(changed.coverage.filesRead, 1); assert.equal(changed.reused, 1);
   await f.put("P/A.md", "## Budget\nThe orchid budget is now 30 euros.");
-  await assert.rejects(f.index.source(old.path, f.info.revision, old.hash), /Source changed/);
+  await assert.rejects(f.index.source(old.path, f.info.revision, old.hash), /note changed/);
   await rename(join(f.root, "P/A.md"), join(f.root, "P/Renamed.md"));
   assert.equal((await f.index.search("orchid", f.info.revision)).hits[0]!.path, "P/Renamed.md");
   await rm(join(f.root, "P/Renamed.md"));
@@ -50,7 +50,7 @@ test("desktop scope reset, cancellation and malformed metadata cannot expose cac
   assert.equal(first.invalid, 1); assert.equal(first.coverage.omittedFiles, 1);
   assert.equal((await f.index.search("secret", f.info.revision)).hits.length, 0);
   f.index.cancel(f.info.revision);
-  await assert.rejects(f.index.search("orchid", f.info.revision), /paused/);
+  await assert.rejects(f.index.search("orchid", f.info.revision), /stopped reading notes/i);
   await f.index.refresh(f.info.revision, true);
   const pending = f.index.refresh(f.info.revision);
   f.reader.grant({ roots: [], excluded: [] }, f.info.revision); f.index.reset();
@@ -70,7 +70,7 @@ test("desktop index keeps shortened-section coverage and omits oversized files",
   assert.equal(snapshot.coverage.sizeSkips, 1); assert.equal(snapshot.coverage.omittedFiles, 1);
   assert.equal(snapshot.coverage.shortenedNotes, 1);
   assert.equal((await f.index.search("rareorchid", f.info.revision)).hits[0]!.heading, "Target");
-  await assert.rejects(f.index.search('"unclosed', f.info.revision), /Invalid search/);
+  await assert.rejects(f.index.search('"unclosed', f.info.revision), /Check the search/);
 });
 
 test("desktop cached derived output loses evidence eligibility when its source changes or is excluded", async t => {
@@ -124,7 +124,7 @@ test("desktop malformed link and long-heading indexing do not delay cancellation
   assert.ok(await canceled < 1500, "a 100ms cancel timer must not wait seconds for malformed links");
   await indexed;
   assert.equal(f.index.index.ready, false); assert.equal(f.index.index.entries.length, 0);
-  await assert.rejects(f.index.search("anything", f.info.revision), /paused/);
+  await assert.rejects(f.index.search("anything", f.info.revision), /stopped reading notes/i);
   }
 });
 

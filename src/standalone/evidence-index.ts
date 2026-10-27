@@ -47,15 +47,15 @@ export class EvidenceIndex {
   }
   cancel(revision: unknown): void {
     this.requireRevision(revision); this.reset(); this.paused = true;
-    this.notify({ revision: revision as number, generation: this.generation, kind: "invalidated", message: "Indexing canceled. Refresh to resume monitoring." });
+    this.notify({ revision: revision as number, generation: this.generation, kind: "invalidated", message: "Stopped reading notes. Thread will not notice changes until you choose Refresh." });
   }
   private requireRevision(revision: unknown): number {
-    if (!Number.isSafeInteger(revision) || this.reader.getInfo()?.revision !== revision) throw new DesktopError("Vault or access changed. Refresh before using evidence.");
+    if (!Number.isSafeInteger(revision) || this.reader.getInfo()?.revision !== revision) throw new DesktopError("The folder or what Thread may read changed. Choose Refresh first.");
     return revision as number;
   }
   assertCurrent(snapshot: IndexSnapshot): void {
     this.requireRevision(snapshot.revision);
-    if (this.paused || !this.index.ready || snapshot.generation !== this.generation) throw new DesktopError("Evidence changed or was canceled. Refresh and try again.");
+    if (this.paused || !this.index.ready || snapshot.generation !== this.generation) throw new DesktopError("Your notes changed or reading was stopped. Choose Refresh and try again.");
   }
   scope(): ReadScope & { pdfPaths: string[] } {
     const info = this.reader.getInfo(), pdfPaths = (info?.pdfs ?? []).filter(path => this.listing?.pdfs[path] !== undefined);
@@ -65,7 +65,7 @@ export class EvidenceIndex {
   async refresh(revision: unknown, resume = false): Promise<IndexSnapshot> {
     const rev = this.requireRevision(revision);
     if (resume) this.paused = false;
-    if (this.paused) throw new DesktopError("Indexing is paused. Choose Refresh to resume.");
+    if (this.paused) throw new DesktopError("Thread stopped reading notes. Choose Refresh to continue.");
     if (this.task) return this.task;
     const epoch = this.epoch, controller = new AbortController(); this.controller = controller;
     const current = (): void => {
@@ -78,7 +78,7 @@ export class EvidenceIndex {
     catch (error) {
       if (epoch === this.epoch) {
         this.reset(); this.paused = true;
-        this.notify({ revision: rev, generation: this.generation, kind: "invalidated", message: "Index unavailable. Refresh or select the vault again." });
+        this.notify({ revision: rev, generation: this.generation, kind: "invalidated", message: "Thread could not read your notes. Choose Refresh, or choose the folder again." });
       }
       throw error;
     } finally { if (this.task === task) this.task = null; }
@@ -91,7 +91,7 @@ export class EvidenceIndex {
     if (this.signature === signature && this.snapshot) return this.snapshot;
     const generation = ++this.generation;
     this.index.clear(); this.snapshot = null;
-    this.notify({ revision, generation, kind: "invalidated", message: "Sources changed. Rebuilding affected evidence..." });
+    this.notify({ revision, generation, kind: "invalidated", message: "Some notes changed. Updating..." });
     this.listing = listing;
     const next = new Map<string, { stamp: string; entry: IndexEntry }>(), entries: IndexEntry[] = [];
     let admittedBytes = 0, rawBytesRead = 0, filesRead = 0, sizeSkips = 0, readBudgetSkips = 0, invalid = 0, reused = 0;
@@ -109,7 +109,7 @@ export class EvidenceIndex {
         else {
           const note = await this.reader.read(path, revision, file.bytes); current();
           rawBytesRead += file.bytes; filesRead++;
-          if (note.stamp !== file.stamp) throw new DesktopError("Source changed while indexing.");
+          if (note.stamp !== file.stamp) throw new DesktopError("A note changed while Thread was reading it.");
           entry = await indexNote({ ...note, metadata: metadata(note.text) }, () => null, { budget, signal }); current();
         }
         const links = [...new Set((entry.linkTexts ?? []).flatMap(target => {
@@ -124,7 +124,7 @@ export class EvidenceIndex {
         }
         next.set(path, { stamp: file.stamp, entry }); entries.push(entry);
       } catch { current(); invalid++; }
-      this.notify({ revision, generation, kind: "progress", message: `Indexing ${position + 1} of ${listing.paths.length} listed notes.` });
+      this.notify({ revision, generation, kind: "progress", message: `Reading note ${position + 1} of ${listing.paths.length}...` });
     }
     current();
     const retained = retainIndexEntries(entries, new Set(listing.paths), budget);
@@ -139,36 +139,36 @@ export class EvidenceIndex {
     const changed = pdfEntries.filter(entry => { const hash = this.index.binaries.get(entry.pdf!.path); return hash !== undefined && hash !== entry.pdf!.hash; }).length;
     const snapshot: IndexSnapshot = { revision, generation, listing, coverage: this.index.coverage, invalid, reused, ...(pdfEntries.length ? { pdfChecks: `${pdfEntries.length} extracted PDF sources; ${ungranted} need an explicit PDF grant; ${changed} have a changed original and stay out of evidence until re-extracted. ${pdfChecks.summary}` } : {}) };
     this.snapshot = snapshot;
-    this.notify({ revision, generation, kind: "ready", message: "Index ready. Keyword search works without an AI model.", snapshot });
+    this.notify({ revision, generation, kind: "ready", message: "Notes ready. Search works without AI.", snapshot });
     return snapshot;
   }
   async search(query: unknown, revision: unknown): Promise<SearchSnapshot> {
-    if (typeof query !== "string" || query.length > 1000 || !query.trim()) throw new DesktopError("Enter a search query of 1 to 1000 characters.");
+    if (typeof query !== "string" || query.length > 1000 || !query.trim()) throw new DesktopError("Enter 1 to 1000 characters to search.");
     const snapshot = await this.refresh(revision), generation = this.generation;
     let result;
     try { result = this.index.search(query, this.scope(), null, {}, 20); }
-    catch { throw new DesktopError("Invalid search. Close quoted phrases and use at most eight phrases."); }
+    catch { throw new DesktopError("Check the search: close each quoted phrase, and use at most eight."); }
     this.requireRevision(revision);
-    if (generation !== this.generation) throw new DesktopError("Sources changed. Search again.");
+    if (generation !== this.generation) throw new DesktopError("Notes changed. Search again.");
     return { ...snapshot, hits: result.hits.map(hit => ({ path: hit.entry.path, hash: hit.entry.hash, heading: hit.heading, excerpt: hit.excerpt })),
       coverageText: searchCoverageText({ ...result.coverage, indexOmittedNotes: snapshot.coverage.omittedFiles }) +
         (snapshot.listing.identityIncomplete ? " Markdown enumeration is incomplete; these file counts cover known files only. Stable-ID uniqueness is unproven and identity-dependent output cannot be reused." : "") };
   }
   async source(path: unknown, revision: unknown, expectedHash: unknown): Promise<NoteSnapshot & { generation: number }> {
-    if (expectedHash !== undefined && (typeof expectedHash !== "string" || !/^[a-f0-9]{64}$/.test(expectedHash))) throw new DesktopError("Invalid source reference. Search again.");
+    if (expectedHash !== undefined && (typeof expectedHash !== "string" || !/^[a-f0-9]{64}$/.test(expectedHash))) throw new DesktopError("This result is no longer valid. Search again.");
     await this.refresh(revision); const generation = this.generation;
     // Evidence and page citations into extracted PDF text require the consented original to match the extraction.
     const pdf = expectedHash === undefined ? undefined : this.index.entries.find(entry => entry.path === path)?.pdf;
     if (pdf && (this.index.binaries.get(pdf.path) !== pdf.hash || await this.reader.currentHash(pdf.path, revision).catch(() => "") !== pdf.hash)) throw new DesktopError("The original PDF changed, moved or is no longer granted. Grant it again or extract a new source; the saved extraction is unchanged.");
     const note = await this.reader.read(path, revision);
     const hash = await contentHash(note.text); this.requireRevision(revision);
-    if (generation !== this.generation || expectedHash !== undefined && hash !== expectedHash) throw new DesktopError("Source changed. Search again before opening this evidence.");
+    if (generation !== this.generation || expectedHash !== undefined && hash !== expectedHash) throw new DesktopError("This note changed since the search. Search again to open it.");
     return { ...note, generation };
   }
   async resolve(from: unknown, target: unknown, revision: unknown): Promise<ReturnType<typeof resolveLink>> {
-    if (typeof from !== "string" || typeof target !== "string") throw new DesktopError("Invalid note link.");
+    if (typeof from !== "string" || typeof target !== "string") throw new DesktopError("This link could not be followed.");
     const snapshot = await this.refresh(revision);
-    if (!snapshot.listing.paths.includes(from)) throw new DesktopError("The source is outside the current permitted list.");
+    if (!snapshot.listing.paths.includes(from)) throw new DesktopError("Thread is not allowed to read this note.");
     return resolveLink(from, target, snapshot.listing.paths);
   }
 }

@@ -51,9 +51,9 @@ test("desktop home maps permitted projects without granting access and records d
 test("desktop project requests reject malformed/out-of-scope selections, revocation and paused work", async t => {
   const f = await fixture(t);
   for (const input of [{ folder: "../Projects", project: "" }, { folder: ".", project: "" }, { folder: "Projects", project: "Projects/Private" }, { folder: "Projects", project: "Projects/A", extra: true }]) await assert.rejects(f.projects.home(input, f.info.revision));
-  await assert.rejects(f.projects.resume({ folder: "Projects", project: "" }, f.info.revision), /Choose a permitted project/);
+  await assert.rejects(f.projects.resume({ folder: "Projects", project: "" }, f.info.revision), /Choose a project/);
   f.index.cancel(f.info.revision);
-  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /paused/);
+  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /stopped reading notes/i);
   await f.index.refresh(f.info.revision, true);
   f.reader.grant({ roots: [], excluded: [] }, f.info.revision); f.index.reset();
   await assert.rejects(f.projects.resume(f.selection, f.info.revision));
@@ -79,5 +79,5 @@ test("desktop Resume omits stale derived records and rejects edits/cancellation 
   await assert.rejects(f.projects.resume(f.selection, f.info.revision), /changed/);
   f.reader.read = original; await f.index.refresh(f.info.revision);
   f.reader.read = async (...args) => { const result = await original(...args); f.index.cancel(f.info.revision); return result; };
-  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /canceled/);
+  await assert.rejects(f.projects.resume(f.selection, f.info.revision), /canceled|stopped/);
 });

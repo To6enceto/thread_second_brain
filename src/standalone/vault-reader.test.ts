@@ -22,7 +22,7 @@ async function fixture(run: (reader: VaultReader, root: string, base: string) =>
 test("desktop selection grants nothing; approved scope excludes private and plugin data and preserves bytes", async () => fixture(async (reader, root) => {
   let info = await reader.select(root);
   assert.deepEqual((await reader.list(info.revision)).paths, []);
-  await assert.rejects(reader.read("Projects/Overview.md", info.revision), /outside/);
+  await assert.rejects(reader.read("Projects/Overview.md", info.revision), /not allowed to read|outside/);
   info = reader.grant({ roots: ["Projects", "Projects/Private"], excluded: ["Projects/Private"] }, info.revision);
   assert.deepEqual((await reader.list(info.revision)).paths, ["Projects/Overview.md"]);
   const note = await reader.read("Projects/Overview.md", info.revision);

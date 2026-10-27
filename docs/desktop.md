@@ -38,15 +38,16 @@ described below.
 
 1. Choose **Choose vault folder** and select a folder containing your Markdown
    notes. This selection alone grants no content access.
-2. In **Allowed paths**, enter a vault-relative folder such as `Projects` (or a
-   particular note such as `Projects/Example/Overview.md`). Put any private paths
-   in **Excluded paths**, one per line.
-3. Inspect **Access after approval**, then choose **Approve read access**.
+2. In **Folders Thread may read**, enter a folder such as `Projects`, written from
+   the top of your notes folder (or a particular note such as
+   `Projects/Example/Overview.md`). Put any private folders in **Keep private**, one
+   per line.
+3. Check **What Thread will read**, then choose **Approve read access**.
    Use `.` only when you explicitly intend to grant the entire vault. Hidden
    folders, including `.obsidian`, remain unavailable; exclusions take precedence.
-4. Choose a listed note, or enter keywords or a quoted phrase in **Search note
-   contents** and choose **Search evidence**. A result opens its current source
-   near the cited heading. **Filter listed paths** filters names, not note text.
+4. Choose a listed note, or enter keywords or a quoted phrase in **Search inside
+   your notes** and choose **Search**. A result opens its current source near the
+   cited heading. **Find a note by name** filters names, not note text.
 5. The formatted preview supports headings, simple emphasis, lists, quotes, code
    and internal wiki/Markdown links. HTML and embeds stay inert; no remote assets
    are loaded. Expand **Original Markdown source** to inspect the literal text.
@@ -54,8 +55,9 @@ described below.
 6. External changes are checked every 2.5 seconds and before search/navigation.
    Changed sources clear old visible evidence and invalidate dependent outputs.
    Reopen or search again to see replacements. **Refresh** explicitly reconciles;
-   **Cancel indexing** clears evidence and pauses monitoring until Refresh.
-7. Clear Allowed paths and approve, or choose **Close vault and clear access**.
+   **Stop reading notes** clears evidence and pauses monitoring until Refresh.
+7. Clear Folders Thread may read and approve, or choose **Close this folder and
+   clear access**.
    The old source and list disappear. No note or plugin history is changed.
 
 Use **Appearance** for light/dark/system. All controls support keyboard navigation;
@@ -94,7 +96,7 @@ An unreadable saved file is never used; Thread shows a warning and Forget remove
   to inspect other notes; the path filter searches only the returned list.
 - The index uses the conservative profile: at most 1 MiB per admitted note, 8 MiB
   admitted raw text, 60,000 characters and 60 chunks per note, and 2 MiB serialized
-  entries. Basic Search evidence returns at most 20 balanced passages; Ask offers explicit
+  entries. Basic Search returns at most 20 balanced passages; Ask offers explicit
   larger finite budgets described below. Coverage reports omitted
   notes and shortened sections; it does not establish exhaustive vault coverage.
 - YAML 1.2 metadata uses the bundled ISC-licensed yaml parser. Invalid, duplicate,
@@ -141,7 +143,7 @@ existing section budget.
 
 After read access is approved, choose **Refresh projects**. Notes with `type:
 project` discover their containing project folder. For existing Overview.md notes
-without that metadata, expand **Project folder mapping**, enter `Projects` (or your
+without that metadata, expand **Where are your projects?**, enter `Projects` (or your
 own named folder), then **Refresh projects**. This only organizes already permitted
 notes; it never grants access. Root-level projects are not supported in this milestone.
 
@@ -158,10 +160,10 @@ visible; generated records with stale or unavailable dependencies are withheld.
 Plugin pending reviews are not loaded. Project membership follows existing schema:
 folder contents, explicit links from those notes, and matching project IDs.
 
-External edits, access changes and Cancel indexing clear the project output too.
+External edits, access changes and Stop reading notes clear the project output too.
 Refresh projects and select again to rebuild it. Source bytes/dependencies are
 checked before publication and citation navigation. Mapping and selection clear on
-vault change/reload. Desktop preference drafts can be restored explicitly as described
+vault change/reload. Saved desktop settings can be restored explicitly as described
 below; read grants and live model selection are never restored automatically.
 
 ## Optional local AI
@@ -169,10 +171,10 @@ below; read grants and live model selection are never restored automatically.
 1. Start your existing Ollama runtime with cloud disabled (`OLLAMA_NO_CLOUD=1`).
    Download a free text model separately if needed. Thread never starts services,
    downloads models, uses a hosted fallback or selects one automatically.
-2. Expand **Optional local AI** in Thread's left sidebar. Enter the loopback
-   endpoint for your runtime, normally `http://127.0.0.1:11434`.
-3. Choose **Find downloaded models**, select a compatible text model, then
-   **Apply AI settings** and **Test local connection**. Discovery inspects at most
+2. Expand **Optional local AI** in Thread's left sidebar. Enter the **Ollama
+   address** for your runtime, normally `http://127.0.0.1:11434`.
+3. Choose **Find downloaded models**, select a compatible **Model**, then
+   **Use this model** and **Test connection**. Discovery inspects at most
    40 entries and checks local capability, not answer quality. The isolated test
    model is `qwen3:4b-instruct`; your installed model names may differ.
 4. Choose **Resume project**. Recorded context appears first. If an applied model
@@ -181,7 +183,7 @@ below; read grants and live model selection are never restored automatically.
    recorded facts or any notes.
 5. **Cancel AI interpretation** stops the optional inference while keeping the
    current recorded context. Model/setup edits clear AI output; apply the draft
-   before using it. **Recorded only (no model)** disables automatic interpretation.
+   before using it. **No model (notes only)** disables automatic interpretation.
 
 Connection failure, malformed output or cancellation leaves still-current recorded
 context available. Changing projects/read access, external edits or vault closure
@@ -190,8 +192,8 @@ transmission after model checks and after generation. Renderer content cannot
 supply arbitrary prompts or network URLs. Operations are bounded to 180 seconds
 and provider responses to 2 MiB; try a smaller model if these limits are reached.
 
-Active model setup resets on vault change/reload. Saved preference drafts require
-explicit restoration and Apply AI settings. Selecting a model never
+Active model setup resets on vault change/reload unless you continue with saved
+access. Saved settings require explicit restoration and Use this model. Selecting a model never
 grants note access. Cloud status must be explicitly disabled and a fully local
 completion capability confirmed; remote aliases and enabled/unknown cloud status
 are refused. The downloaded runtime/model work offline once installed, with no
@@ -221,7 +223,7 @@ account, subscription or hosted API cost.
    metadata calls immediately before transmission, and after generation.
 
 For optional hybrid search, use **Find downloaded models**, explicitly select an
-**Optional embedding model**, then **Apply AI settings**. Choose **Hybrid (local
+**Search model (optional)**, then **Use this model**. Choose **Hybrid (local
 embeddings)** in Ask. Text and embedding models are separate choices; the tested
 local embedding model is `qwen3-embedding:0.6b`. Model discovery never selects or
 downloads one automatically. Hybrid sends a bounded set of current permitted
@@ -256,28 +258,28 @@ Source/project/model/scope changes invalidate it. Reload does not resume inferen
 
 ## Enable reviewed desktop saves
 
-1. Close the Obsidian process and other editors of this vault. Open **Desktop
-   storage and writing** in Vault settings. Read the compatibility consent text,
-   enter the actual Obsidian configuration folder (normally `.obsidian`), then
-   **Read plugin settings and recovery files**. This explicitly reads only Thread's manifest,
+1. Close the Obsidian process and other editors of this vault. Open **Saving
+   notes** in the left sidebar. Read the steps and **Details**, enter the actual
+   **Obsidian settings folder** (normally `.obsidian`), then **Check the Obsidian
+   plugin's files**. This explicitly reads only Thread's manifest,
    settings, changes and project-import journals, up to 40 MiB. Stored originals
    may include formerly permitted content. They are never indexed or sent to AI.
 2. An installed plugin must be the compatible Thread 0.4.2 build. Unsupported,
-   malformed or unresolved plugin journals block desktop writing; resolve them in
+   malformed or unresolved plugin journals block saving notes; resolve them in
    the compatible plugin and close Obsidian first. An absent plugin is allowed.
    Inspecting the wrong configuration folder cannot certify another installation.
-3. Choose **Enable desktop writing**. The compatible plugin and desktop use a
+3. Choose **Allow saving notes**. The compatible plugin and desktop use a
    kernel-held exclusive writer handle for the same vault filesystem identity.
    The plugin retains it until its Obsidian process exits, including after plugin
    disable, to cover pending operations. Desktop releases after its operation
    settles on close or explicit release. Coordination requires the same Linux
    host, user and network namespace; isolated containers/Flatpak namespaces and
    unrelated editors are not covered. Keep them closed during saves.
-4. Optionally **Copy previewed plugin preferences and history** after inspecting the exact
-   copy. This saves preference drafts and a separate immutable history snapshot;
+4. Optionally **Copy settings and history from the plugin** after inspecting the
+   exact copy. This saves settings and a separate immutable history snapshot;
    plugin files/live journals, read grants and PDF consent never migrate. **Use
-   preference drafts** still requires explicit Apply AI settings and project refresh.
-   **Save desktop preferences** retains the current model drafts and folder roles;
+   saved settings** still requires explicit Use this model and project refresh.
+   **Save these settings** retains the current model choices and folder roles;
    neither action grants reads. All-permitted-notes saves require a mapped Knowledge
    folder and separate read permission for that destination.
 
@@ -298,14 +300,14 @@ ordinary destination subfolders are created only after Save. **Save exact new no
 creates exclusively; existing files, case/normalization collisions, links, changed
 sources/choices/corrections or revoked access are refused. Saves are bounded to 1 MiB.
 The Markdown uses the same answer/conversation schemas as the plugin. Open it in
-Obsidian normally after releasing desktop writing; transcripts do not become
+Obsidian normally after choosing Stop saving notes; transcripts do not become
 source evidence or resume a conversation automatically.
 
 Before any vault creation, a durable receipt stores the exact intended bytes in
 the separate desktop profile. Confirmed bytes mark it complete. Interrupted or
 unconfirmed saves keep their pending receipt and block further note saves. Reopen
 Thread, select the vault, explicitly restore read grants and writer ownership,
-then **Refresh desktop state** and **Inspect pending save**. Review the intended
+then **Refresh** under Saving notes and **Look at unfinished save**. Review the intended
 bytes and whether the current file matches. **Confirm completed save** is available
 only for matching bytes; it does not prove which process created those bytes.
 **Keep files and close recovery** acknowledges the unresolved result while retaining
@@ -318,8 +320,8 @@ is claimed. Existing-note changes use the separate reviewed flow below.
 
 ## Review existing-note changes and recovery
 
-1. Enable desktop writing as above. In **Folder preference drafts**, map the
-   existing Projects or another writable role, then **Save desktop preferences**.
+1. Allow saving notes as above. In **Where Thread saves each kind of note**, map the
+   existing Projects or another writable role, then **Save these settings**.
    This mapping never grants reads; the target must also be inside current allowed
    paths and outside exclusions.
 2. Open a current note and choose **Propose body change**. Edit the body and choose
@@ -347,7 +349,7 @@ blocks writing without resetting files. Pending changes/recovery block ordinary
 new-note saves; pending new-note receipts block note updates.
 
 After interruption, select the vault again, explicitly approve read access, inspect
-plugin compatibility and enable writing. **Review changes > Inspect recovery**
+plugin compatibility and allow saving notes. **Review changes > Inspect recovery**
 shows the exact intended restore and current content. **Restore reviewed recovery**
 rechecks every target and preserves conflicting later edits. If the current note
 matches neither known version, automatic restore is unavailable: compare the retained
@@ -370,7 +372,7 @@ current permitted notes. The expandable list opens original decisions/questions;
 status is recorded metadata, never model acceptance. Index/identity limits may
 require a narrower explicit scope before record changes are available.
 
-Enable writing and map Projects as described above before preparing proposals.
+Allow saving notes and map Projects as described above before preparing proposals.
 Every action opens **Review changes**. Use **Preview pending change**, inspect the
 exact before/after and diff, then choose **Apply exact change** or **Reject
 proposal**. Preparing or assessing never changes a note. The same guarded Undo
@@ -611,7 +613,7 @@ Choose **Project portability** with a selected project. Packages use the same
 `.thread-project.json` format as the Obsidian plugin, so checkpoints move both
 ways. A checkpoint is a selected project package, not a full vault backup or a
 change journal. Settings, caches, journals, models and plugin data are never
-included. Exports and imports need desktop writing (see **Enable reviewed
+included. Exports and imports need saving allowed (see **Enable reviewed
 desktop saves**).
 
 - **Export a checkpoint:** tick the current permitted project files to include.

@@ -19,7 +19,7 @@ test("exclusive desktop writer preserves collisions, aliases, scope and exact UT
   await assert.rejects(writer.inspect("Projects/Answers/cafe\u0301.md", info.revision), /already exists/);
   for (const bad of ["Projects/Private/X.md", "Elsewhere/X.md", "../X.md", "Projects/.obsidian/X.md", "Projects/X.js"]) await assert.rejects(writer.inspect(bad, info.revision));
   await symlink(join(root, "Projects/Answers"), join(root, "Projects/Linked")); await assert.rejects(writer.inspect("Projects/Linked/X.md", info.revision), /link/);
-  await link(join(root, path), join(root, "Projects/Hard.md")); await assert.rejects(writer.inspect("Projects/Hard.md", info.revision), /single-link/);
+  await link(join(root, path), join(root, "Projects/Hard.md")); await assert.rejects(writer.inspect("Projects/Hard.md", info.revision), /ordinary Markdown notes/);
 });
 
 test("reviewed existing-note updates preserve exact UTF-8, shorten content and conditionally undo creations", async t => {

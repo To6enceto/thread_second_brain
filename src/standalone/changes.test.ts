@@ -76,10 +76,10 @@ test("late edit preparation cannot restore a revoked draft and protected provena
 
 test("pending changes block ordinary saves and pending save receipts block change operations", async t => {
   const f = await fixture(t); await f.changes.propose([{ path: f.path, before: f.before, after: "reviewed" }], [], f.info.revision);
-  await assert.rejects(f.storage.owned(f.info.revision, async () => "must not run"), /pending changes/);
+  await assert.rejects(f.storage.owned(f.info.revision, async () => "must not run"), /unfinished changes/);
   await f.changes.reject(f.changes.snapshot(f.info.revision).pending!.id, f.info.revision);
   await f.storage.owned(f.info.revision, async (profile, current) => { await profile.store({ ...profile.state, saves: [{ id: "unfinished", path: "Projects/New.md", content: "intended", hash: hashText("intended"), createdAt: new Date().toISOString(), status: "pending" }] }, current); });
-  await assert.rejects(f.changes.propose([{ path: f.path, before: f.before, after: "reviewed" }], [], f.info.revision), /pending new-note/);
+  await assert.rejects(f.changes.propose([{ path: f.path, before: f.before, after: "reviewed" }], [], f.info.revision), /unfinished saves/);
   assert.equal(await readFile(join(f.vault, f.path), "utf8"), f.before);
 });
 

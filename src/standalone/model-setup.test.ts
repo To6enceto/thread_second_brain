@@ -48,7 +48,7 @@ test("an unavailable runtime, missing model or failed connection test leaves Thr
   assert.deepEqual(failed.calls.configured, [{ endpoint: saved.endpoint, model: saved.model }, { endpoint: saved.endpoint, model: "" }]);
   const unlisted = fixture(t, { listed: [models[1]!] }); await unlisted.setup.restore(saved); assert.deepEqual(unlisted.calls.configured, []);
   const f = fixture(t, { listed: [models[0]!] }); await f.setup.restore(saved);
-  assert.equal(f.setup.model(), saved.model); assert.equal(f.setup.embeddingModel(), ""); assert.match(f.el("ai-setup-status").textContent, /nomic-embed-text is unavailable, so Ask uses keyword search\./);
+  assert.equal(f.setup.model(), saved.model); assert.equal(f.setup.embeddingModel(), ""); assert.match(f.el("ai-setup-status").textContent, /nomic-embed-text is not available, so Ask searches by keywords\./);
 });
 
 test("Cancel or a superseded recheck returns main to recorded-only, but never undoes a newer explicit Apply", async t => {

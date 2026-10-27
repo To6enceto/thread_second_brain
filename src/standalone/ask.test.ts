@@ -195,7 +195,7 @@ test("desktop correction and follow-up identities reject invalid input and stale
   for (const question of ["", ["question"], "x".repeat(1001)]) await assert.rejects(f.ask.continue(answer.id, question, f.info.revision));
   await writeFile(join(f.root, "Projects/Demo/Overview.md"), f.notes["Projects/Demo/Overview.md"] + "\nExternal edit");
   const requestsBeforeEdit = f.p.calls.length;
-  await assert.rejects(f.ask.correct(answer.id, 0, "changed", "interpretation", f.info.revision), /Local AI canceled/);
+  await assert.rejects(f.ask.correct(answer.id, 0, "changed", "interpretation", f.info.revision), /AI canceled/);
   await assert.rejects(f.ask.continue(answer.id, "Next", f.info.revision), /Answer or correction changed/);
   assert.equal(f.p.calls.length, requestsBeforeEdit);
   const second = await f.ask.retrieve(options, f.info.revision), chosen = await f.ask.choose(second.id, {}, f.info.revision), fresh = await f.ask.generate(chosen.id, f.info.revision);
@@ -264,10 +264,10 @@ test("desktop interrupted receipt survives restart, blocks further saves and res
   await mkdir(join(f.root, "Projects/Demo/Answers"));
   const preview = await f.saves.prepare(f.answer.id, "answer", "Interrupted", [1], revision);
   await chmod(join(f.root, "Projects/Demo/Answers"), 0o500);
-  try { await assert.rejects(f.saves.save(preview.id, revision), /pending recovery/); }
+  try { await assert.rejects(f.saves.save(preview.id, revision), /unfinished save/); }
   finally { await chmod(join(f.root, "Projects/Demo/Answers"), 0o700); }
   const pending = f.storage.status(revision).saves[0]!; assert.equal(pending.status, "pending");
-  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "Another", [1], revision), /pending/);
+  await assert.rejects(f.saves.prepare(f.answer.id, "answer", "Another", [1], revision), /resolve unfinished saves/);
   await f.storage.close(); const restarted = new DesktopStorage(f.reader, f.profile); t.after(() => restarted.close());
   await restarted.initialize(revision); const compatibility = await restarted.inspect(".obsidian", revision); await restarted.enable(compatibility.id, revision);
   const saves = new DesktopSaves(f.reader, restarted, f.ask), recovery = await saves.inspectRecovery(pending.id, revision);

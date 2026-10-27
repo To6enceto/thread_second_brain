@@ -18,7 +18,7 @@ export interface PdfOriginal { path: string; bytes: Uint8Array; hash: string; st
 // Directory-relative descriptors prevent a parent rename/symlink swap from
 // redirecting a later open outside the selected root on the supported Linux host.
 export async function absoluteDirectory(path: string): Promise<FileHandle> {
-  if (!isAbsolute(path) || normalize(path) !== path || path.includes("\0")) throw new DesktopError("Choose an ordinary absolute directory.");
+  if (!isAbsolute(path) || normalize(path) !== path || path.includes("\0")) throw new DesktopError("Choose an ordinary folder.");
   let handle = await open("/", directoryFlags);
   try {
     for (const part of path.split("/").filter(Boolean)) {
@@ -43,7 +43,7 @@ export class VaultReader {
     const root = await absoluteDirectory(path);
     try {
       const stat = await root.stat();
-      if (epoch !== this.revision) throw new DesktopError("Vault selection changed. Select the vault again.");
+      if (epoch !== this.revision) throw new DesktopError("The folder choice changed. Choose the folder again.");
       this.selection = { path, dev: stat.dev, ino: stat.ino, revision: ++this.revision, scope: { roots: [], excluded: [] }, pdfs: [] };
       return this.getInfo()!;
     } finally { await root.close(); }
@@ -75,7 +75,7 @@ export class VaultReader {
   }
   private current(revision: unknown): Selection {
     if (!this.selection || !Number.isSafeInteger(revision) || revision !== this.selection.revision) {
-      throw new DesktopError("Vault or read access changed. Refresh before reading.");
+      throw new DesktopError("The folder or what Thread may read changed. Choose Refresh and try again.");
     }
     return this.selection;
   }
@@ -84,7 +84,7 @@ export class VaultReader {
     const root = await absoluteDirectory(selected.path);
     const stat = await root.stat();
     if (stat.dev !== selected.dev || stat.ino !== selected.ino) {
-      await root.close(); throw new DesktopError("The selected vault was replaced. Select it again and review access.");
+      await root.close(); throw new DesktopError("This notes folder was replaced by a different folder. Choose it again and approve access.");
     }
     return root;
   }
@@ -108,25 +108,25 @@ export class VaultReader {
   }
   /** Explicit metadata consent only; never added to the text index or read grants. */
   async pluginFiles(input: unknown, revision: unknown): Promise<Record<string, string | null>> {
-    if (typeof input !== "string" || !/^[.]?[A-Za-z0-9_-]{1,100}$/.test(input)) throw new DesktopError("Use a single ordinary Obsidian configuration folder name, such as .obsidian.");
+    if (typeof input !== "string" || !/^[.]?[A-Za-z0-9_-]{1,100}$/.test(input)) throw new DesktopError("Enter just the Obsidian settings folder name, such as .obsidian.");
     const selected = this.current(revision), base = `${input}/plugins/thread`, files: Record<string, string | null> = {};
     let total = 0;
     for (const [name, limit] of [["manifest.json", 65536], ["data.json", 1048576], ["changes.json", 24 * 1048576], ["project-imports.json", 16 * 1048576]] as const) {
       const path = `${base}/${name}`;
-      if (selected.scope.excluded.some(root => root === "." || path === root || path.startsWith(`${root}/`))) throw new DesktopError("Plugin metadata is excluded. Review exclusions explicitly before compatibility inspection.");
+      if (selected.scope.excluded.some(root => root === "." || path === root || path.startsWith(`${root}/`))) throw new DesktopError("The Obsidian settings folder is listed under Keep private. Remove it there before checking the plugin's files.");
       let file: FileHandle;
       try { file = await this.openPath(selected, path); }
-      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { files[name] = null; continue; } throw new DesktopError("Plugin metadata is unavailable or uses a link. Preserve it; writing remains disabled."); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") { files[name] = null; continue; } throw new DesktopError("The plugin's files could not be read safely (not an ordinary file, a link, or not permitted). Leave them as they are; saving stays off."); }
       try {
         const before = await file.stat();
-        if (!before.isFile() || before.nlink !== 1 || before.size > limit) throw new DesktopError("Plugin metadata exceeds its ordinary-file budget. Preserve it; writing remains disabled.");
+        if (!before.isFile() || before.nlink !== 1 || before.size > limit) throw new DesktopError("A plugin file is too large or not an ordinary file. Leave it as it is; saving stays off.");
         const buffer = Buffer.alloc(before.size + 1); let count = 0;
         while (count < buffer.length) { this.current(revision); const part = await file.read(buffer, count, buffer.length - count, count); if (!part.bytesRead) break; count += part.bytesRead; }
         const after = await file.stat(), current = await this.openPath(selected, path);
         let actual; try { actual = await current.stat(); } finally { await current.close(); }
-        if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("Plugin metadata changed. Inspect compatibility again.");
+        if (count !== before.size || stamp(after) !== stamp(before) || stamp(actual) !== stamp(before)) throw new DesktopError("The plugin's files changed during the check. Check again.");
         this.current(revision); total += count;
-        if (total > 40 * 1048576) throw new DesktopError("Plugin metadata exceeds the 40 MiB inspection budget.");
+        if (total > 40 * 1048576) throw new DesktopError("The plugin's files are larger than the 40 MiB Thread checks. Saving stays off.");
         files[name] = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, count));
       } finally { await file.close(); }
     }
@@ -200,11 +200,11 @@ export class VaultReader {
   async read(input: unknown, revision: unknown, byteLimit: number = READ_LIMITS.bytes): Promise<NoteSnapshot> {
     if (!Number.isSafeInteger(byteLimit) || byteLimit < 0 || byteLimit > READ_LIMITS.bytes) throw new DesktopError("Invalid read budget.");
     const path = relativePath(input), selected = this.current(revision);
-    if (!path.toLowerCase().endsWith(".md") || !permitted(path, selected.scope)) throw new DesktopError("This Markdown note is outside the approved read scope.");
+    if (!path.toLowerCase().endsWith(".md") || !permitted(path, selected.scope)) throw new DesktopError("Thread is not allowed to read this note. Check What Thread may read.");
     const handle = await this.openPath(selected, path);
     try {
       const before = await handle.stat();
-      if (!before.isFile() || before.nlink !== 1 || before.size > byteLimit) throw new DesktopError("Only ordinary single-link Markdown files within the read budget (at most 2 MiB) can be read.");
+      if (!before.isFile() || before.nlink !== 1 || before.size > byteLimit) throw new DesktopError("Thread can only open ordinary Markdown notes of up to 2 MiB.");
       const buffer = Buffer.alloc(byteLimit + 1);
       let count = 0;
       while (count < buffer.length) {
@@ -218,13 +218,13 @@ export class VaultReader {
       let actual;
       try { actual = await current.stat(); } finally { await current.close(); }
       if (count > byteLimit || count !== before.size || [after, actual].some(stat => stat.dev !== before.dev || stat.ino !== before.ino || stat.nlink !== 1 || stat.size !== before.size || stat.mtimeMs !== before.mtimeMs || stat.ctimeMs !== before.ctimeMs)) {
-        throw new DesktopError("The source changed while reading. Refresh and open it again.");
+        throw new DesktopError("The note changed while Thread was reading it. Open it again.");
       }
       this.current(selected.revision);
       let text: string;
       // A leading BOM is part of the original snapshot and its conflict hash.
       try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, count)); }
-      catch { throw new DesktopError("This note is not valid UTF-8 text."); }
+      catch { throw new DesktopError("This note is not readable text (it is not UTF-8)."); }
       return { revision: selected.revision, path, text, modifiedAt: after.mtimeMs, stamp: stamp(after) };
     } finally { await handle.close(); }
   }

@@ -12,12 +12,12 @@ const MAX_BYTES = 64 * 1024;
 const UNREADABLE = "Saved access could not be read, so Thread is not using it. Choose your vault folder as usual, or forget saved access to remove the unreadable file.";
 
 function fields(input: unknown, keys: string): Record<string, unknown> {
-  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).sort().join(",") !== keys.split(",").sort().join(",")) throw new DesktopError("Saved access has unknown or missing fields.");
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).sort().join(",") !== keys.split(",").sort().join(",")) throw new DesktopError("The saved access file has unexpected content.");
   return input as Record<string, unknown>;
 }
 function projectsFolder(value: unknown): string {
   if (value === "") return "";
-  if (relativePath(value) === ".") throw new DesktopError("Map a named project folder. Root-level projects are not supported yet.");
+  if (relativePath(value) === ".") throw new DesktopError("Enter a named projects folder. Projects at the top of the notes folder are not supported yet.");
   return value as string;
 }
 function savedAI(value: unknown): SavedAI {
@@ -27,14 +27,14 @@ function savedAI(value: unknown): SavedAI {
 }
 export function accessState(input: unknown): AccessState {
   const data = fields(input, "schemaVersion,saved");
-  if (data.schemaVersion !== 1) throw new DesktopError("Saved access uses an unknown version.");
+  if (data.schemaVersion !== 1) throw new DesktopError("The saved access file is from an unknown version.");
   if (data.saved === null) return { schemaVersion: 1, saved: null };
   const saved = fields(data.saved, "path,identity,scope,projectsFolder,ai,savedAt");
-  if (typeof saved.path !== "string" || saved.path.length > 4096 || !isAbsolute(saved.path) || normalize(saved.path) !== saved.path || saved.path.includes("\0")) throw new DesktopError("Saved access has an invalid folder.");
-  if (typeof saved.identity !== "string" || !/^[a-f0-9]{64}$/.test(saved.identity)) throw new DesktopError("Saved access has an invalid folder identity.");
-  if (typeof saved.savedAt !== "string" || !Number.isFinite(Date.parse(saved.savedAt)) || new Date(saved.savedAt).toISOString() !== saved.savedAt) throw new DesktopError("Saved access has an invalid date.");
+  if (typeof saved.path !== "string" || saved.path.length > 4096 || !isAbsolute(saved.path) || normalize(saved.path) !== saved.path || saved.path.includes("\0")) throw new DesktopError("The saved access file names an invalid folder.");
+  if (typeof saved.identity !== "string" || !/^[a-f0-9]{64}$/.test(saved.identity)) throw new DesktopError("The saved access file has an invalid folder check.");
+  if (typeof saved.savedAt !== "string" || !Number.isFinite(Date.parse(saved.savedAt)) || new Date(saved.savedAt).toISOString() !== saved.savedAt) throw new DesktopError("The saved access file has an invalid date.");
   const scope = scopeInput(saved.scope);
-  if (!scope.roots.length) throw new DesktopError("Saved access has no read roots.");
+  if (!scope.roots.length) throw new DesktopError("The saved access file lists no folders to read.");
   return { schemaVersion: 1, saved: { path: saved.path, identity: saved.identity, scope, projectsFolder: projectsFolder(saved.projectsFolder), ai: savedAI(saved.ai), savedAt: saved.savedAt } };
 }
 
@@ -53,10 +53,10 @@ export class RememberedAccess {
   }
   /** Saves main-held scope and identity; the renderer supplies only the mapping and embedding name. */
   async remember(reader: VaultReader, ai: AIConfig, folder: unknown, embeddingModel: unknown, revision: unknown): Promise<SavedAccessStatus> {
-    if (this.warning) throw new DesktopError("Forget the unreadable saved access before remembering this vault.");
+    if (this.warning) throw new DesktopError("Forget the unreadable saved access first, then remember this folder.");
     const info = reader.getInfo();
     if (!info || info.revision !== revision) throw new DesktopError("Access changed. Approve read access again, then remember it.");
-    if (!info.scope.roots.length) throw new DesktopError("Approve read access before remembering it.");
+    if (!info.scope.roots.length) throw new DesktopError("Approve read access first, then remember it.");
     const identity = await reader.identity(revision);
     const state = accessState({ schemaVersion: 1, saved: { path: info.path, identity, scope: info.scope, projectsFolder: folder, ai: { endpoint: ai.endpoint, model: ai.model, embeddingModel }, savedAt: new Date().toISOString() } });
     try { await this.file.store(state, () => { if (reader.getInfo()?.revision !== revision) throw new DesktopError("Access changed. Approve read access again, then remember it."); }); }
@@ -72,7 +72,7 @@ export class RememberedAccess {
   /** Reopens the saved folder only if it is still the same directory, then grants exactly the saved scope. */
   async open(reader: VaultReader): Promise<ContinuedAccess> {
     const saved = this.warning ? null : this.file.state.saved;
-    if (!saved) throw new DesktopError("No saved access is available. Choose your vault folder.");
+    if (!saved) throw new DesktopError("There is no saved access. Choose your notes folder.");
     let identity = "", revision = 0;
     try { revision = (await reader.select(saved.path)).revision; identity = await reader.identity(revision); }
     catch { reader.close(); throw new DesktopError(`The saved folder is not available at ${saved.path}. Reconnect it and continue again, choose the folder again, or forget saved access.`); }

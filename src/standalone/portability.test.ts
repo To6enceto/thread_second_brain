@@ -102,7 +102,7 @@ test("desktop export refuses changed sources between preview and write and cance
   await assert.rejects(pending, /changed|canceled|aborted/i);
   await f.storage.release(); inventory = await f.portability.exportInventory(f.selection, f.info.revision);
   const unowned = await f.portability.previewExport(inventory.id, ["Projects/Demo/Notes.md"], "Checkpoints", "Unowned", f.info.revision);
-  await assert.rejects(f.portability.writeExport(unowned.id, f.info.revision), /Enable writing|compatibility/);
+  await assert.rejects(f.portability.writeExport(unowned.id, f.info.revision), /allow saving|plugin's files/);
 });
 
 async function exported(f: Awaited<ReturnType<typeof vault>>, name: string): Promise<string> {

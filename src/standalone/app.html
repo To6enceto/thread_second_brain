@@ -14,13 +14,13 @@
     <label class="thread-theme">Appearance <select id="theme" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
   </header>
   <main class="thread-layout">
-    <aside class="thread-sidebar" aria-label="Vault and read access">
+    <aside class="thread-sidebar" aria-label="Notes folder and access">
       <p class="thread-eyebrow">YOUR KNOWLEDGE, LOCALLY</p>
       <h1>A space to pick up the thread.</h1>
-      <p class="thread-muted">Open the same notes you use in Obsidian. This window runs independently.</p>
+      <p class="thread-muted">Open the notes you keep in Obsidian, or any folder of Markdown notes. Thread runs on its own and keeps everything on this computer.</p>
       <section id="saved-access" class="thread-saved-access" aria-labelledby="saved-access-title" hidden>
         <h2 id="saved-access-title">Saved access</h2>
-        <p class="thread-muted">Thread remembered this on your request. Nothing is read until you continue.</p>
+        <p class="thread-muted">You asked Thread to remember this. Nothing is read until you continue.</p>
         <ul id="saved-access-details" class="thread-saved-list"></ul>
         <p id="saved-access-warning" class="thread-empty" hidden></p>
         <div class="thread-controls"><button id="saved-continue" class="thread-primary" disabled>Continue with saved access</button><button id="saved-forget" class="thread-quiet">Forget saved access</button></div>
@@ -29,88 +29,98 @@
       <section id="vault-details" hidden>
         <h2 id="vault-name"></h2><p id="vault-path" class="thread-path"></p>
         <details id="access" open>
-          <summary>Read access</summary>
-          <p class="thread-muted">Choosing a vault grants no access. Approve folders below for this session only.</p>
-          <label for="roots">Allowed paths</label>
+          <summary>What Thread may read</summary>
+          <p class="thread-muted">Choosing a folder lets Thread read nothing yet. List the folders it may read, then approve.</p>
+          <label for="roots">Folders Thread may read</label>
           <textarea id="roots" rows="3" placeholder="Projects&#10;Sources" spellcheck="false"></textarea>
-          <p id="roots-help" class="thread-muted">One relative folder or Markdown file per line. Use . only to grant the whole vault. Hidden folders are unavailable as note evidence.</p>
-          <label for="exclusions">Excluded paths</label><textarea id="exclusions" rows="2" placeholder="Projects/Private" spellcheck="false"></textarea>
-          <p class="thread-muted">Exclusions always take precedence.</p>
-          <div class="thread-scope-preview"><span class="thread-eyebrow">ACCESS AFTER APPROVAL</span><p id="scope-preview"></p></div>
+          <p id="roots-help" class="thread-muted">One folder or note per line, written from the top of your notes folder, for example Projects. Enter . to allow everything. Hidden folders such as .obsidian are never read as notes; only the Saving notes check reads Thread's own plugin files there.</p>
+          <label for="exclusions">Keep private</label><textarea id="exclusions" rows="2" placeholder="Projects/Private" spellcheck="false"></textarea>
+          <p class="thread-muted">Folders listed here are never read, even inside an allowed folder.</p>
+          <div class="thread-scope-preview"><span class="thread-eyebrow">WHAT THREAD WILL READ</span><p id="scope-preview"></p></div>
           <button id="grant" class="thread-primary">Approve read access</button>
         </details>
         <div class="thread-remember">
           <button id="remember-access" aria-describedby="remember-help" disabled>Remember this access on this computer</button>
-          <p id="remember-help" class="thread-muted">Saves this folder, the approved paths, the projects folder and the applied AI model in your desktop profile, outside the vault. PDF permissions and saving are never remembered. Next time Thread shows them and reads nothing until you continue.</p>
+          <p id="remember-help" class="thread-muted">Thread remembers this folder, what it may read, your projects folder and your AI model, in its own settings outside your notes. PDF permissions and saving are never remembered. Next time it shows them and reads nothing until you continue.</p>
         </div>
         <details id="storage-setup">
-          <summary>Desktop storage and writing</summary>
-          <p class="thread-muted">Preferences and recovery stay in this app profile. Read access and PDF consent are never restored or imported. Writing is optional and each note still needs an exact preview.</p>
-          <p id="storage-status" role="status" aria-live="polite">Select a vault to inspect desktop state.</p>
-          <button id="storage-refresh">Refresh desktop state</button>
-          <details><summary>Saved preference drafts</summary><pre id="storage-preferences"></pre><button id="storage-use-drafts">Use preference drafts</button></details>
-          <label for="plugin-config">Obsidian configuration folder</label><input id="plugin-config" value=".obsidian" maxlength="101">
-          <p class="thread-muted">Inspecting explicitly reads only Thread's manifest.json, data.json, changes.json and project-imports.json under this configuration folder (up to 40 MiB). History may contain stored original notes, including formerly permitted content. It is never indexed or sent to AI. Files remain unchanged.</p>
-          <button id="storage-inspect">Read plugin settings and recovery files</button>
+          <summary>Saving notes</summary>
+          <p class="thread-muted">Thread can save answers, decisions and other notes into your folder. Saving is optional, and you always see the exact note before it is written.</p>
+          <ol class="thread-steps">
+            <li>Close Obsidian and any other app that edits these notes.</li>
+            <li>Choose <strong>Check the Obsidian plugin's files</strong>.</li>
+            <li>If the check passes, choose <strong>Allow saving notes</strong>.</li>
+          </ol>
+          <p id="storage-status" role="status" aria-live="polite">Choose a notes folder first.</p>
+          <label for="plugin-config">Obsidian settings folder</label><input id="plugin-config" value=".obsidian" maxlength="101">
+          <button id="storage-inspect">Check the Obsidian plugin's files</button>
           <div id="storage-compatibility"></div>
-          <p class="thread-muted">Close Obsidian before enabling writing. Compatible Thread writers use exclusive ownership; other editors must not edit concurrently. Unknown or unresolved plugin recovery blocks writing. Desktop reading stays available.</p>
-          <div class="thread-controls"><button id="storage-enable" disabled>Enable desktop writing</button><button id="storage-release">Release writing</button></div>
-          <details><summary>Folder preference drafts (grant no read access)</summary><div id="storage-roles"></div></details>
-          <button id="storage-save" disabled>Save desktop preferences</button>
-          <details open><summary>Exact preference copy preview (replaces saved drafts)</summary><pre id="storage-import-preferences" tabindex="0"></pre></details>
-          <button id="storage-import" disabled>Copy previewed plugin preferences and history</button>
-          <details><summary>Exact history copy preview</summary><pre id="storage-history-preview"></pre></details>
-          <p class="thread-muted">Copying retains a separate read-only history snapshot; it never migrates or shares the plugin's live journal. At most five copies and twenty save receipts are retained; full history blocks new entries.</p>
+          <div class="thread-controls"><button id="storage-enable" disabled>Allow saving notes</button><button id="storage-release">Stop saving notes</button><button id="storage-refresh">Refresh</button></div>
+          <details><summary>Details</summary>
+            <p class="thread-muted">Thread's own settings and recovery history stay in its profile, outside your notes. PDF permissions are never restored or imported, and read access returns only from saved access you chose to remember.</p>
+            <p class="thread-muted">The check reads only Thread's manifest.json, data.json, changes.json and project-imports.json in this settings folder (up to 40 MiB) and changes nothing. That history may contain earlier copies of notes; it is never searched or sent to AI.</p>
+            <p class="thread-muted">While saving is allowed, Thread holds an exclusive lock that a compatible Thread plugin also respects. Other editors are not covered, so keep them closed. Unknown or unresolved plugin recovery keeps saving off; reading always works.</p>
+          </details>
+          <details><summary>Saved settings</summary><pre id="storage-preferences"></pre><button id="storage-use-drafts">Use saved settings</button></details>
+          <details><summary>Where Thread saves each kind of note (does not allow reading)</summary><div id="storage-roles"></div></details>
+          <button id="storage-save" disabled>Save these settings</button>
+          <details open><summary>Settings that would be copied from the plugin (replaces saved settings)</summary><pre id="storage-import-preferences" tabindex="0"></pre></details>
+          <button id="storage-import" disabled>Copy settings and history from the plugin</button>
+          <details><summary>History that would be copied</summary><pre id="storage-history-preview"></pre></details>
+          <p class="thread-muted">Copying keeps a separate read-only snapshot of the plugin's history; the plugin's own files are never changed or shared. Thread keeps at most five copies and twenty save records, and stops adding new ones when full.</p>
           <div id="storage-recovery"></div>
         </details>
-        <button id="close" class="thread-quiet">Close vault and clear access</button>
+        <button id="close" class="thread-quiet">Close this folder and clear access</button>
       </section>
       <details id="ai-setup">
         <summary>Optional local AI</summary>
-        <p class="thread-muted">Use a downloaded Ollama text model. Start your local runtime with OLLAMA_NO_CLOUD=1. Thread does not install it or download models.</p>
-        <label for="ai-endpoint">Local Ollama endpoint</label><input id="ai-endpoint" value="http://127.0.0.1:11434" maxlength="200" spellcheck="false">
+        <p class="thread-muted">Thread works without AI. To add AI suggestions, run Ollama on this computer with cloud features off (OLLAMA_NO_CLOUD=1) and download a text model. Thread never installs Ollama or downloads models.</p>
+        <label for="ai-endpoint">Ollama address</label><input id="ai-endpoint" value="http://127.0.0.1:11434" maxlength="200" spellcheck="false">
         <button id="ai-discover">Find downloaded models</button>
-        <label for="ai-model">Available text models</label><select id="ai-model" aria-label="Available text models" disabled><option value="">Discover models first</option></select>
-        <label for="ai-embedding">Optional embedding model</label><select id="ai-embedding" aria-label="Available embedding models" disabled><option value="">Discover models first</option></select>
-        <p class="thread-muted">Embeddings are optional for hybrid Ask. Keyword search needs no model.</p>
-        <div class="thread-controls"><button id="ai-apply">Apply AI settings</button><button id="ai-check" disabled>Test local connection</button><button id="ai-cancel-checks" disabled>Cancel local checks</button></div>
-        <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Recorded context works without an AI model.</p>
+        <label for="ai-model">Model</label><select id="ai-model" aria-label="Model" disabled><option value="">Find models first</option></select>
+        <label for="ai-embedding">Search model (optional)</label><select id="ai-embedding" aria-label="Search model" disabled><option value="">Find models first</option></select>
+        <p class="thread-muted">A search model lets Ask find passages by meaning as well as words. Keyword search needs no model.</p>
+        <div class="thread-controls"><button id="ai-apply">Use this model</button><button id="ai-check" disabled>Test connection</button><button id="ai-cancel-checks" disabled>Cancel</button></div>
+        <p id="ai-setup-status" role="status" aria-live="polite" class="thread-muted">Optional. Everything else works without AI.</p>
       </details>
-      <p class="thread-footnote">Resume and Ask run locally. Note saves and changes require explicit writer setup and exact approval.</p>
+      <p class="thread-footnote">Everything runs on this computer. Thread only saves a note after you see it and approve it.</p>
     </aside>
-    <section class="thread-library" aria-label="Permitted Markdown notes">
+    <section class="thread-library" aria-label="Projects and notes">
       <section class="thread-project-controls" aria-label="Projects">
         <h2>Your projects</h2>
-        <details><summary>Project folder mapping</summary>
+        <details><summary>Where are your projects?</summary>
           <label for="projects-folder">Projects folder</label><input id="projects-folder" maxlength="512" placeholder="Projects" aria-describedby="project-mapping-help">
-          <p id="project-mapping-help" class="thread-muted">Optional mapping finds Overview.md projects in already permitted folders. It grants no read access. Project-type notes are discovered without a mapping.</p>
+          <p id="project-mapping-help" class="thread-muted">If each project is a folder with an Overview.md note, enter the folder that holds them, for example Projects. Notes marked type: project are found without this. This does not let Thread read anything new.</p>
         </details>
         <button id="load-projects" disabled>Refresh projects</button>
-        <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a permitted project</option></select>
-        <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
-        <button id="open-ask" disabled>Ask your vault</button>
-        <button id="open-records">Decisions and questions</button>
-        <button id="open-research">Capture and research</button>
-        <button id="open-portability">Project portability</button>
-        <button id="open-reviews">Project reviews</button>
-        <button id="open-actions">Actions and wrap-up</button>
-        <button id="open-changes">Review changes</button>
+        <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a project</option></select>
+        <div class="thread-controls thread-main-actions"><button id="resume-project" class="thread-primary" disabled>Resume project</button><button id="open-ask" disabled>Ask your vault</button><button id="open-research">Capture and research</button></div>
+        <button id="project-home" disabled>Project home</button>
+        <details id="more-tools" class="thread-more-tools"><summary>More tools</summary>
+          <div class="thread-tool-list">
+            <button id="open-records">Decisions and questions</button>
+            <button id="open-actions">Actions and wrap-up</button>
+            <button id="open-reviews">Project reviews</button>
+            <button id="open-changes">Review changes</button>
+            <button id="open-portability">Project portability</button>
+          </div>
+        </details>
         <button id="ai-cancel-generation" disabled>Cancel AI interpretation</button>
         <p id="ai-generation-status" role="status" aria-live="polite" class="thread-muted"></p>
-        <p class="thread-muted">Recorded context first. Works without AI. Selection and mapping are session-only.</p>
+        <p class="thread-muted">Resume shows what your notes say first, and works without AI. Your project choice is not remembered; saved access keeps only the projects folder.</p>
       </section>
       <div class="thread-section-heading"><h2>Your notes</h2><button id="refresh" disabled>Refresh</button></div>
-      <label for="filter">Filter listed paths</label><input id="filter" type="search" placeholder="Find a note in this list" disabled>
+      <label for="filter">Find a note by name</label><input id="filter" type="search" placeholder="Type part of a note name" disabled>
       <form id="search-form" class="thread-search-form">
-        <label for="search-query">Search note contents</label>
-        <input id="search-query" type="search" maxlength="1000" placeholder="Keywords or &quot;quoted phrase&quot;" disabled>
-        <div class="thread-controls"><button id="search" type="submit" disabled>Search evidence</button><button id="cancel-index" type="button" disabled>Cancel indexing</button></div>
+        <label for="search-query">Search inside your notes</label>
+        <input id="search-query" type="search" maxlength="1000" placeholder="Words, or &quot;an exact phrase&quot;" disabled>
+        <div class="thread-controls"><button id="search" type="submit" disabled>Search</button><button id="cancel-index" type="button" disabled>Stop reading notes</button></div>
       </form>
-      <p id="coverage-summary" class="thread-muted">No index yet.</p>
-      <details><summary>Index coverage and limits</summary><p id="coverage" class="thread-muted">Select a vault and approve read access to begin.</p></details>
+      <p id="coverage-summary" class="thread-muted">Nothing read yet.</p>
+      <details><summary>What Thread read</summary><p id="coverage" class="thread-muted">Choose a notes folder and approve access to begin.</p></details>
       <p id="search-summary" class="thread-muted"></p>
-      <details id="search-details" hidden><summary>Search coverage and limits</summary><p id="search-coverage" class="thread-muted"></p></details>
-      <ul id="search-results" class="thread-note-list" aria-label="Evidence search results"></ul>
+      <details id="search-details" hidden><summary>What this search covered</summary><p id="search-coverage" class="thread-muted"></p></details>
+      <ul id="search-results" class="thread-note-list" aria-label="Search results"></ul>
       <ul id="notes" class="thread-note-list"></ul>
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
@@ -163,7 +173,7 @@
       </section>
       <section id="changes-panel" tabindex="-1" aria-label="Change review and recovery" hidden>
         <h2>Review changes</h2>
-        <p class="thread-muted">Inspect exact changes and retained originals. Nothing applies automatically. Close other editors and enable writing in Desktop storage before confirming.</p>
+        <p class="thread-muted">Inspect exact changes and retained originals. Nothing applies automatically. Close other editors and allow saving under Saving notes before confirming.</p>
         <div class="thread-controls"><button id="changes-refresh">Refresh changes</button><button id="changes-close">Close change review</button></div>
         <p id="changes-status" role="status" aria-live="polite"></p>
         <div id="changes-work"></div><div id="changes-list"></div>
@@ -202,6 +212,6 @@
       </div>
     </section>
   </main>
-  <footer class="thread-status"><p id="status" role="status" aria-live="polite">Thread is ready. No vault access has been granted.</p></footer>
+  <footer class="thread-status"><p id="status" role="status" aria-live="polite">Thread is ready. It cannot read anything until you choose a folder and approve access.</p></footer>
 </body>
 </html>

@@ -21,13 +21,13 @@ export class DesktopSaves {
   async prepare(identity: unknown, kind: unknown, title: unknown, selected: unknown, revision: unknown): Promise<SavePreview> {
     if (this.applying) throw new DesktopError("A save is running. Wait for its receipt.");
     this.revoke(); const epoch = this.epoch, state = this.storage.status(revision);
-    if (!state.writing || state.warning || state.saves.some(s => s.status === "pending") || state.changesPending || state.changesRecovery) throw new DesktopError("Enable desktop writing and resolve pending saves or Review changes before saving another note.");
+    if (!state.writing || state.warning || state.saves.some(s => s.status === "pending") || state.changesPending || state.changesRecovery) throw new DesktopError("Allow saving notes, and resolve unfinished saves or Review changes, before saving another note.");
     if (state.saves.length >= 20) throw new DesktopError("Twenty save receipts are retained. History is full; preserve it. No receipt was removed.");
     let artifact: ReturnType<DesktopAsk["artifact"]>;
     try { artifact = this.ask.artifact(identity, kind, title, selected, revision); }
     catch (error) { if (error instanceof DesktopError) throw error; throw new DesktopError("This answer or selection cannot form a valid note. Check its name and selected turns; reduce the selection if too large."); }
     const folder = artifact.project || state.preferences.roles.knowledge;
-    if (!folder) throw new DesktopError("Map an existing Knowledge folder in Desktop storage for all-permitted-notes answers. Mapping grants no read access.");
+    if (!folder) throw new DesktopError("For answers from all your notes, set a Knowledge folder under Saving notes. This does not let Thread read anything new.");
     const path = relativePath(`${folder}/${kind === "answer" ? "Answers" : "Conversations"}/${title}.md`);
     await artifact.validate(); const destination = await this.writer.inspect(path, revision); artifact.assert();
     if (destination.file) throw new DesktopError("This note already exists. Choose a new name; no overwrite is allowed.");
@@ -48,7 +48,7 @@ export class DesktopSaves {
       await this.storage.owned(revision, async (profile, owned) => {
         const current = (): void => { owned(); currentPreview(); };
         current();
-        if (profile.state.saves.some(s => s.status === "pending") || profile.state.saves.length >= 20) throw new DesktopError("Pending or full save history blocks this save. Inspect Desktop storage.");
+        if (profile.state.saves.some(s => s.status === "pending") || profile.state.saves.length >= 20) throw new DesktopError("An unfinished save or a full save history blocks this save. Look under Saving notes.");
         await preview.artifact.validate(); current();
         if (JSON.stringify(await this.writer.inspect(preview.value.path, revision)) !== JSON.stringify(preview.destination)) throw new DesktopError("Destination changed since preview. Inspect it and choose a new name.");
         const receipt: SaveReceipt = { ...preview.value, createdAt: new Date().toISOString(), status: "pending" };
@@ -58,9 +58,9 @@ export class DesktopSaves {
       });
       return { path: preview.value.path };
     } catch (error) {
-      if (receiptRecorded) throw new DesktopError("Save did not finish with a confirmed receipt. Preserve any created note and folders. Open Desktop storage, refresh receipts and inspect pending recovery before another save. If history is unavailable, reopen Thread without resetting the profile.");
+      if (receiptRecorded) throw new DesktopError("Save did not finish with a confirmed receipt. Preserve any created note and folders. Open Saving notes, choose Refresh and look at the unfinished save before another save. If history is unavailable, reopen Thread without resetting the profile.");
       if (error instanceof DesktopError) throw error;
-      throw new DesktopError("Save could not begin. Inspect folder permissions and Desktop storage; no overwrite was attempted. Preserve the profile if history is unavailable.");
+      throw new DesktopError("Save could not begin. Check folder permissions and Saving notes; nothing was overwritten. Preserve the profile if history is unavailable.");
     } finally { this.applying = false; this.revoke(); }
   }
   async inspectRecovery(id: unknown, revision: unknown): Promise<RecoveryPreview> {

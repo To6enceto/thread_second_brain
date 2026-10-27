@@ -5,20 +5,20 @@ import type { ReadScope } from "./contracts.ts";
 export class DesktopError extends Error {}
 export function relativePath(value: unknown): string {
   if (typeof value !== "string" || !value || value.length > 512 || /[\\\x00-\x1f\x7f]/.test(value)) {
-    throw new DesktopError("Use a vault-relative path, with forward slashes and no control characters.");
+    throw new DesktopError("Write folders from the top of your notes folder with forward slashes, for example Projects/Demo.");
   }
   if (value === ".") return value;
   if (value.split("/").some(part => !part || part.startsWith(".") || part.trim() !== part)) {
-    throw new DesktopError("Use ordinary relative folders or Markdown files. Hidden paths and parent paths are unavailable.");
+    throw new DesktopError("Use ordinary folder or note names. Hidden folders (starting with a dot) and .. are not allowed.");
   }
   return value;
 }
 export function scopeInput(value: unknown): ReadScope {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Review the read roots and exclusions.");
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new DesktopError("Check the folders Thread may read and the ones kept private.");
   const record = value as Record<string, unknown>;
-  if (Object.keys(record).sort().join(",") !== "excluded,roots") throw new DesktopError("Review the read roots and exclusions.");
+  if (Object.keys(record).sort().join(",") !== "excluded,roots") throw new DesktopError("Check the folders Thread may read and the ones kept private.");
   const paths = (input: unknown): string[] => {
-    if (!Array.isArray(input) || input.length > 32) throw new DesktopError("Use at most 32 read roots and 32 exclusions.");
+    if (!Array.isArray(input) || input.length > 32) throw new DesktopError("List at most 32 folders to read and 32 to keep private.");
     return [...new Set(input.map(relativePath))].sort();
   };
   return { roots: paths(record.roots), excluded: paths(record.excluded) };
@@ -36,5 +36,5 @@ export function assetAllowed(url: string, assets: readonly string[]): boolean {
   return assets.some(asset => pathToFileURL(asset).href === url);
 }
 export function publicFailure(error: unknown): string {
-  return error instanceof DesktopError || error instanceof WriterOwnershipError ? error.message : "Thread could not finish this read. Check folder access, then refresh or select the vault again.";
+  return error instanceof DesktopError || error instanceof WriterOwnershipError ? error.message : "Thread could not read this. Check that the folder is still there, then choose Refresh or choose the folder again.";
 }

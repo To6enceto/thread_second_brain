@@ -36,7 +36,7 @@ const text = (node: Element): string[] => node.children.map(child => child.textC
 test("the card shows exactly the saved access and nothing else is read before Continue", async t => {
   const f = fixture(t, saved); await f.view.load();
   assert.equal(f.el("saved-access").hidden, false); assert.equal(f.el("saved-access-warning").hidden, true);
-  assert.deepEqual(text(f.el("saved-access-details")), ["Folder: Vault (/home/user/Vault)", "Allowed paths: Projects, Sources", "Excluded paths: Projects/Private", "Projects folder: Projects",
+  assert.deepEqual(text(f.el("saved-access-details")), ["Folder: Vault (/home/user/Vault)", "Thread may read: Projects, Sources", "Kept private: Projects/Private", "Projects folder: Projects",
     "Local AI: qwen3:4b-instruct at http://127.0.0.1:11439, checked again when you continue", `Saved: ${new Date(saved.saved!.savedAt).toLocaleString()}`, "Never remembered: PDF permissions and saving."]);
   assert.equal(f.calls.continued, 0); assert.equal(f.calls.closing, 0); assert.equal(f.el("saved-continue").disabled, false);
   assert.equal(f.el("remember-access").disabled, true);

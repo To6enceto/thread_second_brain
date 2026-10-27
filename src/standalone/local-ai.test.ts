@@ -40,19 +40,19 @@ const output = () => ({ message: { content: JSON.stringify({ ...Object.fromEntri
 test("desktop model setup is metadata-only, validates loopback/config and never grants read access", async t => {
   const p = provider(), f = await fixture(t, p.fetcher), scope = f.reader.getInfo();
   const found = await f.ai.discover("http://localhost:11434"); assert.equal(found.models[0]!.completion, true);
-  assert.match(await f.ai.check(), /cloud features disabled/);
+  assert.match(await f.ai.check(), /cloud features are off/);
   assert.ok(p.calls.every(c => ["/api/status", "/api/tags", "/api/show"].includes(c.path)));
   assert.deepEqual(f.reader.getInfo(), scope);
-  for (const url of ["https://example.com", "http://127.0.0.1/path", "http://user@localhost", "file:///tmp/x"]) await assert.rejects(f.ai.discover(url), /loopback/);
+  for (const url of ["https://example.com", "http://127.0.0.1/path", "http://user@localhost", "file:///tmp/x"]) await assert.rejects(f.ai.discover(url), /on this computer/);
   for (const model of ["remote:cloud", "a b", "x".repeat(201)]) assert.throws(() => f.ai.configure({ endpoint: "http://localhost", model }));
   assert.throws(() => f.ai.configure({ endpoint: "http://localhost", model: "text", extra: true }));
-  f.ai.reset(); await assert.rejects(f.ai.interpret(f.prepared.briefingId, f.info.revision), /briefing changed/);
+  f.ai.reset(); await assert.rejects(f.ai.interpret(f.prepared.briefingId, f.info.revision), /notes changed/);
 });
 
 test("desktop interpretation uses main-owned context and keeps recorded facts separate", async t => {
   const p = provider(async () => output()), f = await fixture(t, p.fetcher);
   const before = structuredClone(f.prepared.recorded);
-  await assert.rejects(f.ai.interpret("forged", f.info.revision), /briefing changed/);
+  await assert.rejects(f.ai.interpret("forged", f.info.revision), /notes changed/);
   const result = await f.ai.interpret(f.prepared.briefingId, f.info.revision);
   assert.equal(result.interpretations.length, 1); assert.equal(result.interpretations[0]!.kind, "interpretation");
   assert.deepEqual(f.prepared.recorded, before); assert.equal(result.model, "text:local");
@@ -127,7 +127,7 @@ test("desktop unavailable transport and invalid provider JSON give safe diagnost
       return new Response('{"synthetic-private-provider-body');
     });
     await assert.rejects(f.ai.interpret(f.prepared.briefingId, f.info.revision), error => error instanceof Error
-      && /Cannot reach local Ollama|malformed JSON/.test(error.message) && !error.message.includes("synthetic-private"));
+      && /Cannot reach local Ollama|could not understand/.test(error.message) && !error.message.includes("synthetic-private"));
     assert.match(f.prepared.recorded.sections.objective[0]!.text, /Compare orchids locally/);
   }
 });

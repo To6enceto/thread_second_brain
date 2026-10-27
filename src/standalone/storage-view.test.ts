@@ -45,7 +45,7 @@ test("configuration edits reject delayed compatibility results and revoke owners
   assert.equal(f.el("storage-enable").disabled, true); assert.equal(f.el("storage-import").disabled, true);
   assert.equal(f.el("storage-import-preferences").textContent, ""); assert.equal(f.el("storage-history-preview").textContent, "");
   f.el("storage-enable").fire("click"); assert.deepEqual(f.calls.enabled, []); assert.equal(f.calls.released, 1);
-  assert.match(f.el("storage-status").textContent, /Configuration folder changed/);
+  assert.match(f.el("storage-status").textContent, /Settings folder changed/);
 });
 
 test("exact proposed preferences and history are visible before copy and clear together", async t => {
@@ -68,6 +68,6 @@ test("configuration edits suppress late enable and import replies and mismatched
     f.el("plugin-config").value = ".actual-config"; f.el("plugin-config").fire("input");
     (stage === "copy" ? f.copied : f.enabled).resolve({ ok: true, value: { ...f.state, writing: true, importedCopies: 1 } }); await flush();
     assert.equal(f.calls.released, 1); assert.equal(f.el("storage-save").disabled, true); assert.equal(f.el("storage-import").disabled, true);
-    assert.match(f.el("storage-status").textContent, /Configuration folder changed/);
+    assert.match(f.el("storage-status").textContent, /Settings folder changed/);
   });
 });
