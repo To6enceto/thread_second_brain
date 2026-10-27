@@ -615,7 +615,7 @@ PDF bytes; excluded names are hidden.
 Select a PDF inside ordinary allowed paths and choose **Allow ongoing binary
 reads** for that exact displayed path. This separate consent permits extraction
 and later original-file hash checks; text grants alone never enable PDF reads.
-It is stored compatibly in settings schema1 with at most 100 exact paths.
+It is stored compatibly in settings schema 1 with at most 100 exact paths.
 Exclusions always win. Revoke any grant in the same dialog; unavailable grants
 hide their paths. Changing/revoking scope clears previews immediately. Check
 write-access errors before reopening if a grant change could not be persisted.
@@ -699,19 +699,19 @@ Sources, settings and durable change/import history are preserved. Cancel or
 source/scope/input changes revoke the preview. An uncertain write can leave a
 folder or package file: inspect it and choose a new name before retrying.
 
-Project packages are uncompressed UTF-8 JSON version1 with a manifest and base64
+Project packages are uncompressed UTF-8 JSON version 1 with a manifest and base64
 payloads, not ZIP archives. The manifest identifies the checkpoint and project,
 original paths, file types, byte lengths, SHA-256, identities and permitted
 links/provenance. Only visible portable NFC paths with `.md`, `.txt` or `.pdf`
 files are supported. Case-equivalent/file-folder conflicts and common reserved
-platform names are refused. Limits:100 candidates/entries,2 MiB per text file,
-16 MiB per PDF,32 MiB expanded file bytes and48 MiB serialized package bytes.
+platform names are refused. Limits: 100 candidates/entries, 2 MiB per text file,
+16 MiB per PDF, 32 MiB expanded file bytes and 48 MiB serialized package bytes.
 Explicit original-PDF verification keeps its existing finite per-pass limits.
 No model or network is needed, and there is no service charge.
 
 Whole notes with stale, unsupported or unavailable copied decision/question/
 review/output provenance are omitted by default, with generic counts. Every
-retained synthesis block is checked (at most100 blocks/2000 references), including
+retained synthesis block is checked (at most 100 blocks/2000 references), including
 older blocks omitted by AI recall. Legacy appended decision model observations
 without complete source snapshots are conservatively omitted; local notes remain
 unchanged. Manifest
@@ -730,13 +730,13 @@ rewrite identities, source hashes or provenance to declare moved evidence fresh.
 
 Add a `.thread-project.json` file to a visible, non-excluded vault location using
 Obsidian. Run **Thread: Import project package and recovery** (also in Home's
-More actions). The picker lists at most200 names without reading contents.
+More actions). The picker lists at most 200 names without reading contents.
 **Validate selected package and preview** explicitly reads that package, including
 any embedded PDF bytes. This grants no continuing access to the package or PDFs.
 No AI or network is involved.
 
-Only version1 uncompressed Thread JSON is accepted:1-100 Markdown/plain-text/PDF
-files,2 MiB/text,16 MiB/PDF,32 MiB expanded and48 MiB serialized. Compression,
+Only version 1 uncompressed Thread JSON is accepted: 1-100 Markdown/plain-text/PDF
+files, 2 MiB/text, 16 MiB/PDF, 32 MiB expanded and 48 MiB serialized. Compression,
 ZIP project packages, extra schema fields, unsupported assets, traversal, hidden,
 absolute, nonportable or colliding paths, noncanonical base64, invalid UTF-8,
 incorrect lengths/hashes and identity metadata inconsistent with note properties
@@ -761,7 +761,7 @@ Keep old extracted/output notes as history; importing never freshens them.
 
 Vault I/O is not atomic. A bounded plugin-local `project-imports.json` journal
 records intent, file hashes, completed copies and an uncertain write before each
-create. It retains up to100 receipts without automatic pruning; full or invalid
+create. It retains up to 100 receipts without automatic pruning; full or invalid
 history blocks imports with instructions to preserve it. One import/recovery can
 run at a time. Cancel, reload or disk failure can leave folders/files; nothing is
 automatically deleted. Reopen the command and validate the exact unchanged package
@@ -773,7 +773,7 @@ created just before a journal failure may require this conservative path. Restor
 invalid journals only from your own known good backup; never reset history to
 force a retry. This is a new-copy import, not a destructive vault restore.
 
-Release0.4.1 includes192 explicitly inventoried files and preserves earlier build
+Release 0.4.1 includes 192 explicitly inventoried files and preserves earlier build
 artifacts in version-specific staging. `node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.2.zip` checks exact paths, ZIP records/CRC, production bytes,
 PDF resources/licenses and SHA-256. Development/evaluation tools remain separate
 from the installed plugin. This private build has no API/hosting subscription;
@@ -795,8 +795,8 @@ still requires exact current original consent and matching supporting snapshots.
 Excluded or stale historical evidence is withheld even if the package contains
 matching old copies. Package integrity alone does not establish permission.
 
-Existing package budgets apply to each side, with at most100 current candidates
-and200 comparison rows. Text display is limited to50000 characters per side and
+Existing package budgets apply to each side, with at most 100 current candidates
+and 200 comparison rows. Text display is limited to 50000 characters per side and
 200000 total, with explicit clipping notices; full-byte hashes remain visible.
 Source/package/input/settings changes or Cancel clear results. Recompare current
 content; importing copies is a separate explicit workflow, not a restore button.
@@ -805,7 +805,7 @@ content; importing copies is a separate explicit workflow, not a restore button.
 
 Use **Review web clip** in Research (or **Thread: Review saved web clip**) to review a deliberately saved local clip, explicitly choose its project, inspect metadata and possible duplicates, then preview a new source copy. Publication, capture and intake dates stay separate; missing or ambiguous metadata stays unknown. The original clip is never overwritten, URLs are not fetched and no AI model is used. Changes require a fresh preview.
 
-Importable article/selection templates and detailed steps are in [the Web Clipper guide](integrations/clipper/README.md). Intake accepts original permitted local text up to2 MiB including saved provenance. The picker covers up to200 indexed notes; duplicate hints cover up to100 current permitted imported sources and do not establish complete coverage or duplicate identity. Browser-extension use remains a separate explicit user action.
+Importable article/selection templates and detailed steps are in [the Web Clipper guide](integrations/clipper/README.md). Intake accepts original permitted local text up to 2 MiB including saved provenance. The picker covers up to 200 indexed notes; duplicate hints cover up to 100 current permitted imported sources and do not establish complete coverage or duplicate identity. Browser-extension use remains a separate explicit user action.
 
 ## Local updates and recovery
 

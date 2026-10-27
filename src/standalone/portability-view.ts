@@ -69,7 +69,7 @@ export class PortabilityView {
       this.message("Exact checkpoint preview ready. Saving refuses existing destinations.");
     }); }).className = "thread-primary";
     add(form, "div", "", "thread-ai-card").id = "portability-preview";
-    this.button(form, "Save previewed checkpoint", () => { const preview = this.exportPreview; if (!preview) return; void this.run(async (access, current) => { const path = value(await this.bridge.writeExport(preview.id, access.revision)); this.completed(access, current, `Saved checkpoint ${path}. Source notes and read access are unchanged.`); this.exportPreview = null; }); }, "export");
+    this.button(form, "Save previewed checkpoint", () => { const preview = this.exportPreview; if (!preview) return; void this.run(async (access, current) => { const path = value(await this.bridge.writeExport(preview.id, access.revision)); this.completed(access, current, `Saved checkpoint ${path}. Source notes and read access are unchanged.`); if (this.exportPreview === preview) this.exportPreview = null; }); }, "export");
   }
   private packages(area: HTMLElement, mode: string, status: ImportStatus | null): void {
     const form = add(area, "section", "", "thread-record-form");
@@ -92,7 +92,7 @@ export class PortabilityView {
         const list = add(output, "ul"); for (const entry of preview.entries) add(list, "li", `${entry.path} - ${entry.kind}, ${entry.bytes} bytes`, "thread-path");
         this.message("Import preview ready. Import writes only new files.");
       }); }, "package");
-      this.button(form, "Import as new copies", () => { const preview = this.importPreview; if (!preview) return; void this.run(async (access, current) => { const result = value(await this.bridge.applyImport(preview.id, access.revision)); this.completed(access, current, `Imported ${preview.entries.length} new copies into ${preview.root}. ${result.completed} completed imports recorded. Grant read access to that folder explicitly to use it.`); this.importPreview = null; }); }, "import").className = "thread-primary";
+      this.button(form, "Import as new copies", () => { const preview = this.importPreview; if (!preview) return; void this.run(async (access, current) => { const result = value(await this.bridge.applyImport(preview.id, access.revision)); this.completed(access, current, `Imported ${preview.entries.length} new copies into ${preview.root}. ${result.completed} completed imports recorded. Grant read access to that folder explicitly to use it.`); if (this.importPreview === preview) this.importPreview = null; }); }, "import").className = "thread-primary";
     }
     add(form, "div", "", "thread-ai-card").id = "portability-preview";
   }

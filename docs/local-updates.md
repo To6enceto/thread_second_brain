@@ -4,11 +4,11 @@ The Node helper inspects an explicitly selected local Thread ZIP and installatio
 It never downloads or executes package code. Preview first, then explicitly apply
 the exact approved result with Obsidian closed. Recovery and compatible previous
 code rollback are explicit commands.
-Use Node22.15+ and a locally trusted, verified package. Checksums detect changed
+Use Node 22.15+ and a locally trusted, verified package. Checksums detect changed
 bytes; they do not authenticate a publisher or make arbitrary code trustworthy.
 
 Build a private candidate with `npm run package`. This runs Verify and packages
-192 files: the191 existing runtime/PDF assets plus `thread-update.json` with exact
+192 files: the 191 existing runtime/PDF assets plus `thread-update.json` with exact
 hashes and declared compatibility. Earlier version packages remain separate.
 To verify it against the current production build:
 
@@ -17,8 +17,8 @@ node --experimental-strip-types scripts/verify-package.mjs dist/thread-0.4.1.zip
 ```
 
 Copy the actual Obsidian version from About. The current helper supports
-Obsidian1.14.4 through the1.14.x series, candidate Thread0.4.x, and installed
-legacy0.3.0 or declared-compatible0.4.x. It refuses prereleases, unknown series,
+Obsidian 1.14.4 through the 1.14.x series, candidate Thread 0.4.x, and installed
+legacy 0.3.0 or declared-compatible 0.4.x. It refuses prereleases, unknown series,
 ordinary downgrades and undeclared data compatibility. These are explicit
 supported ranges, not a promise about untested future host versions.
 
@@ -41,17 +41,17 @@ write workflow. The helper does not stop or launch Obsidian/Ollama.
 
 The helper validates the fixed runtime inventory, ordinary nonsymlink parent
 paths, regular non-hardlinked files, package ZIP records/CRC/hashes, and known
-plugin data schemas. It bounds packages to40 MiB, payloads to32 MiB and individual
-runtime files to12 MiB. Known data inspection is bounded to32 MiB/file and64 MiB
+plugin data schemas. It bounds packages to 40 MiB, payloads to 32 MiB and individual
+runtime files to 12 MiB. Known data inspection is bounded to 32 MiB/file and 64 MiB
 total; values are not printed or copied into the preview. Settings, indexes,
 change/recovery/import/project-import/rename journals and unrelated files stay
 in place. Unknown or malformed data is a refusal, never an instruction to delete
 it. Current-state hashes detect changed snapshots; no filesystem-wide atomicity
 or protection from uncooperative external writes is claimed.
 
-Legacy0.3.0 has no declared new-data compatibility, so a preview marks previous
+Legacy 0.3.0 has no declared new-data compatibility, so a preview marks previous
 code rollback incompatible. Keeping old code alone does not prove it can read new
-records. Declared0.4.x uses `thread-0.4-v1`; compatible code rollback will never
+records. Declared 0.4.x uses `thread-0.4-v1`; compatible code rollback will never
 reverse note changes or data migrations. This helper performs no migrations.
 
 ## Apply the reviewed preview
@@ -141,7 +141,7 @@ previous code to declare the same data format. It validates current data and
 captures new data hashes, so records made since the update stay in place.
 Review the output, then use `apply` with this new preview, its new approval SHA,
 and a new state directory. An interrupted rollback uses the same `recover`
-command. Ordinary previews still refuse downgrades. Legacy0.3.0 rollback is
+command. Ordinary previews still refuse downgrades. Legacy 0.3.0 rollback is
 unavailable because it has no compatibility declaration.
 
 Rollback restores code only. It does not restore earlier notes, settings, actions,

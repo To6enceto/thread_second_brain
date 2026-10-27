@@ -1,7 +1,7 @@
 # Saved web clips for Thread
 
 These original templates use Obsidian Web Clipper's documented JSON import format
-(schema0.1.0), create behavior and preset variables. They use no Interpreter or
+(schema 0.1.0), create behavior and preset variables. They use no Interpreter or
 model prompts. They do not install anything or enable Thread read access.
 
 1. In your installed Web Clipper extension, open Settings, Templates, Import.

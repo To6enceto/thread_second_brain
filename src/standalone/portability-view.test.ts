@@ -93,3 +93,13 @@ test("a write confirmation is shown once, survives a refresh that lands first, a
   await f.view.refresh(); f.button("Preview checkpoint").fire("click"); await flush(); bridge.writeExport = async () => ({ ok: true, value: "Projects/Demo/Checkpoints/D.thread-project.json" });
   f.button("Save previewed checkpoint").fire("click"); await flush(); f.el("portability-cancel").fire("click"); assert.equal(f.el("portability-status").textContent, "Portability work canceled. Refresh to continue.");
 });
+test("a late save reply leaves a newer preview built after a refresh intact and saveable", async t => {
+  const f = fixture(t), saved = deferred<DesktopResult<string>>(); await f.view.refresh();
+  f.previewed.resolve({ ok: true, value: { id: "p1", path: "x", bytes: 1, manifest, texts: ["T"] } }); f.button("Preview checkpoint").fire("click"); await flush();
+  const bridge = (f.view as unknown as { bridge: Record<string, unknown> }).bridge; bridge.writeExport = () => saved.promise;
+  f.button("Save previewed checkpoint").fire("click"); f.view.invalidate(); await f.view.refresh();
+  bridge.previewExport = async () => ({ ok: true, value: { id: "p2", path: "y", bytes: 1, manifest, texts: ["T2"] } }); f.button("Preview checkpoint").fire("click"); await flush();
+  saved.resolve({ ok: true, value: "Projects/Demo/Checkpoints/C.thread-project.json" }); await flush();
+  bridge.writeExport = async (id: string) => { f.calls.writes.push(id); return { ok: true, value: "Projects/Demo/Checkpoints/D.thread-project.json" }; };
+  f.button("Save previewed checkpoint").fire("click"); await flush(); assert.deepEqual(f.calls.writes, ["p2"]);
+});
