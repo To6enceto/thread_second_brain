@@ -79,6 +79,7 @@
         <div class="thread-controls"><button id="project-home" disabled>Project home</button><button id="resume-project" class="thread-primary" disabled>Resume project</button></div>
         <button id="open-ask" disabled>Ask your vault</button>
         <button id="open-records">Decisions and questions</button>
+        <button id="open-research">Capture and research</button>
         <button id="open-reviews">Project reviews</button>
         <button id="open-actions">Actions and wrap-up</button>
         <button id="open-changes">Review changes</button>
@@ -102,6 +103,17 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="research-panel" tabindex="-1" aria-label="Capture and research" hidden>
+        <h2>Capture and research</h2>
+        <p class="thread-muted">Keep original sources. Every save goes through exact change review; websites and attachments are never fetched.</p>
+        <div class="thread-review-controls">
+          <label>Research workflow<select id="research-mode" aria-label="Research workflow"><option value="capture">Capture a thought or local file</option><option value="clips">Review a saved clip</option><option value="collections">Saved collections</option><option value="knowledge">Knowledge synthesis</option></select></label>
+          <label id="research-scope-label">Collection scope<select id="research-scope" aria-label="Collection scope"><option value="project">Selected project</option><option value="allowed">All permitted notes</option></select></label>
+        </div>
+        <div class="thread-controls"><button id="research-refresh">Refresh research context</button><button id="research-cancel">Cancel research work</button><button id="research-close">Close research</button></div>
+        <p id="research-status" role="status" aria-live="polite"></p>
+        <div id="research-content"></div>
+      </section>
       <section id="reviews-panel" tabindex="-1" aria-label="Project reviews" hidden>
         <h2>Project reviews</h2>
         <p class="thread-muted">Inspect current records and make explicit choices. Review never runs automatically.</p>
@@ -150,7 +162,7 @@
           <label>From record date<input id="ask-from" type="date"></label>
           <label>Through record date<input id="ask-through" type="date"></label>
         </div><p class="thread-muted">Dates use recorded fields, falling back to file modification dates; they do not verify events.</p></details>
-        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button><button id="ask-new-conversation">New conversation</button></div>
+        <div class="thread-controls"><button id="ask-retrieve">Retrieve evidence</button><button id="ask-cancel" disabled>Cancel Ask</button><button id="ask-new-conversation">New conversation</button><button id="ask-open-collections">Open saved collections</button></div>
         <p id="ask-status" role="status" aria-live="polite" class="thread-muted">Enter a question and retrieve current permitted evidence.</p>
         <div id="ask-results"></div>
       </section>

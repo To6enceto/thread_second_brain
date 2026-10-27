@@ -61,6 +61,22 @@ export interface DesktopBridge {
   prepareReviewDraft(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   reviewDraftChanged(): Promise<DesktopResult<null>>;
   cancelReviews(): Promise<DesktopResult<null>>;
+  loadIntake(selection: ProjectRequest, revision: number): Promise<DesktopResult<import("./intake.ts").IntakeSnapshot>>;
+  pickIntakeFile(id: string, revision: number): Promise<DesktopResult<import("./intake.ts").IntakeFile | null>>;
+  suggestIntakeProject(id: string, input: Pick<import("./intake.ts").CaptureInput, "kind" | "text" | "file">, revision: number): Promise<DesktopResult<string | null>>;
+  prepareCapture(id: string, input: import("./intake.ts").CaptureInput, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  reviewClip(id: string, input: { path: string; project: string; name: string }, revision: number): Promise<DesktopResult<import("./intake.ts").ClipSnapshot>>;
+  prepareClip(id: string, reviewId: string, acknowledge: boolean, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  loadCollections(selection: ProjectRequest, scope: "project" | "allowed", revision: number): Promise<DesktopResult<import("./collections.ts").CollectionsSnapshot>>;
+  openCollection(id: string, path: string, revision: number): Promise<DesktopResult<import("./collections.ts").CollectionReview>>;
+  reuseCollection(id: string, reviewId: string, choices: CollectionChoices, question: string, revision: number): Promise<DesktopResult<CollectionHandoff>>;
+  saveEditedCollection(id: string, reviewId: string, choices: CollectionChoices, name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  saveAskCollection(id: string, name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  loadKnowledge(selection: ProjectRequest, revision: number): Promise<DesktopResult<import("./knowledge.ts").KnowledgeSnapshot>>;
+  generateKnowledge(id: string, input: import("./knowledge.ts").KnowledgeInput, revision: number): Promise<DesktopResult<import("./knowledge.ts").KnowledgeDraft>>;
+  prepareKnowledge(id: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
+  researchDraftChanged(keepClip: boolean): Promise<DesktopResult<null>>;
+  cancelResearch(): Promise<DesktopResult<null>>;
   closeVault(): Promise<DesktopResult<null>>;
 }
 import type { IndexCoverage } from "../vault/index-coverage.ts";
@@ -99,3 +115,6 @@ export interface AskSnapshot {
 }
 export interface AskContext { id: string; retrievalId: string; bundle: import("../vault/evidence.ts").EvidenceBundle; conversation: import("../intelligence/conversation.ts").ConversationContext; }
 export interface AskAnswer { id: string; turnNumber: number; corrections: import("../vault/answer-record.ts").ClaimCorrections; contextId: string; answer: import("../intelligence/answer.ts").Answer; model: string; generatedAt: number; }
+
+export interface CollectionChoices { choices: Record<string, import("../vault/workbench.ts").EvidenceChoice>; confirmed: number[]; }
+export interface CollectionHandoff { snapshot: AskSnapshot; context: AskContext; choices: Record<string, import("../vault/workbench.ts").EvidenceChoice>; }

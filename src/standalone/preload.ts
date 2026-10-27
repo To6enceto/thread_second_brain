@@ -63,6 +63,22 @@ const bridge: DesktopBridge = {
   prepareReviewDraft: (id, revision) => ipcRenderer.invoke("thread:prepare-review-draft", id, revision),
   reviewDraftChanged: () => ipcRenderer.invoke("thread:review-draft-changed"),
   cancelReviews: () => ipcRenderer.invoke("thread:cancel-reviews"),
+  loadIntake: (selection, revision) => ipcRenderer.invoke("thread:load-intake", selection, revision),
+  pickIntakeFile: (id, revision) => ipcRenderer.invoke("thread:pick-intake-file", id, revision),
+  suggestIntakeProject: (id, input, revision) => ipcRenderer.invoke("thread:suggest-intake-project", id, input, revision),
+  prepareCapture: (id, input, revision) => ipcRenderer.invoke("thread:prepare-capture", id, input, revision),
+  reviewClip: (id, input, revision) => ipcRenderer.invoke("thread:review-clip", id, input, revision),
+  prepareClip: (id, reviewId, acknowledge, revision) => ipcRenderer.invoke("thread:prepare-clip", id, reviewId, acknowledge, revision),
+  loadCollections: (selection, scope, revision) => ipcRenderer.invoke("thread:load-collections", selection, scope, revision),
+  openCollection: (id, path, revision) => ipcRenderer.invoke("thread:open-collection", id, path, revision),
+  reuseCollection: (id, reviewId, choices, question, revision) => ipcRenderer.invoke("thread:reuse-collection", id, reviewId, choices, question, revision),
+  saveEditedCollection: (id, reviewId, choices, name, revision) => ipcRenderer.invoke("thread:save-edited-collection", id, reviewId, choices, name, revision),
+  saveAskCollection: (id, name, revision) => ipcRenderer.invoke("thread:save-ask-collection", id, name, revision),
+  loadKnowledge: (selection, revision) => ipcRenderer.invoke("thread:load-knowledge", selection, revision),
+  generateKnowledge: (id, input, revision) => ipcRenderer.invoke("thread:generate-knowledge", id, input, revision),
+  prepareKnowledge: (id, revision) => ipcRenderer.invoke("thread:prepare-knowledge", id, revision),
+  researchDraftChanged: keepClip => ipcRenderer.invoke("thread:research-draft-changed", keepClip),
+  cancelResearch: () => ipcRenderer.invoke("thread:cancel-research"),
   closeVault: () => ipcRenderer.invoke("thread:close-vault")
 };
 contextBridge.exposeInMainWorld("threadDesktop", bridge);

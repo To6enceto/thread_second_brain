@@ -8,7 +8,7 @@ import { ANSWER_SCHEMA, validateAnswer } from "../intelligence/answer.ts";
 import { searchBudget, searchLevels } from "../retrieval/budget.ts";
 import { filterEntries, normalizeFilters, searchEntries, type SearchResult } from "../retrieval/search.ts";
 import { SemanticSearch, semanticCandidates } from "../retrieval/semantic.ts";
-import { buildEvidence } from "../vault/evidence.ts";
+import { buildEvidence, type EvidenceBundle } from "../vault/evidence.ts";
 import { hitsToNotes, identityFromIndex, type IndexEntry } from "../vault/index.ts";
 import { contentHash } from "../vault/scope.ts";
 import { selectContext, type EvidenceChoice } from "../vault/workbench.ts";
@@ -44,7 +44,7 @@ export class DesktopAsk {
   private projects: DesktopProjects;
   private ai: DesktopAI;
   private semantic = new SemanticSearch();
-  private prepared: { value: AskSnapshot; version: number; hashes: Record<string, string> } | null = null;
+  private prepared: { value: AskSnapshot; version: number; hashes: Record<string, string>; collectionHashes?: Record<string, string> } | null = null;
   private context: AskContext | null = null;
   private epoch = 0;
   private answer: AskAnswer | null = null;
@@ -115,6 +115,7 @@ export class DesktopAsk {
       const guard = (): void => { current(); if (epoch !== this.epoch || this.active(identity, revision) !== prepared) throw new DesktopError("Ask choices changed. Preview again."); };
       await this.verify(prepared.value.index, prepared.hashes, guard);
       const bundle = selectContext(prepared.value.bundle, choices as Record<string, EvidenceChoice>);
+      Object.assign(bundle.noteHashes, prepared.collectionHashes);
       const result = { id: randomUUID(), retrievalId: prepared.value.id, bundle, conversation: conversationContext(this.turns, bundle) };
       guard(); this.choices = { ...choices } as Record<string, EvidenceChoice>; this.context = result; return structuredClone(result);
     });
@@ -174,6 +175,24 @@ export class DesktopAsk {
         history: this.turns.map(({ question, answer, corrections }) => structuredClone({ question, answer, corrections })) };
       this.prepared = { ...prepared, value }; this.context = null; this.answer = null; this.epoch++; return structuredClone(value);
     });
+  }
+
+  /** Main-only collection capture: renderer can choose intents but never supply evidence. */
+  collectionSource(identity: unknown, revision: unknown) {
+    const prepared = this.active(identity, revision), context = this.context, epoch = this.epoch;
+    if (!context || context.retrievalId !== identity) throw new DesktopError("Review evidence choices before saving a collection.");
+    const assert = () => { if (epoch !== this.epoch || this.active(identity, revision) !== prepared || this.context !== context) throw new DesktopError("Ask choices changed. Prepare a new collection preview."); };
+    return { snapshot: structuredClone(prepared.value), choices: { ...this.choices }, hashes: { ...prepared.hashes }, assert, validate: () => this.verify(prepared.value.index, prepared.hashes, assert) };
+  }
+  /** Trusted main-process handoff only. No inference runs until Generate is chosen. */
+  async useCollection(input: AskRequest, index: IndexSnapshot, bundle: EvidenceBundle, choices: Record<string, EvidenceChoice>, hashes: Record<string, string>, collectionHashes: Record<string, string>, current: () => void): Promise<{ snapshot: AskSnapshot; context: AskContext; choices: Record<string, EvidenceChoice> }> {
+    const options = request(input); this.forget(); const epoch = this.epoch, version = this.ai.version;
+    const guard = () => { current(); if (epoch !== this.epoch || version !== this.ai.version) throw new DesktopError("Collection handoff canceled. Open and review it again."); this.evidence.assertCurrent(index); };
+    await this.verify(index, hashes, guard); guard();
+    const value: AskSnapshot = { id: randomUUID(), request: options, index, bundle: structuredClone(bundle), history: [] }, chosen = selectContext(bundle, choices); Object.assign(chosen.noteHashes, collectionHashes);
+    const context: AskContext = { id: randomUUID(), retrievalId: value.id, bundle: chosen, conversation: conversationContext([], chosen) };
+    this.prepared = { value, version, hashes: { ...hashes }, collectionHashes: { ...collectionHashes } }; this.context = context; this.choices = { ...choices };
+    return structuredClone({ snapshot: value, context, choices });
   }
 
   artifact(identity: unknown, kind: unknown, title: unknown, selected: unknown, revision: unknown): { content: string; project: string; assert: () => void; validate: () => Promise<void> } {

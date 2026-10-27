@@ -189,7 +189,8 @@ export class VaultReader {
       }
       this.current(selected.revision);
       let text: string;
-      try { text = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, count)); }
+      // A leading BOM is part of the original snapshot and its conflict hash.
+      try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(buffer.subarray(0, count)); }
       catch { throw new DesktopError("This note is not valid UTF-8 text."); }
       return { revision: selected.revision, path, text, modifiedAt: after.mtimeMs, stamp: stamp(after) };
     } finally { await handle.close(); }

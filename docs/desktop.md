@@ -4,9 +4,10 @@ Thread has an independent Linux window with scoped vault browsing, keyword
 evidence search, safe Markdown navigation, project home, recorded Resume, optional
 local AI interpretation, an Ask evidence workbench, bounded follow-ups and reviewed
 new-note saves, exact existing-note change review, guarded undo and interruption
-recovery, decisions, managed questions, actions, session wrap-up and on-demand
-project reviews. Obsidian can stay closed. Remaining
-desktop workflows are tracked in items 59-62 of the build plan; the existing plugin remains available.
+recovery, decisions, managed questions, actions, session wrap-up, on-demand
+project reviews, reviewed capture and clip intake, saved research collections and
+cited knowledge synthesis. Obsidian can stay closed. Remaining
+desktop workflows are tracked in items 60-62 of the build plan; the existing plugin remains available.
 
 ## Run from this checkout
 
@@ -74,7 +75,8 @@ source text can receive keyboard focus for scrolling and selection.
   unknown-tag or aliased headers omit the note from evidence; its original source
   remains readable. Ordinary metadata is limited to 64 KiB. Supported action
   histories may exceed that header limit within their 256 KiB record and 1 MiB
-  note bounds. No plugin metadata parser is required.
+  note bounds, and validated research collections within their 128 KiB record
+  and 512 KiB note bounds. No plugin metadata parser is required.
 - The formatted preview is capped at 120,000 characters, 2,000 blocks and 5,000
   inline tokens. The literal source remains available. Parent traversal, hidden,
   external and attachment links are refused. Full Obsidian syntax is not emulated.
@@ -476,3 +478,64 @@ indexed files, 1 MiB per file and 8 MiB total, displaying 200 diagnostics. Weekl
 review considers the 80 most recently modified eligible notes before the existing
 16000-character evidence limit. No view certifies complete vault coverage or model
 truth; inspect current source excerpts and reported limits.
+
+## Capture and research
+
+Choose **Capture and research** and a **Research workflow**. Saving needs desktop
+writing and explicit folder roles: Inbox for typed thoughts, Sources for imported
+files and clip copies, and Knowledge for synthesis notes and all-permitted
+collections. Roles never grant reads. **Refresh research context** rebuilds the
+snapshot; **Cancel research work**, edited inputs, model changes, source changes
+and revoked access discard obsolete work. Websites, images and attachments are
+never fetched, and original files and notes are never modified.
+
+- **Capture a thought or local file:** type a thought, or choose **Choose local
+  text file** to pick one ordinary UTF-8 `.md` or `.txt` file up to 2 MiB in the
+  system dialog. The picked file is read once into a read-only snapshot; Thread
+  keeps no path, watch or later access to it. **Suggest project association**
+  only proposes a project; choose **Use suggested project** or pick one yourself.
+  An optional original URL is recorded, not fetched. **Preview captured note**
+  opens exact change review. Importing the same exact text again is refused and
+  names the earlier permitted source. Invalid UTF-8, symlinks, special files and
+  hardlinked files are refused without replacing bytes.
+- **Review a saved clip:** choose an ordinary permitted note saved by Obsidian
+  Web Clipper and a project, then **Review selected clip**. Title, author, URL,
+  publication date and capture date are shown separately; missing or ambiguous
+  values stay Unknown. Possible duplicates (same original text, same recorded
+  URL) must be acknowledged with **I reviewed possible duplicates** before
+  **Preview clipped source** prepares a separate copy. Same URL is a hint, not
+  proof of identity.
+- **Saved collections:** in Ask, after reviewing evidence, expand **Save these
+  references as a collection**, enter a name and choose **Preview named
+  collection**. Collections store references, headings, hashes and your
+  Include/Pin/Exclude choices, not excerpts. Selected-project collections go to
+  the project's `Collections` folder; all-permitted ones go to
+  `Knowledge/Collections`. Under **Saved collections**, choose a **Collection
+  scope** and **Open collection**. Current passages are reread. Changed passages
+  need **I reviewed this changed passage** before they can enter Ask; unconfirmed
+  ones are left out. References that are no longer permitted show only their
+  number and state. **Use chosen references in Ask** hands the current passages
+  to Ask without running the model; choose Generate there. **Preview collection
+  copy** saves edited choices as a new note containing only currently available
+  and reconfirmed references; the original collection is unchanged.
+- **Knowledge synthesis:** enter a title and focus, choose Concept or Comparison,
+  and select one to five current sources with Ctrl/Shift. Choose **Create a new
+  Knowledge note** or append to an existing eligible Knowledge note, and
+  optionally pick a project note to receive a link. Sources cannot also be
+  targets. With an applied local text model, choose **Generate knowledge
+  proposal**, inspect the cited claims and every affected note, then **Preview
+  knowledge changes**. Appends keep existing properties and text.
+
+All saves use **Review changes**, **Preview pending change** and **Apply exact
+change**. New notes refuse existing destinations. A source, target or catalog
+change after preview refuses Apply and preserves the newer text; reject the stale
+proposal and prepare a new one. Guarded Undo restores exact prior bytes and
+refuses to erase later edits.
+
+Coverage is finite: duplicate checks cover currently indexed permitted source
+records only, and clip review offers at most 100 ordinary notes; known Thread
+records are skipped and any other managed record is refused on review. Collections hold
+1-50 references and at most 100 are listed. Synthesis uses the existing
+16000-character evidence limit. Captured text above the journal's 1 MB combined
+before/after budget is refused rather than truncated. A valid citation shows where
+text came from; it does not prove the claim is true.

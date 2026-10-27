@@ -1,3 +1,6 @@
+import { DesktopIntake } from "./intake.ts";
+import { DesktopCollections } from "./collections.ts";
+import { DesktopKnowledge } from "./knowledge.ts";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
@@ -12,7 +15,7 @@ import { DesktopAI } from "./local-ai.ts";
 import { DesktopProjects } from "./projects.ts";
 import { EvidenceIndex } from "./evidence-index.ts";
 import { assetAllowed, DesktopError, publicFailure, trustedSender } from "./security.ts";
-import type { DesktopResult } from "./contracts.ts";
+import type { DesktopResult, ProjectRequest } from "./contracts.ts";
 
 app.setName("Thread Desktop");
 app.enableSandbox();
@@ -25,11 +28,16 @@ let saves: DesktopSaves;
 let changes: DesktopChanges;
 let records: DesktopRecords;
 let reviews: DesktopReviews;
-const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { reviews?.invalidate(); records?.invalidate(); changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
+let intake: DesktopIntake;
+let collections: DesktopCollections;
+let knowledge: DesktopKnowledge;
+function invalidateResearch(): void { intake?.invalidate(); collections?.invalidate(); knowledge?.invalidate(); }
+function researchDraftChanged(keepClip = false): void { intake?.draftChanged(keepClip); collections?.draftChanged(); knowledge?.draftChanged(); }
+const evidence = new EvidenceIndex(reader, event => { if (event.kind === "invalidated") { invalidateResearch(); reviews?.invalidate(); records?.invalidate(); changes?.invalidate(); saves?.revoke(); ai?.forget(); ask?.forget(); } if (window && !window.webContents.isDestroyed()) window.webContents.send("thread:index-event", event); });
 const projects = new DesktopProjects(reader, evidence);
 ai = new DesktopAI(projects, evidence);
 ask = new DesktopAsk(reader, evidence, projects, ai);
-function clearVault(): void { reviews?.invalidate(); records?.invalidate(); changes?.invalidate(); saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
+function clearVault(): void { invalidateResearch(); reviews?.invalidate(); records?.invalidate(); changes?.invalidate(); saves?.revoke(); ask.forget(); ai.reset(); evidence.reset(); reader.close(); void storage?.close(); }
 let choosing = false;
 const entry = join(__dirname, "app.html");
 const assets = [entry, join(__dirname, "renderer.js"), join(__dirname, "styles.css")];
@@ -53,6 +61,9 @@ async function start(): Promise<void> {
   changes = new DesktopChanges(reader, storage);
   records = new DesktopRecords(reader, evidence, projects, storage, changes, ai);
   reviews = new DesktopReviews(reader, evidence, projects, storage, changes, ai);
+  intake = new DesktopIntake(reader, evidence, projects, storage, changes);
+  collections = new DesktopCollections(reader, evidence, projects, storage, changes, ask);
+  knowledge = new DesktopKnowledge(reader, evidence, projects, storage, changes, ai);
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -81,36 +92,36 @@ async function start(): Promise<void> {
       const choice = await dialog.showOpenDialog(window, { title: "Choose your Obsidian vault folder", properties: ["openDirectory"] });
       if (choice.canceled || !choice.filePaths[0]) return null;
       if (!window || reader.getInfo()?.revision !== previous) throw new DesktopError("The current vault changed. Choose the folder again.");
-      reviews.invalidate(); records.invalidate(); await storage.close();
+      invalidateResearch(); reviews.invalidate(); records.invalidate(); await storage.close();
       const selected = await reader.select(choice.filePaths[0]); ask.forget(); ai.reset(); evidence.reset(); await storage.initialize(selected.revision); return selected;
     } finally { choosing = false; }
   });
-  handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
+  handle("thread:grant-scope", 2, async (scope, revision) => { const info = reader.grant(scope, revision); invalidateResearch(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); evidence.reset(); await storage.release(); return info; });
   handle("thread:list-notes", 1, revision => reader.list(revision));
   handle("thread:read-note", 3, (path, revision, hash) => evidence.source(path, revision, hash));
   handle("thread:refresh-index", 1, revision => evidence.refresh(revision, true));
   handle("thread:cancel-index", 1, revision => { evidence.cancel(revision); return null; });
   handle("thread:search-notes", 2, (query, revision) => evidence.search(query, revision));
   handle("thread:resolve-link", 3, (from, target, revision) => evidence.resolve(from, target, revision));
-  handle("thread:project-home", 2, (selection, revision) => { reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return projects.home(selection, revision); });
-  handle("thread:resume-project", 2, (selection, revision) => { reviews.invalidate(); records.invalidate(); ask.forget(); return ai.prepare(selection, revision); });
+  handle("thread:project-home", 2, (selection, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return projects.home(selection, revision); });
+  handle("thread:resume-project", 2, (selection, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); ask.forget(); return ai.prepare(selection, revision); });
   handle("thread:discover-models", 1, endpoint => ai.discover(endpoint));
-  handle("thread:configure-ai", 1, settings => { const result = ai.configure(settings); reviews.invalidate(); records.invalidate(); ask.forget(); return result; });
+  handle("thread:configure-ai", 1, settings => { const result = ai.configure(settings); invalidateResearch(); reviews.invalidate(); records.invalidate(); ask.forget(); return result; });
   handle("thread:check-ai", 0, () => ai.check());
-  handle("thread:cancel-ai", 0, () => { reviews.draftChanged(); records.draftChanged(false); saves.revoke(); ai.cancel(); return null; });
+  handle("thread:cancel-ai", 0, () => { researchDraftChanged(); reviews.draftChanged(); records.draftChanged(false); saves.revoke(); ai.cancel(); return null; });
   handle("thread:interpret-resume", 2, (identity, revision) => ai.interpret(identity, revision));
-  handle("thread:retrieve-ask", 2, (request, revision) => { reviews.invalidate(); records.invalidate(); ai.forget(); return ask.retrieve(request, revision); });
-  handle("thread:choose-ask", 3, (identity, choices, revision) => { saves.revoke(); return ask.choose(identity, choices, revision); });
-  handle("thread:generate-ask", 2, (identity, revision) => { saves.revoke(); return ask.generate(identity, revision); });
-  handle("thread:correct-ask", 5, (identity, index, text, kind, revision) => { saves.revoke(); return ask.correct(identity, index, text, kind, revision); });
-  handle("thread:continue-ask", 3, (identity, question, revision) => { saves.revoke(); return ask.continue(identity, question, revision); });
-  handle("thread:reset-ask", 0, () => { saves.revoke(); ask.forget(); return null; });
+  handle("thread:retrieve-ask", 2, (request, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); ai.forget(); return ask.retrieve(request, revision); });
+  handle("thread:choose-ask", 3, (identity, choices, revision) => { collections.draftChanged(); saves.revoke(); return ask.choose(identity, choices, revision); });
+  handle("thread:generate-ask", 2, (identity, revision) => { collections.draftChanged(); saves.revoke(); return ask.generate(identity, revision); });
+  handle("thread:correct-ask", 5, (identity, index, text, kind, revision) => { collections.draftChanged(); saves.revoke(); return ask.correct(identity, index, text, kind, revision); });
+  handle("thread:continue-ask", 3, (identity, question, revision) => { collections.draftChanged(); saves.revoke(); return ask.continue(identity, question, revision); });
+  handle("thread:reset-ask", 0, () => { collections.draftChanged(); saves.revoke(); ask.forget(); return null; });
   handle("thread:storage-status", 1, revision => storage.status(revision));
   handle("thread:inspect-compatibility", 2, (folder, revision) => storage.inspect(folder, revision));
   handle("thread:enable-writing", 2, (id, revision) => storage.enable(id, revision));
-  handle("thread:release-writing", 0, async () => { reviews.invalidate(); records.invalidate(); changes.invalidate(); await storage.release(); return null; });
-  handle("thread:save-preferences", 2, (preferences, revision) => { reviews.invalidate(); records.invalidate(); changes.invalidate(); return storage.savePreferences(preferences, revision); });
-  handle("thread:import-plugin-copy", 2, (id, revision) => { reviews.invalidate(); records.invalidate(); changes.invalidate(); return storage.importCopy(id, revision); });
+  handle("thread:release-writing", 0, async () => { invalidateResearch(); reviews.invalidate(); records.invalidate(); changes.invalidate(); await storage.release(); return null; });
+  handle("thread:save-preferences", 2, (preferences, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); changes.invalidate(); return storage.savePreferences(preferences, revision); });
+  handle("thread:import-plugin-copy", 2, (id, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); changes.invalidate(); return storage.importCopy(id, revision); });
   handle("thread:preview-ask-save", 5, (id, kind, title, selected, revision) => saves.prepare(id, kind, title, selected, revision));
   handle("thread:save-ask-preview", 2, (id, revision) => saves.save(id, revision));
   handle("thread:revoke-save-preview", 0, () => { saves.revoke(); return null; });
@@ -125,21 +136,41 @@ async function start(): Promise<void> {
   handle("thread:reject-change", 2, (id, revision) => changes.reject(id, revision));
   handle("thread:change-draft-edited", 1, id => { changes.draftChanged(id); return null; });
   handle("thread:invalidate-change-view", 0, () => { changes.invalidate(); return null; });
-  handle("thread:load-records", 2, (selection, revision) => { reviews.invalidate(); return records.load(selection, revision); });
+  handle("thread:load-records", 2, (selection, revision) => { invalidateResearch(); reviews.invalidate(); return records.load(selection, revision); });
   handle("thread:prepare-record", 3, (id, command, revision) => records.prepare(id, command, revision));
   handle("thread:assess-decision", 4, (id, path, sources, revision) => records.assess(id, path, sources, revision));
   handle("thread:record-draft-changed", 1, keep => { records.draftChanged(keep); return null; });
   handle("thread:cancel-records", 0, () => { records.invalidate(); return null; });
-  handle("thread:load-actions", 2, (selection, revision) => { reviews.invalidate(); return records.loadActions(selection, revision); });
+  handle("thread:load-actions", 2, (selection, revision) => { invalidateResearch(); reviews.invalidate(); return records.loadActions(selection, revision); });
   handle("thread:prepare-action", 3, (id, command, revision) => records.prepareAction(id, command, revision));
   handle("thread:generate-session", 3, (id, input, revision) => records.generateSession(id, input, revision));
   handle("thread:prepare-session", 2, (id, revision) => records.prepareSession(id, revision));
-  handle("thread:load-reviews", 2, (request, revision) => { records.invalidate(); ask.forget(); ai.forget(); return reviews.load(request, revision); });
+  handle("thread:load-reviews", 2, (request, revision) => { invalidateResearch(); records.invalidate(); ask.forget(); ai.forget(); return reviews.load(request, revision); });
   handle("thread:prepare-review", 3, (id, command, revision) => reviews.prepare(id, command, revision));
   handle("thread:generate-review", 3, (id, input, revision) => reviews.generate(id, input, revision));
   handle("thread:prepare-review-draft", 2, (id, revision) => reviews.prepareDraft(id, revision));
   handle("thread:review-draft-changed", 0, () => { reviews.draftChanged(); return null; });
   handle("thread:cancel-reviews", 0, () => { reviews.invalidate(); return null; });
+  handle("thread:load-intake", 2, (selection, revision) => { collections.invalidate(); knowledge.invalidate(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return intake.load(selection as ProjectRequest, revision); });
+  handle("thread:pick-intake-file", 2, (id, revision) => intake.pick(id, revision, async () => {
+    if (choosing || !window) throw new DesktopError("Finish the open dialog first."); choosing = true;
+    try { const choice = await dialog.showOpenDialog(window, { title: "Choose a local Markdown or text source", properties: ["openFile"], filters: [{ name: "Local text", extensions: ["md", "txt"] }] }); return choice.canceled ? null : choice.filePaths[0] ?? null; }
+    finally { choosing = false; }
+  }));
+  handle("thread:suggest-intake-project", 3, (id, input, revision) => intake.suggest(id, input, revision));
+  handle("thread:prepare-capture", 3, (id, input, revision) => intake.capture(id, input, revision));
+  handle("thread:review-clip", 3, (id, input, revision) => intake.reviewClip(id, input, revision));
+  handle("thread:prepare-clip", 4, (id, reviewId, acknowledge, revision) => intake.prepareClip(id, reviewId, acknowledge, revision));
+  handle("thread:load-collections", 3, (selection, scope, revision) => { intake.invalidate(); knowledge.invalidate(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return collections.load(selection as ProjectRequest, scope, revision); });
+  handle("thread:open-collection", 3, (id, path, revision) => collections.open(id, path, revision));
+  handle("thread:reuse-collection", 5, (id, reviewId, choices, question, revision) => { saves.revoke(); return collections.reuse(id, reviewId, choices, question, revision); });
+  handle("thread:save-edited-collection", 5, (id, reviewId, choices, name, revision) => collections.saveEdited(id, reviewId, choices, name, revision));
+  handle("thread:save-ask-collection", 3, (id, name, revision) => collections.saveAsk(id, name, revision));
+  handle("thread:load-knowledge", 2, (selection, revision) => { intake.invalidate(); collections.invalidate(); reviews.invalidate(); records.invalidate(); ask.forget(); ai.forget(); return knowledge.load(selection as ProjectRequest, revision); });
+  handle("thread:generate-knowledge", 3, (id, input, revision) => knowledge.generate(id, input, revision));
+  handle("thread:prepare-knowledge", 2, (id, revision) => knowledge.prepare(id, revision));
+  handle("thread:research-draft-changed", 1, keepClip => { if (typeof keepClip !== "boolean") throw new DesktopError("Use the current research controls."); researchDraftChanged(keepClip); return null; });
+  handle("thread:cancel-research", 0, () => { invalidateResearch(); return null; });
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
   const monitor = setInterval(() => {
     const selected = reader.getInfo();

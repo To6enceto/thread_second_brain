@@ -1,3 +1,4 @@
+import { ResearchView } from "./research-view.ts";
 import { ReviewsView } from "./reviews-view.ts";
 import { ActionsView } from "./actions-view.ts";
 import { RecordsView } from "./records-view.ts";
@@ -25,16 +26,17 @@ let changesView: ChangesView;
 let recordsView: RecordsView;
 let actionsView: ActionsView;
 let reviewsView: ReviewsView;
+let researchView: ResearchView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
 function clearAI(): void {
   aiEpoch++; element("project-panel").querySelector(".thread-ai-card")?.remove(); aiFeedback.textContent = ""; aiCancel.disabled = true;
 }
-const modelSetup = new ModelSetup(bridge, () => { reviewsView?.invalidate(); actionsView?.invalidate("Model setup changed. Refresh actions."); recordsView?.invalidate("Model setup changed. Refresh records."); clearAI(); askView?.invalidate("Local model setup changed. Retrieve evidence again."); });
+const modelSetup = new ModelSetup(bridge, () => { researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("Model setup changed. Refresh actions."); recordsView?.invalidate("Model setup changed. Refresh records."); clearAI(); askView?.invalidate("Local model setup changed. Retrieve evidence again."); });
 function cancelAI(): void { clearAI(); void bridge.cancelAI(); }
 function clearProjects(): void {
-  reviewsView?.invalidate(); actionsView?.invalidate("Project or source context changed. Refresh actions.");
+  researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("Project or source context changed. Refresh actions.");
   recordsView?.invalidate("Project or source context changed. Refresh records.");
   askView?.invalidate(); askView?.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
@@ -44,8 +46,8 @@ function clearProjects(): void {
 let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
-const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => { reviewsView?.invalidate(); actionsView?.invalidate("Writer setup changed. Refresh actions."); recordsView?.invalidate("Writer setup changed. Refresh records."); changesView?.invalidate("Writer setup changed. Refresh and inspect the exact change again."); });
-changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { reviewsView?.hide(); actionsView?.hide(); recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
+const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => { researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("Writer setup changed. Refresh actions."); recordsView?.invalidate("Writer setup changed. Refresh records."); changesView?.invalidate("Writer setup changed. Refresh and inspect the exact change again."); });
+changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { researchView?.hide(); reviewsView?.hide(); actionsView?.hide(); recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
 function value<T>(result: DesktopResult<T>): T {
@@ -71,19 +73,23 @@ function clearContent(invalidate = true): void {
   element("coverage").textContent = "No source content is loaded.";
   element("list-empty").textContent = "Approve read access to list Markdown notes.";
 }
-askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); });
-element("open-ask").addEventListener("click", () => { reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); askView.open(); });
+askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); }, () => changesView.open());
+element("open-ask").addEventListener("click", () => { researchView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); askView.open(); });
 recordsView = new RecordsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { reviewsView?.hide(); actionsView?.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); reviewsView?.hide(); actionsView?.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
 actionsView = new ActionsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { reviewsView?.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); reviewsView?.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
 reviewsView = new ReviewsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); },
   async path => { if (![...projectSelect.options].some(option => option.value === path)) throw Error("Load the current permitted project list before switching projects."); projectSelect.value = path; requests.invalidate(); await loadProject(); },
   () => recordsView.open());
+researchView = new ResearchView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
+  () => { reviewsView.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); },
+  handoff => { researchView.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); askView.adoptCollection(handoff); });
 function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
   element("scope-preview").textContent = `Read roots: ${allowed.length ? allowed.join(", ") : "none (no notes)"}. Exclusions: ${excluded.length ? excluded.join(", ") : "none"}. This preview grants nothing.`;
@@ -132,7 +138,7 @@ async function openNote(path: string, heading = "", expectedHash?: string): Prom
   if (!vault) return;
   const ticket = requests.beginRead();
   if (ticket === null) return;
-  reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
+  researchView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
   clearReader(); announce("Reading the selected source...");
   try {
     const note = value(await bridge.readNote(path, vault.revision, expectedHash));
@@ -260,7 +266,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
-  reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide();
+  researchView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide();
   askView.invalidate("Project changed. Retrieve evidence again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };

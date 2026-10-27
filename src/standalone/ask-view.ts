@@ -1,4 +1,4 @@
-import type { AskAnswer, AskContext, AskRequest, AskSnapshot, DesktopBridge, DesktopResult, ProjectRequest } from "./contracts.ts";
+import type { AskAnswer, AskContext, AskRequest, AskSnapshot, CollectionHandoff, DesktopBridge, DesktopResult, ProjectRequest } from "./contracts.ts";
 import type { EvidenceChoice } from "../vault/workbench.ts";
 import { contextCoverageText } from "../vault/evidence.ts";
 import { searchCoverageText } from "../retrieval/search.ts";
@@ -16,12 +16,14 @@ export class AskView {
   private bridge: DesktopBridge;
   private access: () => Access | null;
   private openSource: (path: string, heading: string, hash: string) => void;
+  private reviewChanges: () => void;
   private epoch = 0;
   private prepared: AskSnapshot | null = null;
   private context: AskContext | null = null;
   private answer: AskAnswer | null = null;
   private choices: Record<string, EvidenceChoice> = {};
   private busy = false;
+  private collectionSaving = false;
   private drafts = new Map<number, { text: string; kind: string }>();
   private revokeSave = (): void => {};
   private panel = el("ask-panel");
@@ -29,8 +31,8 @@ export class AskView {
   private feedback = el("ask-status");
   private retrieveButton = el<HTMLButtonElement>("ask-retrieve");
   private cancelButton = el<HTMLButtonElement>("ask-cancel");
-  constructor(bridge: DesktopBridge, access: () => Access | null, open: (path: string, heading: string, hash: string) => void) {
-    this.bridge = bridge; this.access = access; this.openSource = open;
+  constructor(bridge: DesktopBridge, access: () => Access | null, open: (path: string, heading: string, hash: string) => void, reviewChanges: () => void = () => {}) {
+    this.bridge = bridge; this.access = access; this.openSource = open; this.reviewChanges = reviewChanges;
     for (const id of ["ask-question", "ask-scope", "ask-method", "ask-level", "ask-type", "ask-status-filter", "ask-path", "ask-from", "ask-through"]) {
       el(id).addEventListener(el(id).tagName === "SELECT" ? "change" : "input", () => this.invalidate("Search inputs changed. Retrieve evidence again."));
     }
@@ -47,7 +49,7 @@ export class AskView {
   update(): void { el<HTMLButtonElement>("open-ask").disabled = !this.access(); this.retrieveButton.disabled = this.busy || !this.access(); }
   invalidate(message = "Evidence or model changed. Retrieve evidence again."): void {
     this.revokeSave(); this.drafts.clear();
-    this.epoch++; this.prepared = null; this.context = null; this.answer = null; this.choices = {}; this.results.replaceChildren();
+    this.epoch++; this.collectionSaving = false; this.prepared = null; this.context = null; this.answer = null; this.choices = {}; this.results.replaceChildren();
     this.feedback.textContent = message; this.setBusy(false); el<HTMLButtonElement>("back-ask").disabled = true; void this.bridge.resetAsk();
   }
   hide(): void { this.panel.hidden = true; }
@@ -56,10 +58,18 @@ export class AskView {
     el("project-panel").hidden = true; el("source-pane").hidden = true; this.panel.hidden = false; this.panel.focus();
     this.update();
   }
+  adoptCollection(handoff: CollectionHandoff): void {
+    const access = this.access(), prepared = handoff.snapshot;
+    if (!access || access.revision !== prepared.index.revision || access.generation !== prepared.index.generation) { this.invalidate("Collection context changed. Reopen and review it again."); return; }
+    this.revokeSave(); this.drafts.clear(); this.epoch++; this.answer = null; this.choices = { ...handoff.choices }; this.prepared = prepared; this.context = handoff.context;
+    el<HTMLTextAreaElement>("ask-question").value = prepared.request.question; el<HTMLSelectElement>("ask-scope").value = prepared.request.scope; el<HTMLSelectElement>("ask-method").value = prepared.request.method; el<HTMLSelectElement>("ask-level").value = prepared.request.level;
+    for (const id of ["ask-type", "ask-status-filter", "ask-path", "ask-from", "ask-through"]) el<HTMLInputElement>(id).value = "";
+    this.render(prepared); this.renderContext(prepared, handoff.context); el<HTMLButtonElement>("back-ask").disabled = false; this.setBusy(false); this.open();
+  }
   private setBusy(busy: boolean): void {
     this.busy = busy; this.cancelButton.disabled = !busy; this.update();
     const generate = document.getElementById("ask-generate") as HTMLButtonElement | null;
-    for (const button of this.results.querySelectorAll<HTMLButtonElement>("[data-ask-action]")) button.disabled = busy || button.dataset.limit === "true" || button.hasAttribute("data-draft-blocked") && this.drafts.size > 0;
+    for (const button of this.results.querySelectorAll<HTMLButtonElement>("[data-ask-action]")) button.disabled = busy || button.dataset.needsContext === "true" && !this.context || button.dataset.limit === "true" || button.hasAttribute("data-draft-blocked") && this.drafts.size > 0;
     if (generate) generate.disabled = busy || !this.context?.bundle.sources.length || !this.access()?.model;
   }
   private live(prepared: AskSnapshot): boolean {
@@ -125,6 +135,12 @@ export class AskView {
     const generate = add(context, "button", "Generate from chosen evidence", "thread-primary"); generate.id = "ask-generate"; generate.disabled = true;
     generate.addEventListener("click", () => { void this.generate(prepared); });
     add(context, "p", "No note changes. A cited answer still needs your judgment.", "thread-muted");
+    const collections = add(context, "details"); add(collections, "summary", "Save these references as a collection");
+    add(collections, "p", "Stores current references and Include/Pin/Exclude choices, including excluded passages. No excerpts are stored and no read permissions are granted. Every save is a new reviewed note.", "thread-muted");
+    const name = add(add(collections, "label", "Collection name"), "input"); name.setAttribute("aria-label", "Collection name"); name.maxLength = 100;
+    name.addEventListener("input", () => { if (this.collectionSaving) { this.epoch++; this.collectionSaving = false; this.setBusy(false); } void this.bridge.researchDraftChanged(false); });
+    const save = add(collections, "button", "Preview named collection"); save.dataset.askAction = "true"; save.dataset.needsContext = "true"; save.disabled = true;
+    save.addEventListener("click", () => { void this.saveCollection(prepared, name.value); });
     add(context, "div").id = "ask-answer";
   }
   private async renew(prepared: AskSnapshot): Promise<void> {
@@ -134,15 +150,24 @@ export class AskView {
     try {
       const result = value(await this.bridge.chooseAsk(prepared.id, { ...this.choices }, prepared.index.revision));
       if (epoch !== this.epoch || !this.live(prepared)) return;
-      this.context = result; const sources = result.bundle.sources;
-      el("ask-conversation-exact").textContent = result.conversation.serialized;
-      el("ask-conversation-coverage").textContent = `Earlier turns included: ${result.conversation.turns.map(turn => turn.turn).join(", ") || "none"}. Omitted: ${result.conversation.omitted.map(turn => `${turn.turn} (${turn.reason})`).join(", ") || "none"}. Six turns, 4000 characters of earlier context, 24000 total prompt characters maximum.`;
-      el("ask-context-exact").textContent = JSON.stringify(sources, null, 2);
-      el("ask-context-count").textContent = `${sources.length} of ${prepared.bundle.sources.length} passages included; ${sources.filter(s => this.choices[s.id] === "pin").length} pinned first; ${Object.values(this.choices).filter(c => c === "exclude").length} explicitly excluded.`;
-      el("ask-context-coverage").textContent = contextCoverageText(result.bundle);
-      this.feedback.textContent = sources.length ? this.access()?.model ? "Evidence ready. Review the exact context, then generate." : "Evidence ready. Apply a downloaded text model in Optional local AI to generate." : "No chosen evidence. Include a passage, or retrieve again.";
+      this.context = result; this.renderContext(prepared, result);
     } catch (error) { if (epoch === this.epoch) this.feedback.textContent = error instanceof Error ? error.message : "Context preview failed. Retrieve again."; }
     finally { if (epoch === this.epoch) this.setBusy(false); }
+  }
+  private renderContext(prepared: AskSnapshot, result: AskContext): void {
+    const sources = result.bundle.sources;
+    el("ask-conversation-exact").textContent = result.conversation.serialized;
+    el("ask-conversation-coverage").textContent = `Earlier turns included: ${result.conversation.turns.map(turn => turn.turn).join(", ") || "none"}. Omitted: ${result.conversation.omitted.map(turn => `${turn.turn} (${turn.reason})`).join(", ") || "none"}. Six turns, 4000 characters of earlier context, 24000 total prompt characters maximum.`;
+    el("ask-context-exact").textContent = JSON.stringify(sources, null, 2);
+    el("ask-context-count").textContent = `${sources.length} of ${prepared.bundle.sources.length} passages included; ${sources.filter(s => this.choices[s.id] === "pin").length} pinned first; ${Object.values(this.choices).filter(c => c === "exclude").length} explicitly excluded.`;
+    el("ask-context-coverage").textContent = contextCoverageText(result.bundle);
+    this.feedback.textContent = sources.length ? this.access()?.model ? "Evidence ready. Review the exact context, then generate." : "Evidence ready. Apply a downloaded text model in Optional local AI to generate." : "No chosen evidence. Include a passage, or retrieve again.";
+  }
+  private async saveCollection(prepared: AskSnapshot, name: string): Promise<void> {
+    if (this.busy || !this.context || !this.live(prepared)) return; const epoch = ++this.epoch; this.collectionSaving = true; this.setBusy(true); this.feedback.textContent = "Preparing the exact named collection preview...";
+    try { value(await this.bridge.saveAskCollection(prepared.id, name, prepared.index.revision)); if (epoch === this.epoch && this.live(prepared)) this.reviewChanges(); }
+    catch (error) { if (epoch === this.epoch) this.feedback.textContent = error instanceof Error ? error.message : "Collection preview failed. Retrieve again."; }
+    finally { if (epoch === this.epoch) { this.collectionSaving = false; this.setBusy(false); } }
   }
   private async generate(prepared: AskSnapshot): Promise<void> {
     const context = this.context; if (this.busy || !context || !this.live(prepared)) return;

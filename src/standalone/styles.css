@@ -148,7 +148,17 @@
 
 .thread-review-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px; }
 .thread-review-controls select { width: 100%; }
+.thread-review-controls > label[hidden] { display: none; }
 .thread-review-card { border-left: 2px solid var(--thread-recorded); }
 .thread-review-card button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; margin: 6px 6px 0 0; }
 .thread-review-form > label[hidden] { display: none; }
 .thread-review-form { border-top: 1px solid var(--thread-border); padding-top: 16px; margin-top: 24px; }
+
+.thread-research-form { border-top: 1px solid var(--thread-border); margin-top: 18px; padding-top: 16px; }
+.thread-research-form button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; margin: 6px 6px 0 0; }
+.thread-research-form .thread-research-check { display: flex; align-items: center; gap: 10px; }
+.thread-research-check input { width: auto; min-width: 18px; min-height: 32px; }
+.thread-research-form textarea[readonly] { font-family: var(--thread-mono); }
+.thread-research-reference[data-state="changed"] { border: 2px dashed var(--thread-recorded); }
+.thread-research-reference[data-state="unavailable"] { border-style: dashed; color: var(--thread-muted); }
+.thread-research-form .thread-ai-card:empty { display: none; }
