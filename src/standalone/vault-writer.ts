@@ -52,7 +52,8 @@ export class VaultWriter {
       await this.reader.identity(revision); this.path(path, revision); return { parents, file };
     } finally { await parent.close(); }
   }
-  async create(input: string, content: string, expected: DestinationState, revision: unknown, validate: () => Promise<void>, current: () => void): Promise<void> {
+  /** Creates one new note and returns the parent chain it verified, including folders it made. */
+  async create(input: string, content: string, expected: DestinationState, revision: unknown, validate: () => Promise<void>, current: () => void): Promise<string[]> {
     const path = this.path(input, revision);
     if (Buffer.byteLength(content) > 1048576) throw new DesktopError("The new note would be larger than 1 MiB. Make it smaller.");
     current();
@@ -79,7 +80,7 @@ export class VaultWriter {
       finally { await file.close(); }
       await parent.sync(); await check();
       if (hashText((await this.reader.read(path, revision, 1048576)).text) !== hashText(content)) throw new DesktopError("The written note changed right away. Keep it, and look at the unfinished work under Saving notes or with Inspect recovery in Review changes.");
-      current();
+      current(); return chain;
     } finally { await parent.close(); }
   }
   private async existing(input: string, before: string, expected: DestinationState, revision: unknown, current: () => void, mutate: (file: FileHandle, parent: FileHandle, name: string) => Promise<void>): Promise<void> {

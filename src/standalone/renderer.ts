@@ -6,6 +6,7 @@ import { RecordsView } from "./records-view.ts";
 import type { DesktopBridge, DesktopResult, IndexSnapshot, NoteList, VaultInfo, PreparedResume } from "./contracts.ts";
 import { StorageView } from "./storage-view.ts";
 import { SavedAccessView, continueSteps } from "./saved-access-view.ts";
+import { WelcomeView } from "./welcome-view.ts";
 import { ChangesView } from "./changes-view.ts";
 import { AskView } from "./ask-view.ts";
 import { ModelSetup } from "./model-setup.ts";
@@ -31,6 +32,7 @@ let reviewsView: ReviewsView;
 let researchView: ResearchView;
 let portabilityView: PortabilityView;
 let savedAccess: SavedAccessView;
+let welcomeView: WelcomeView;
 let aiEpoch = 0;
 let activePrepared: PreparedResume | null = null;
 const aiFeedback = element("ai-generation-status"), aiCancel = element<HTMLButtonElement>("ai-cancel-generation");
@@ -51,7 +53,7 @@ let vault: VaultInfo | null = null, listing: NoteList | null = null;
 let generation = 0, scoping = false, paused = false;
 const requests = new ReaderRequests();
 const storageView = new StorageView(bridge, () => vault?.revision ?? null, modelSetup, () => { researchView?.invalidate(); reviewsView?.invalidate(); actionsView?.invalidate("Saving settings changed. Refresh actions."); recordsView?.invalidate("Saving settings changed. Refresh to continue."); changesView?.invalidate("Saving settings changed. Refresh and review the change again."); });
-changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView?.hide(); recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; });
+changesView = new ChangesView(bridge, () => vault?.revision ?? null, () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView?.hide(); recordsView?.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); });
 const lines = (text: string): string[] => text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 function announce(message: string): void { status.textContent = message; }
 function value<T>(result: DesktopResult<T>): T {
@@ -72,30 +74,30 @@ function clearContent(invalidate = true): void {
   listing = null; clearProjects(); clearReader(); element("notes").replaceChildren();
   element("search-results").replaceChildren(); element("search-coverage").textContent = "";
   element("coverage-summary").textContent = "Nothing read yet."; element("search-summary").textContent = ""; element("search-details").hidden = true;
-  search.disabled = true; query.disabled = true; askView?.update(); savedAccess?.update();
+  search.disabled = true; query.disabled = true; askView?.update(); savedAccess?.update(); welcomeView?.update();
   filter.value = ""; filter.disabled = true;
   element("coverage").textContent = "No notes are loaded.";
   element("list-empty").textContent = "Approve read access to see your notes here.";
 }
 askView = new AskView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value }, model: modelSetup.model(), embeddingModel: modelSetup.embeddingModel() } : null, (path, heading, hash) => { void openNote(path, heading, hash); }, () => changesView.open());
-element("open-ask").addEventListener("click", () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); askView.open(); });
+element("open-ask").addEventListener("click", () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); welcomeView?.hide(); askView.open(); });
 recordsView = new RecordsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView?.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView?.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
 actionsView = new ActionsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); });
 reviewsView = new ReviewsView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { researchView?.hide(); portabilityView?.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView?.hide(); portabilityView?.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); },
   async path => { if (![...projectSelect.options].some(option => option.value === path)) throw Error("Refresh projects before switching to another project."); projectSelect.value = path; requests.invalidate(); await loadProject(); },
   () => recordsView.open());
 researchView = new ResearchView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { portabilityView?.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { portabilityView?.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); },
   () => changesView.open(), (path, heading, hash) => { void openNote(path, heading, hash); },
   handoff => { researchView.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); askView.adoptCollection(handoff); });
 portabilityView = new PortabilityView(bridge, () => vault && listing && !scoping && !paused ? { revision: vault.revision, generation, selection: { folder: projectFolder.value.trim(), project: projectSelect.value } } : null,
-  () => { researchView.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  () => { researchView.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); cancelAI(); askView.hide(); changesView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; welcomeView?.hide(); },
   (path, heading, hash) => { void openNote(path, heading, hash); });
 function scopePreview(): void {
   const allowed = lines(roots.value), excluded = lines(exclusions.value);
@@ -143,6 +145,7 @@ function renderMarkdown(path: string, text: string, heading: string): string {
 }
 async function openNote(path: string, heading = "", expectedHash?: string): Promise<void> {
   if (!vault) return;
+  welcomeView?.hide();
   const ticket = requests.beginRead();
   if (ticket === null) return;
   researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = false;
@@ -174,7 +177,7 @@ function renderNotes(): void {
 }
 function applyIndex(result: IndexSnapshot): void {
   if (!vault || result.revision !== vault.revision || result.generation < generation) return;
-  generation = result.generation; listing = result.listing; askView.update(); savedAccess.update(); loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes(); researchView?.indexReady();
+  generation = result.generation; listing = result.listing; askView.update(); savedAccess.update(); welcomeView?.update(); loadProjects.disabled = scoping; filter.disabled = false; query.disabled = false; search.disabled = false; renderNotes(); researchView?.indexReady();
   element("coverage-summary").textContent = `${result.coverage.indexedFiles} notes ready to search · ${result.coverage.omittedFiles} skipped · ${result.coverage.shortenedNotes} shortened.${result.listing.identityIncomplete ? " Not every note could be listed." : ""}`;
   element("coverage").textContent = `${result.listing.identityIncomplete ? "Not every note could be listed, so these counts cover only the notes Thread found, and saved results that depend on note IDs are not reused. " : ""}${indexCoverageText(result.coverage)} ${result.invalid} ${result.invalid === 1 ? "note" : "notes"} skipped because they could not be read or their properties are invalid. ${result.listing.omitted} other ${result.listing.omitted === 1 ? "file" : "files"} skipped. ${result.listing.limited ? "Thread stopped at its listing limit, so some files may be missing." : result.listing.identityIncomplete ? "Some folders or files could not be checked." : "All allowed folders were checked."} ${result.reused} unchanged notes reused. Find a note by name matches names; Search looks inside notes.${result.pdfChecks ? ` ${result.pdfChecks}` : ""}`;
 }
@@ -257,11 +260,11 @@ function showVault(selected: VaultInfo): void {
   roots.value = selected.scope.roots.join("\n"); exclusions.value = selected.scope.excluded.join("\n"); projectFolder.value = ""; modelSetup.reset(); scopePreview();
   element("vault-details").hidden = false;
   element("vault-name").textContent = selected.name; element("vault-path").textContent = selected.path;
-  refresh.disabled = false;
+  refresh.disabled = false; welcomeView?.update();
 }
 function resetVault(): void {
   clearContent(); vault = null; storageView.reset(); generation = 0; refresh.disabled = true; cancel.disabled = true; element("vault-details").hidden = true;
-  roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); element("vault-name").textContent = ""; element("vault-path").textContent = "";
+  roots.value = ""; exclusions.value = ""; projectFolder.value = ""; modelSetup.reset(); element("vault-name").textContent = ""; element("vault-path").textContent = ""; welcomeView?.update();
 }
 savedAccess = new SavedAccessView(bridge,
   () => vault && listing && !scoping && !paused && vault.scope.roots.length ? { revision: vault.revision, projectsFolder: projectFolder.value.trim(), embeddingModel: modelSetup.embeddingModel() } : null,
@@ -275,7 +278,15 @@ savedAccess = new SavedAccessView(bridge,
       async () => { if (result.ai.model || result.ai.embeddingModel) void modelSetup.restore(result.ai); }
     ]);
   }, announce);
-void savedAccess.load();
+welcomeView = new WelcomeView(bridge, {
+  state: () => ({ folder: vault ? vault.name : null, roots: vault && listing ? vault.scope.roots : [], revision: vault && listing && vault.scope.roots.length ? vault.revision : null }),
+  choose: () => choose.click(),
+  focusAccess: () => { if (!vault) return false; element<HTMLDetailsElement>("access").open = true; roots.focus(); return true; },
+  endpoint: () => element<HTMLInputElement>("ai-endpoint").value,
+  hideOthers: () => { researchView.hide(); portabilityView.hide(); reviewsView.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); cancelAI(); askView.hide(); element("project-panel").hidden = true; element("source-pane").hidden = true; },
+  openChanges: () => changesView.open()
+});
+void savedAccess.load().then(() => { if (!savedAccess.present()) welcomeView.open(); });
 close.addEventListener("click", () => { void (async () => {
   resetVault();
   try { value(await bridge.closeVault()); announce("Folder closed. Thread can no longer read it."); choose.focus(); }
@@ -292,7 +303,7 @@ element<HTMLSelectElement>("theme").addEventListener("change", event => {
 async function loadProject(resume = false, discover = false): Promise<void> {
   if (!vault || !listing || scoping || paused) return;
   const ticket = requests.beginRead(); if (ticket === null) return;
-  researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide();
+  researchView?.hide(); portabilityView?.hide(); reviewsView?.hide(); actionsView.hide(); recordsView.hide(); changesView.hide(); welcomeView?.hide();
   askView.invalidate("Project changed. Find passages again."); askView.hide();
   activePrepared = null; element<HTMLButtonElement>("back-project").disabled = true; cancelAI();
   const revision = vault.revision, selection = { folder: projectFolder.value.trim(), project: discover ? "" : projectSelect.value };

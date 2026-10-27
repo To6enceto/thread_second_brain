@@ -6,6 +6,7 @@ import { DesktopPdf } from "./pdf.ts";
 import { DesktopPortability } from "./portability.ts";
 import { VaultFiles } from "./vault-files.ts";
 import { RememberedAccess } from "./remembered-access.ts";
+import { DesktopNewProject } from "./new-project.ts";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
@@ -39,6 +40,7 @@ let knowledge: DesktopKnowledge;
 let pdf: DesktopPdf;
 let portability: DesktopPortability;
 let remembered: RememberedAccess;
+let newProject: DesktopNewProject;
 function cancelResearchWork(): void { intake?.invalidate(); collections?.invalidate(); knowledge?.invalidate(); pdf?.invalidate(); }
 // Scope, vault, writer and evidence changes also discard portability tokens and previews.
 function invalidateResearch(): void { cancelResearchWork(); portability?.invalidate(); }
@@ -78,6 +80,7 @@ async function start(): Promise<void> {
   pdf = new DesktopPdf(reader, evidence, storage, changes);
   portability = new DesktopPortability(reader, evidence, storage, new VaultFiles(reader));
   remembered = new RememberedAccess(app.getPath("userData")); await remembered.load();
+  newProject = new DesktopNewProject(reader, storage, changes);
   window = new BrowserWindow({
     title: "Thread Desktop", width: 1240, height: 820, minWidth: 720, minHeight: 560,
     show: false,
@@ -207,6 +210,7 @@ async function start(): Promise<void> {
   handle("thread:cancel-portability", 0, () => { portability.draftChanged(); return null; });
   handle("thread:prepare-pdf", 5, (id, token, extraction, name, revision) => pdf.prepare(id, token, extraction, name, revision));
   handle("thread:close-vault", 0, () => { clearVault(); return null; });
+  handle("thread:prepare-new-project", 3, (kind, name, revision) => { invalidateResearch(); reviews.invalidate(); records.invalidate(); return newProject.prepare(kind, name, revision); });
   handle("thread:saved-access", 0, () => remembered.status());
   handle("thread:remember-access", 3, (folder, embeddingModel, revision) => remembered.remember(reader, ai.settings(), folder, embeddingModel, revision));
   handle("thread:forget-saved-access", 0, () => remembered.forget());

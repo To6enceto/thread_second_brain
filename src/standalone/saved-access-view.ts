@@ -38,6 +38,8 @@ export class SavedAccessView {
   async load(): Promise<void> {
     try { this.render(value(await this.bridge.savedAccess())); } catch (error) { this.announce(error instanceof Error ? error.message : "Saved access is unavailable."); }
   }
+  /** True when saved access, or an unreadable saved file, is shown at launch. */
+  present(): boolean { return !!this.state.saved || !!this.state.warning; }
   update(): void {
     el<HTMLButtonElement>("saved-continue").disabled = this.busy || !this.state.saved;
     el<HTMLButtonElement>("saved-forget").disabled = this.busy;

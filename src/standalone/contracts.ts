@@ -93,6 +93,7 @@ export interface DesktopBridge {
   readPdf(id: string, path: string, revision: number): Promise<DesktopResult<import("./pdf.ts").PdfOriginalSnapshot>>;
   preparePdf(id: string, token: string, extraction: import("../pdf/record.ts").PdfExtraction, name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   closeVault(): Promise<DesktopResult<null>>;
+  prepareNewProject(kind: "project" | "sample", name: string, revision: number): Promise<DesktopResult<import("./changes.ts").ChangesSnapshot>>;
   savedAccess(): Promise<DesktopResult<SavedAccessStatus>>;
   rememberAccess(projectsFolder: string, embeddingModel: string, revision: number): Promise<DesktopResult<SavedAccessStatus>>;
   forgetSavedAccess(): Promise<DesktopResult<SavedAccessStatus>>;

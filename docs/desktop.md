@@ -85,6 +85,28 @@ Thread opens nothing and keeps the card: reconnect it and continue, choose the
 folder again, or choose **Forget saved access**. Forget removes only the saved file.
 An unreadable saved file is never used; Thread shows a warning and Forget removes it.
 
+## First run and new projects
+
+When no saved access exists, Thread opens a **Welcome to Thread** panel with four steps.
+**Skip for now** hides it for this session; **Welcome guide** at the top reopens it.
+
+1. **Choose your notes folder** runs the same folder dialog as Choose vault folder.
+2. **Choose what Thread may read** jumps to the read-access fields in the sidebar. Approve
+   read access there as usual; the step shows what Thread may read.
+3. **Optional: add local AI** shows the two commands to run yourself in a terminal
+   (`OLLAMA_NO_CLOUD=1 ollama serve` and `ollama pull qwen3:4b-instruct`). Thread never
+   installs Ollama or downloads models. **Test the Ollama connection** checks the address
+   under Optional local AI and says how many usable text models it found.
+4. **Start a project** needs saving allowed and folders set under Saving notes > Where
+   Thread saves each kind of note: Projects for the sample, Projects and Templates for a
+   new project. **Preview sample project** prepares one synthetic note in a new
+   `Thread Sample` folder. **New project** (also next to Refresh projects) prepares the
+   project's Overview and Questions notes plus the three Thread templates; templates that
+   already exist are kept and skipped, and any existing folder with the project's name is
+   refused, even an empty one. Both open Review changes, and nothing is written until you
+   apply it. Undo in Review changes removes the notes again; the folders it created stay,
+   so use a new name or remove the empty folder yourself before reusing that name.
+
 ## Limits and troubleshooting
 
 - Linux only in this milestone, using descriptor-relative `/proc/self/fd` reads.

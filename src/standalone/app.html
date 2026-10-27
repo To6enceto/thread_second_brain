@@ -11,6 +11,7 @@
 <body class="thread-desktop">
   <header class="thread-header">
     <span class="thread-wordmark">Thread</span><span class="thread-badge">Desktop preview</span>
+    <button id="open-welcome" class="thread-quiet">Welcome guide</button>
     <label class="thread-theme">Appearance <select id="theme" aria-label="Appearance"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
   </header>
   <main class="thread-layout">
@@ -92,7 +93,7 @@
           <label for="projects-folder">Projects folder</label><input id="projects-folder" maxlength="512" placeholder="Projects" aria-describedby="project-mapping-help">
           <p id="project-mapping-help" class="thread-muted">If each project is a folder with an Overview.md note, enter the folder that holds them, for example Projects. Notes marked type: project are found without this. This does not let Thread read anything new.</p>
         </details>
-        <button id="load-projects" disabled>Refresh projects</button>
+        <div class="thread-controls"><button id="load-projects" disabled>Refresh projects</button><button id="new-project">New project</button></div>
         <label for="project-select">Project</label><select id="project-select" aria-label="Project" disabled><option value="">Choose a project</option></select>
         <div class="thread-controls thread-main-actions"><button id="resume-project" class="thread-primary" disabled>Resume project</button><button id="open-ask" disabled>Ask your vault</button><button id="open-research">Capture and research</button></div>
         <button id="project-home" disabled>Project home</button>
@@ -125,6 +126,31 @@
       <p id="list-empty" class="thread-empty">Your notes stay on your computer.</p>
     </section>
     <section class="thread-reader" aria-label="Source reader">
+      <section id="welcome-panel" tabindex="-1" aria-labelledby="welcome-title" hidden>
+        <h2 id="welcome-title">Welcome to Thread</h2>
+        <p class="thread-muted">Four short steps to get started. You can skip this and come back any time with Welcome guide at the top.</p>
+        <ol class="thread-welcome-steps">
+          <li><h3>Choose your notes folder</h3>
+            <p>Pick the folder that holds your Markdown notes, such as your Obsidian vault. Choosing it lets Thread read nothing yet.</p>
+            <button id="welcome-choose" class="thread-primary">Choose vault folder</button><p id="welcome-folder-status" class="thread-muted"></p></li>
+          <li><h3>Choose what Thread may read</h3>
+            <p>In the left sidebar, list the folders Thread may read and any to keep private, then choose Approve read access.</p>
+            <button id="welcome-access">Go to What Thread may read</button><p id="welcome-access-status" class="thread-muted"></p></li>
+          <li><h3>Optional: add local AI</h3>
+            <p>Thread works without AI. To add it, install Ollama yourself, then run these two commands in a terminal:</p>
+            <pre id="welcome-commands" class="thread-commands" tabindex="0" aria-label="Commands to run yourself">OLLAMA_NO_CLOUD=1 ollama serve
+ollama pull qwen3:4b-instruct</pre>
+            <p class="thread-muted">Thread never installs Ollama or downloads models. When Ollama is running, test it here, then choose the model under Optional local AI.</p>
+            <button id="welcome-test-ai">Test the Ollama connection</button><p id="welcome-ai-status" role="status" aria-live="polite" class="thread-muted"></p></li>
+          <li><h3>Start a project</h3>
+            <p>First allow saving under Saving notes and set the Projects folder there (and Templates for a new project). You check every note in Review changes before it is saved.</p>
+            <button id="welcome-sample">Preview sample project</button>
+            <label for="welcome-project-name">New project name</label><input id="welcome-project-name" maxlength="100" placeholder="Pilot study">
+            <button id="welcome-new-project" class="thread-primary">New project</button>
+            <p id="welcome-start-status" role="status" aria-live="polite" class="thread-muted"></p></li>
+        </ol>
+        <div class="thread-controls"><button id="welcome-skip">Skip for now</button></div>
+      </section>
       <section id="research-panel" tabindex="-1" aria-label="Capture and research" hidden>
         <h2>Capture and research</h2>
         <p class="thread-muted">Save thoughts, files, web clips and PDFs as new notes. Originals are never changed, websites are never opened, and you review every note before it is saved.</p>
@@ -138,7 +164,7 @@
       </section>
       <section id="portability-panel" tabindex="-1" aria-label="Project portability" hidden>
         <h2>Project portability</h2>
-        <p class="thread-muted">A checkpoint is a package of the project files you choose, to move or compare them. It is not a full backup of your notes or their history. Thread never overwrites or restores notes, and never lets itself read a new folder unless you allow it.</p>
+        <p class="thread-muted">A checkpoint is a package of the project files you choose, to move or compare them. It is not a full backup of your notes or their history. Exporting, comparing and importing never overwrite or restore your notes, and an imported folder stays unread until you allow it.</p>
         <div class="thread-review-controls">
           <label>Portability workflow<select id="portability-mode" aria-label="Portability workflow"><option value="export">Export a checkpoint</option><option value="compare">Compare a checkpoint</option><option value="import">Import a package as new copies</option></select></label>
         </div>

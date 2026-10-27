@@ -52,6 +52,12 @@
 .thread-saved-list { margin: 8px 0 12px; padding-left: 18px; font-size: 12px; overflow-wrap: anywhere; }
 .thread-saved-access[hidden], .thread-saved-access p[hidden] { display: none; }
 .thread-remember { margin: 14px 0; }
+.thread-welcome-steps { padding-left: 22px; }
+.thread-welcome-steps > li { margin: 0 0 22px; }
+.thread-welcome-steps h3 { margin: 0 0 6px; }
+.thread-commands { font: 12px/1.6 var(--thread-mono); background: var(--thread-surface); border: 1px solid var(--thread-border); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; user-select: text; }
+.thread-header #open-welcome { margin-left: auto; width: auto; flex: 0 0 auto; }
+.thread-header #open-welcome + .thread-theme { margin-left: 0; }
 .thread-library { padding: 24px 20px; border-right: 1px solid var(--thread-border); }
 .thread-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .thread-note-list { list-style: none; padding: 0; margin: 20px 0; }

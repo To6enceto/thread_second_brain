@@ -81,7 +81,7 @@ export class ReviewsView {
     let choose = (_index: number): void => {};
     for (const kind of queueKinds) {
       const section = add(area, "section"), rows = queue.pending.map((row, index) => ({ row, index })).filter(({ row }) => row.item.kind === kind);
-      add(section, "h3", `${queueLabels[kind]} (${rows.length} shown of ${queue.candidateCounts[kind] ?? 0})`);
+      add(section, "h3", `${queueLabels[kind]} (${rows.length} to review; ${queue.candidateCounts[kind] ?? 0} found, including already handled)`);
       if (!rows.length) add(section, "p", "Nothing to review here.", "thread-muted");
       for (const { row, index } of rows) {
         const card = add(section, "article", "", "thread-record-card thread-review-card"); add(card, "p", row.item.text); this.chip(card, row.item, row.item.heading); for (const related of row.item.related) this.chip(card, related);

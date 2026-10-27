@@ -45,7 +45,7 @@ export class DesktopChanges {
     let data: ChangeContext;
     try { data = JSON.parse(batch.context) as ChangeContext; } catch { throw new DesktopError("Thread cannot use this saved change. Keep its history as it is."); }
     if (!data || ![1, 2].includes(data.schemaVersion) || !Array.isArray(data.sources) || data.sources.length > 100 || !data.targets || typeof data.targets !== "object") throw new DesktopError("Thread cannot use this saved change. Keep its history as it is.");
-    if (data.schemaVersion === 2 && (Object.keys(data).sort().join(",") !== "catalog,roles,schemaVersion,scope,sources,targets" || typeof data.catalog !== "string" || !/^[a-f0-9]{64}$/.test(data.catalog))) throw new DesktopError("Thread cannot use this saved review. Keep its history as it is.");
+    if (data.schemaVersion === 2 && (Object.keys(data).sort().join(",") !== "catalog,roles,schemaVersion,scope,sources,targets" || typeof data.catalog !== "string" || !/^[a-f0-9]{64}$/.test(data.catalog))) throw new DesktopError("Thread cannot use this saved change. Keep its history as it is.");
     if (requireScope && JSON.stringify({ scope: data.scope, roles: data.roles }) !== this.settings(revision)) throw new DesktopError("What Thread may read or save changed. Restore that access, or reject the change and make it again.");
     for (const op of batch.operations) this.check(op.path, revision);
     for (const source of data.sources) {
@@ -95,16 +95,28 @@ export class DesktopChanges {
     try {
       return await this.storage.changeWork(revision, async (journal, owned) => {
         const current = (): void => { owned(); if (epoch !== this.epoch || settings !== this.settings(revision)) throw new DesktopError("The approval or access changed. Choose Inspect recovery before trying again."); };
+        // Folders created by an earlier new note in this same run may extend another new note's parent chain.
+        const createdFolders = new Set<string>();
+        const grownByThisRun = (before: DestinationState, actual: DestinationState): boolean => before.file === null && actual.file === null
+          && actual.parents.length > before.parents.length && before.parents.every((parent, index) => actual.parents[index] === parent)
+          && actual.parents.slice(before.parents.length).every(parent => createdFolders.has(parent));
         const currentState = async (path: string): Promise<DestinationState> => {
           current(); this.check(path, revision); const actual = await this.writer.inspect(path, revision); current();
-          if (states[path] && JSON.stringify(states[path]) !== JSON.stringify(actual)) throw new DesktopError("The note changed. Keep the newer work and choose Inspect recovery.");
+          const before = states[path];
+          if (before && JSON.stringify(before) !== JSON.stringify(actual) && !grownByThisRun(before, actual)) throw new DesktopError("The note changed. Keep the newer work and choose Inspect recovery.");
           states[path] = actual; return actual;
         };
         const port: ChangePort = {
           check: path => { current(); this.check(path, revision); },
           read: async path => { const state = await currentState(path); return state.file ? (await this.reader.read(path, revision, 1048576)).text : null; },
           prepare: async path => { await currentState(path); },
-          create: async (path, content) => { await this.writer.create(path, content, await currentState(path), revision, async () => { current(); }, current); states[path] = await this.writer.inspect(path, revision); },
+          create: async (path, content) => {
+            const before = await currentState(path), made = await this.writer.create(path, content, before, revision, async () => { current(); }, current);
+            const after = await this.writer.inspect(path, revision); current();
+            // Only folders in the chain create verified, still holding this note, count as made by this run.
+            if (JSON.stringify(after.parents) !== JSON.stringify(made) || after.file?.hash !== hashText(content)) throw new DesktopError("Folders moved while writing. Keep any note it created and choose Inspect recovery in Review changes.");
+            states[path] = after; for (const parent of made.slice(before.parents.length)) createdFolders.add(parent);
+          },
           replace: async (path, before, after, contextCurrent) => { await this.writer.replace(path, before, after, await currentState(path), revision, () => { current(); if (contextCurrent && !contextCurrent()) throw new DesktopError("A supporting note changed before writing."); }); states[path] = await this.writer.inspect(path, revision); },
           removeCreated: async (path, before) => { await this.writer.removeCreated(path, before, await currentState(path), revision, current); states[path] = await this.writer.inspect(path, revision); },
           persist: async (raw, isCurrent) => { current(); await journal.store(JSON.parse(raw), () => { current(); if (isCurrent && !isCurrent()) throw new DesktopError("Change canceled."); }); },
