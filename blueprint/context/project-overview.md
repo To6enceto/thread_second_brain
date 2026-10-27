@@ -1,6 +1,6 @@
 # Thread - Project Overview
 
-<!-- blueprint:source-hash beaeedce4f6f17a2099b702b7a830be09dcf2b653bcec09703cdea362ef6287b -->
+<!-- blueprint:source-hash c4cf6bcebf2e7803f35ade78867a54931e27e316709f47558abdb95b3fa63ae6 -->
 
 > Local project memory and sourced research, available as an Obsidian plugin
 > and an approved independent Electron desktop application sharing Markdown.
@@ -82,6 +82,7 @@ Preserve prior archive bytes and all notes/history. Implement one feature at a t
 62. **Desktop packaging and offline acceptance**
 63. **Remembered desktop access**
 64. **Plain-language desktop interface**
+    64a. Main window and everyday flows; 64b. Ask, capture, research and PDFs; 64c. Decisions, actions, reviews, changes and portability.
 65. **Desktop first run and new projects**
 
 ## Data and safety
